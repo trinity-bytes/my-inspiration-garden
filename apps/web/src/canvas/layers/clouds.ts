@@ -6,6 +6,7 @@ import {
   cloudForCell,
   visibleCellRange,
 } from "../cloud-field";
+import { clampSpriteCssSize } from "../max-sprite-size";
 import { CLOUD_FRAGMENT_GLSL, CLOUD_VERTEX_GLSL } from "../shaders/cloud";
 import type { Vec2 } from "../types";
 
@@ -50,6 +51,7 @@ export class CloudLayer {
   readonly group: THREE.Group;
   private readonly config: CloudLayerRuntimeConfig;
   private readonly textures: CloudSpriteTextures;
+  private readonly texturePx: readonly number[];
   private readonly pool: PoolEntry[] = [];
 
   constructor(textures: CloudSpriteTextures, config: CloudLayerRuntimeConfig) {
@@ -57,6 +59,13 @@ export class CloudLayer {
     this.config = config;
     this.group = new THREE.Group();
     this.group.position.z = config.zDepth;
+    // The smaller of width/height, conservatively: a sprite is drawn as a
+    // square quad, so the more limited axis sets how large it can go on
+    // screen before the GPU starts magnifying (upscaling) it.
+    this.texturePx = textures.map((texture) => {
+      const image = texture.image as { width: number; height: number } | undefined;
+      return image ? Math.min(image.width, image.height) : config.baseSpriteSizePx;
+    });
   }
 
   private ensurePoolSize(size: number): void {
@@ -84,8 +93,13 @@ export class CloudLayer {
     }
   }
 
-  /** `centerWorld` must already be in this layer's parallax-space (worldOffset * parallax). */
-  update(centerWorld: Vec2, viewportWidth: number, viewportHeight: number): void {
+  /**
+   * `centerWorld` must already be in this layer's parallax-space
+   * (`-worldOffset * parallax` — see `coords.ts`: this is the world point
+   * that screenToWorld maps the viewport center to). `dpr` clamps each
+   * sprite's on-screen size to its texture's own resolution.
+   */
+  update(centerWorld: Vec2, viewportWidth: number, viewportHeight: number, dpr: number): void {
     const { cellSize, marginCells, maxPoolSize, baseSpriteSizePx } = this.config;
     const range = visibleCellRange(
       {
@@ -115,9 +129,14 @@ export class CloudLayer {
 
         const worldX = (cellX + placement.offsetX) * cellSize;
         const worldY = (cellY + placement.offsetY) * cellSize;
-        const size = baseSpriteSizePx * placement.scale;
+        const requestedSize = baseSpriteSizePx * placement.scale;
+        const texturePx = this.texturePx[placement.spriteIndex - 1] ?? baseSpriteSizePx;
+        const size = clampSpriteCssSize(requestedSize, texturePx, dpr);
 
-        entry.mesh.position.set(worldX, worldY, 0);
+        // Y is negated: cell placement is in this engine's world convention
+        // (y-down, canvas/coords.ts), but three.js's scene space is y-up
+        // (matching the default orthographic camera's +Y-up, unrotated).
+        entry.mesh.position.set(worldX, -worldY, 0);
         entry.mesh.scale.set(placement.flipX ? -size : size, size, 1);
         entry.mesh.visible = true;
         entry.uniforms.u_map.value = this.textures[placement.spriteIndex - 1] ?? this.textures[0];

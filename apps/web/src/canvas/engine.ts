@@ -35,12 +35,13 @@ const CLOUD_NEAR_PARALLAX = 0.65;
 
 // Opacity ranges per parent visual QA (2026-09-23): the original 0.25-0.45 /
 // 0.55-0.85 barely read against the sky, worsened by the color-pipeline bug
-// above. Cell size and sprite size also nudged so ~2-4 clouds are reliably
-// visible in a 1440x900 view without clutter.
+// above. Sizes reduced again per owner feedback (2026-09-23, round 2): big
+// clouds read as blurry from magnification past the source texture's own
+// resolution — see max-sprite-size.ts, applied per-sprite in clouds.ts.
 const FAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
   layerId: 0,
-  cellSize: 850,
-  density: 0.3,
+  cellSize: 620,
+  density: 0.32,
   scaleMin: 0.7,
   scaleMax: 1.0,
   opacityMin: 0.45,
@@ -49,22 +50,22 @@ const FAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
   marginCells: 1,
   maxPoolSize: 40,
   zDepth: 5,
-  baseSpriteSizePx: 680,
+  baseSpriteSizePx: 380,
 };
 
 const NEAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
   layerId: 1,
-  cellSize: 650,
-  density: 0.24,
-  scaleMin: 1.0,
-  scaleMax: 1.6,
+  cellSize: 480,
+  density: 0.26,
+  scaleMin: 0.8,
+  scaleMax: 1.2,
   opacityMin: 0.8,
   opacityMax: 0.95,
   parallax: CLOUD_NEAR_PARALLAX,
   marginCells: 1,
   maxPoolSize: 40,
   zDepth: 4,
-  baseSpriteSizePx: 950,
+  baseSpriteSizePx: 520,
 };
 
 /**
@@ -106,6 +107,7 @@ export class CanvasEngine {
   private lastFrameTime: number | null = null;
   private elapsedTime = 0;
   private readonly distortionK = DEFAULT_BARREL_K;
+  private dpr = 1;
 
   private disposed = false;
   private readyFired = false;
@@ -314,6 +316,7 @@ export class CanvasEngine {
     const width = Math.max(1, Math.round(rawWidth));
     const height = Math.max(1, Math.round(rawHeight));
     const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    this.dpr = dpr;
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(width, height, false);
@@ -402,22 +405,31 @@ export class CanvasEngine {
     this.sky?.update(viewport, world, this.elapsedTime);
     this.haze?.update(viewport, world, this.elapsedTime);
 
+    // coords.ts: worldToScreen(world, offset, parallax) = world + offset*parallax.
+    // A cloud's own cell position is fixed ("world"); the group translation
+    // realizes "+offset*parallax" directly (x matches three.js's scene x;
+    // y is negated — scene space is y-up, this engine's world convention is
+    // y-down, see coords.ts and clouds.ts).
     if (this.cloudsFar) {
-      this.cloudsFar.group.position.x = -world.x * CLOUD_FAR_PARALLAX;
-      this.cloudsFar.group.position.y = -world.y * CLOUD_FAR_PARALLAX;
+      this.cloudsFar.group.position.x = world.x * CLOUD_FAR_PARALLAX;
+      this.cloudsFar.group.position.y = -(world.y * CLOUD_FAR_PARALLAX);
+      // visibleCellRange needs "which world point is at screen center", i.e.
+      // screenToWorld(0, offset, parallax) = -offset*parallax (coords.ts).
       this.cloudsFar.update(
-        { x: world.x * CLOUD_FAR_PARALLAX, y: world.y * CLOUD_FAR_PARALLAX },
+        { x: -world.x * CLOUD_FAR_PARALLAX, y: -world.y * CLOUD_FAR_PARALLAX },
         viewport.width,
         viewport.height,
+        this.dpr,
       );
     }
     if (this.cloudsNear) {
-      this.cloudsNear.group.position.x = -world.x * CLOUD_NEAR_PARALLAX;
-      this.cloudsNear.group.position.y = -world.y * CLOUD_NEAR_PARALLAX;
+      this.cloudsNear.group.position.x = world.x * CLOUD_NEAR_PARALLAX;
+      this.cloudsNear.group.position.y = -(world.y * CLOUD_NEAR_PARALLAX);
       this.cloudsNear.update(
-        { x: world.x * CLOUD_NEAR_PARALLAX, y: world.y * CLOUD_NEAR_PARALLAX },
+        { x: -world.x * CLOUD_NEAR_PARALLAX, y: -world.y * CLOUD_NEAR_PARALLAX },
         viewport.width,
         viewport.height,
+        this.dpr,
       );
     }
 
