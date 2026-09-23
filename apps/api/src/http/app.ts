@@ -2,9 +2,11 @@ import { Hono } from "hono";
 import { AppError, errorBody } from "../lib/errors";
 import { createActorMiddleware } from "./middleware/actor";
 import { createCorsMiddleware } from "./middleware/cors";
+import { registerAuthRoutes } from "./routes/auth";
 import { registerCategoryRoutes } from "./routes/categories";
 import { registerItemRoutes } from "./routes/items";
 import { registerMediaRoutes } from "./routes/media";
+import { registerSessionRoutes } from "./routes/session";
 import { registerTagRoutes } from "./routes/tags";
 import { registerTokenRoutes } from "./routes/tokens";
 import { registerUnfurlRoutes } from "./routes/unfurl";
@@ -19,6 +21,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
+  registerSessionRoutes(app);
+  registerAuthRoutes(app);
   registerItemRoutes(app);
   registerCategoryRoutes(app);
   registerTagRoutes(app);
