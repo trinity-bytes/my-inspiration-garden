@@ -17,13 +17,24 @@ export type ItemKind = z.infer<typeof itemKindSchema>;
  * instead of being stripped or rejected.
  */
 
+/**
+ * A palette entry is either a plain hex string (legacy/simple form) or an
+ * object carrying an explicit weight (from client-side `extractPalette`,
+ * `packages/shared/src/palette.ts`). Both forms are normalized by
+ * `normalizePalette` before the API indexes `item_colors`.
+ */
+export const paletteEntrySchema = z.union([
+  hexColorSchema,
+  z.looseObject({ hex: hexColorSchema, weight: z.number().min(0).max(1).optional() }),
+]);
+
 export const imageDataSchema = z.looseObject({
   r2Key: z.string().min(1),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   mime: z.string().min(1),
   alt: z.string().optional(),
-  palette: z.array(hexColorSchema).optional(),
+  palette: z.array(paletteEntrySchema).optional(),
   dominantColor: hexColorSchema.optional(),
 });
 
@@ -36,6 +47,7 @@ export const linkPlatformSchema = z.enum([
   "vimeo",
   "other",
 ]);
+export type LinkPlatform = z.infer<typeof linkPlatformSchema>;
 
 export const linkDataSchema = z.looseObject({
   siteName: z.string().optional(),

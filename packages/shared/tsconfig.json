@@ -1,7 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "dist",
+    // `URL` is a universal runtime global (browser, Workers, Node 18+); DOM
+    // is added here only for that ambient type, not because this package
+    // targets a browser DOM environment.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src", "test"]
 }
