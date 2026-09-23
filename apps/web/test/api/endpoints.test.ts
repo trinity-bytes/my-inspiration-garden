@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getCategoryTree, getItem, listItems } from "../../src/api/endpoints";
+import { getCategoryTree, getItem, getSession, listItems } from "../../src/api/endpoints";
 import { ApiError } from "../../src/api/errors";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -112,5 +112,36 @@ describe("getCategoryTree", () => {
     expect(result).toEqual({ categories: [category] });
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain("/api/categories");
+  });
+});
+
+describe("getSession", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("requests /api/session and validates the role", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ role: "owner" }));
+
+    const result = await getSession();
+
+    expect(result).toEqual({ role: "owner" });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("/api/session");
+  });
+
+  it("rejects with a typed ApiError on an unexpected role value", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ role: "admin" }));
+
+    await expect(getSession()).rejects.toBeInstanceOf(ApiError);
   });
 });

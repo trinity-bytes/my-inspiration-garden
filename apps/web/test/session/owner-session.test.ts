@@ -20,25 +20,39 @@ describe("detectOwnerSession", () => {
     vi.restoreAllMocks();
   });
 
-  it("resolves to owner when the includeDeleted probe succeeds (owner or write-scope only)", async () => {
+  it("resolves to owner when GET /api/session reports role: owner", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextCursor: null }));
+    fetchMock.mockResolvedValue(jsonResponse({ role: "owner" }));
 
     await expect(detectOwnerSession()).resolves.toBe("owner");
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain("includeDeleted=true");
+    expect(url).toContain("/api/session");
   });
 
-  it("resolves to visitor when the probe is forbidden (no owner session)", async () => {
+  it("resolves to visitor when GET /api/session reports role: visitor", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ role: "visitor" }));
+
+    await expect(detectOwnerSession()).resolves.toBe("visitor");
+  });
+
+  it("resolves to visitor (fail-closed) on an HTTP error", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue(jsonResponse({ error: { code: "forbidden", message: "no" } }, 403));
 
     await expect(detectOwnerSession()).resolves.toBe("visitor");
   });
 
-  it("resolves to visitor (fail-safe) on a network failure", async () => {
+  it("resolves to visitor (fail-closed) on a network failure", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockRejectedValue(new TypeError("offline"));
+
+    await expect(detectOwnerSession()).resolves.toBe("visitor");
+  });
+
+  it("resolves to visitor (fail-closed) on an unexpected response shape", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ role: "admin" }));
 
     await expect(detectOwnerSession()).resolves.toBe("visitor");
   });

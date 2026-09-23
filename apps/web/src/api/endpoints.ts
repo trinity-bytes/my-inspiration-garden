@@ -51,3 +51,15 @@ export type CategoryTreeResult = z.infer<typeof categoryTreeResultSchema>;
 export function getCategoryTree(): Promise<CategoryTreeResult> {
   return apiFetch("/api/categories", { schema: categoryTreeResultSchema });
 }
+
+const sessionResultSchema = z.object({ role: z.enum(["owner", "visitor"]) });
+export type SessionResult = z.infer<typeof sessionResultSchema>;
+
+/**
+ * `GET /api/session` — public; reports whether this browser holds the
+ * owner's Cloudflare Access session (positive proof, never the owner
+ * email or any credential data).
+ */
+export function getSession(): Promise<SessionResult> {
+  return apiFetch("/api/session", { schema: sessionResultSchema });
+}

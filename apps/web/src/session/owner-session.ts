@@ -1,25 +1,21 @@
-import { listItems } from "../api/endpoints";
+import { getSession } from "../api/endpoints";
 
 export type OwnerSessionStatus = "loading" | "owner" | "visitor";
 
 /**
  * Determines whether the current browser holds an authenticated owner
- * session, without a dedicated "who am I" endpoint (none exists yet — see
- * `docs/api.md`; T7 does not add one).
- *
- * Signal used: `GET /api/items?includeDeleted=true` is rejected with 403
- * for anyone who is not the owner or a write-scope token
- * (`canSeeDeleted` in `apps/api/src/http/routes/items.ts`), and succeeds
- * otherwise. The web app never sends a bearer token, so a 200 here can only
- * come from a Cloudflare Access owner session (`Cf-Access-Jwt-Assertion`,
- * forwarded via the browser's Access cookie on `credentials: "include"`).
- * Any failure — forbidden, network, or an unexpected response — resolves to
- * `"visitor"`: this never over-claims owner privileges.
+ * session via the dedicated `GET /api/session` endpoint (see
+ * `docs/api.md`): positive proof only, `role: "owner"` exactly when the API
+ * resolved the actor as the owner. Any failure — network, non-2xx status, or
+ * an unexpected response shape — resolves to `"visitor"`: this never
+ * over-claims owner privileges, and it only ever affects UI (showing the
+ * "Sign out" link, etc.) — the API independently enforces write
+ * authorization on every request regardless of what this returns.
  */
 export async function detectOwnerSession(): Promise<OwnerSessionStatus> {
   try {
-    await listItems({ limit: 1, includeDeleted: true });
-    return "owner";
+    const { role } = await getSession();
+    return role;
   } catch {
     return "visitor";
   }
