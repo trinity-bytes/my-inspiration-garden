@@ -3,7 +3,8 @@ import type { VerifyAccessJwt } from "./auth/access-jwt";
 
 export type Actor =
   | { type: "anonymous" }
-  | { type: "owner"; via: "access" | "dev-bypass" }
+  | { type: "owner"; via: "access"; credential: "header" | "cookie" }
+  | { type: "owner"; via: "dev-bypass" }
   | {
       type: "token";
       tokenId: string;
