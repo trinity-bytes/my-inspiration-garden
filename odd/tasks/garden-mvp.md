@@ -51,7 +51,7 @@ Inspiration found across the web (Dribbble, Pinterest, X, sites) is scattered. T
 
 | ID | Task | Route | Status |
 |----|------|-------|--------|
-| T1 | Monorepo scaffold: git init, pnpm workspaces (`apps/web`, `apps/api`, `packages/shared`), TS config, lint/format, Vitest, wrangler config | delegated (writer trigger: 2+ files) | [ ] |
+| T1 | Monorepo scaffold: git init, pnpm workspaces (`apps/web`, `apps/api`, `packages/shared`), TS config, lint/format, Vitest, wrangler config | delegated (writer trigger: 2+ files) | [x] `5ade9ca`, `f1820b7` |
 | T2 | Shared domain package: Zod schemas for 6 item kinds, categories, tags, tokens, API DTOs | delegated | [ ] |
 | T3 | D1 schema + Drizzle migrations: items, item_revisions, categories (tree), item_categories, tags, item_tags, api_tokens, FTS5 index + triggers | delegated | [ ] |
 | T4 | API read endpoints: list with filters (kind, tags, category incl. descendants, color, full-text), cursor pagination, item detail, category tree | delegated | [ ] |
@@ -76,3 +76,4 @@ Inspiration found across the web (Dribbble, Pinterest, X, sites) is scattered. T
 
 - 2026-09-23: Discovery complete; feature document created. Next: resolve TDD mode, then T1.
 - 2026-09-23: TDD mode on (user). Next: chain strategy choice, then T1.
+- 2026-09-23: T1 done on `feat/t1-scaffold` (`5ade9ca` scaffold, `f1820b7` API tests migrated to Vitest 4 + `@cloudflare/vitest-plugin` instead of a stale vitest 3 pin). Evidence: `mise exec -- pnpm test` 3/3 suites pass (RED observed first for each), `pnpm typecheck` clean, `pnpm lint` clean. ~350 authored lines (lockfile excluded). RDD off → no review. Next: T2.
