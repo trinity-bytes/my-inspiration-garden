@@ -11,6 +11,12 @@ export function scopeSatisfies(scope: TokenScope, required: TokenScope): boolean
 }
 
 /** Public projection of an API token: never includes the raw secret or its hash. */
+export const createApiTokenInputSchema = z.object({
+  name: z.string().trim().min(1),
+  scope: tokenScopeSchema,
+});
+export type CreateApiTokenInput = z.infer<typeof createApiTokenInputSchema>;
+
 export const apiTokenPublicSchema = z.object({
   id: idSchema,
   name: z.string().trim().min(1),
