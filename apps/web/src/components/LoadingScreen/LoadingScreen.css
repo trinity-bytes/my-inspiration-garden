@@ -1,11 +1,13 @@
 .loading-screen {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  /* Above the navbar: the loading screen owns the whole viewport until ready. */
+  z-index: 40;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: var(--space-7);
+  /* Lift the message into the clean sky, clear of the hills in the lower third. */
+  padding: var(--space-5) var(--space-5) 30vh;
 
   background-color: var(--garden-lavender-50);
   background-repeat: no-repeat;
