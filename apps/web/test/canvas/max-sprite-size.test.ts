@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { clampSpriteCssSize, maxSpriteCssSize } from "../../src/canvas/max-sprite-size";
+import {
+  clampSpriteCssSize,
+  maxSpriteCssSize,
+  spriteQuadCssSize,
+} from "../../src/canvas/max-sprite-size";
 
 describe("maxSpriteCssSize", () => {
   it("is texturePx / dpr at dpr=1 (device px == css px)", () => {
@@ -40,6 +44,29 @@ describe("clampSpriteCssSize", () => {
         const clamped = clampSpriteCssSize(requested, texturePx, dpr);
         expect(clamped * dpr).toBeLessThanOrEqual(texturePx + 1e-6);
       }
+    }
+  });
+});
+
+describe("spriteQuadCssSize", () => {
+  it("keeps the texture's aspect ratio (a wide cloud stays wide, never squashed into a square)", () => {
+    const { width, height } = spriteQuadCssSize(520, 1600, 879, 1);
+    expect(width).toBeCloseTo(520, 8);
+    expect(width / height).toBeCloseTo(1600 / 879, 8);
+  });
+
+  it("treats the requested size as the quad's width", () => {
+    const { width, height } = spriteQuadCssSize(400, 1464, 1216, 1);
+    expect(width).toBeCloseTo(400, 8);
+    expect(height).toBeCloseTo((400 * 1216) / 1464, 8);
+  });
+
+  it("clamps by the texture width so device px never exceed the texture on either axis", () => {
+    for (const dpr of [1, 1.5, 2]) {
+      const { width, height } = spriteQuadCssSize(5000, 1600, 879, dpr);
+      expect(width * dpr).toBeLessThanOrEqual(1600 + 1e-6);
+      expect(height * dpr).toBeLessThanOrEqual(879 + 1e-6);
+      expect(width / height).toBeCloseTo(1600 / 879, 8);
     }
   });
 });

@@ -17,3 +17,19 @@ export function clampSpriteCssSize(
 ): number {
   return Math.min(requestedCssSize, maxSpriteCssSize(texturePx, dpr));
 }
+
+/**
+ * On-screen quad size for a sprite that preserves its texture's aspect ratio
+ * (owner feedback, T8a: square quads squashed wide clouds). `requestedCssWidth`
+ * is the desired width; the width is clamped by the texture width, which also
+ * bounds the height since both axes scale together.
+ */
+export function spriteQuadCssSize(
+  requestedCssWidth: number,
+  textureWidthPx: number,
+  textureHeightPx: number,
+  dpr: number,
+): { width: number; height: number } {
+  const width = clampSpriteCssSize(requestedCssWidth, textureWidthPx, dpr);
+  return { width, height: (width * textureHeightPx) / textureWidthPx };
+}

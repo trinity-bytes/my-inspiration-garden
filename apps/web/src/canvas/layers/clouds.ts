@@ -6,7 +6,7 @@ import {
   cloudForCell,
   visibleCellRange,
 } from "../cloud-field";
-import { clampSpriteCssSize } from "../max-sprite-size";
+import { spriteQuadCssSize } from "../max-sprite-size";
 import { CLOUD_FRAGMENT_GLSL, CLOUD_VERTEX_GLSL } from "../shaders/cloud";
 import type { Vec2 } from "../types";
 
@@ -51,7 +51,7 @@ export class CloudLayer {
   readonly group: THREE.Group;
   private readonly config: CloudLayerRuntimeConfig;
   private readonly textures: CloudSpriteTextures;
-  private readonly texturePx: readonly number[];
+  private readonly textureSizes: readonly { width: number; height: number }[];
   private readonly pool: PoolEntry[] = [];
 
   constructor(textures: CloudSpriteTextures, config: CloudLayerRuntimeConfig) {
@@ -59,12 +59,13 @@ export class CloudLayer {
     this.config = config;
     this.group = new THREE.Group();
     this.group.position.z = config.zDepth;
-    // The smaller of width/height, conservatively: a sprite is drawn as a
-    // square quad, so the more limited axis sets how large it can go on
-    // screen before the GPU starts magnifying (upscaling) it.
-    this.texturePx = textures.map((texture) => {
+    // Each quad keeps its texture's aspect ratio, so both dimensions are
+    // needed; a missing image falls back to a square of the base size.
+    this.textureSizes = textures.map((texture) => {
       const image = texture.image as { width: number; height: number } | undefined;
-      return image ? Math.min(image.width, image.height) : config.baseSpriteSizePx;
+      return image
+        ? { width: image.width, height: image.height }
+        : { width: config.baseSpriteSizePx, height: config.baseSpriteSizePx };
     });
   }
 
@@ -129,15 +130,23 @@ export class CloudLayer {
 
         const worldX = (cellX + placement.offsetX) * cellSize;
         const worldY = (cellY + placement.offsetY) * cellSize;
-        const requestedSize = baseSpriteSizePx * placement.scale;
-        const texturePx = this.texturePx[placement.spriteIndex - 1] ?? baseSpriteSizePx;
-        const size = clampSpriteCssSize(requestedSize, texturePx, dpr);
+        const requestedWidth = baseSpriteSizePx * placement.scale;
+        const texture = this.textureSizes[placement.spriteIndex - 1] ?? {
+          width: baseSpriteSizePx,
+          height: baseSpriteSizePx,
+        };
+        const { width, height } = spriteQuadCssSize(
+          requestedWidth,
+          texture.width,
+          texture.height,
+          dpr,
+        );
 
         // Y is negated: cell placement is in this engine's world convention
         // (y-down, canvas/coords.ts), but three.js's scene space is y-up
         // (matching the default orthographic camera's +Y-up, unrotated).
         entry.mesh.position.set(worldX, -worldY, 0);
-        entry.mesh.scale.set(placement.flipX ? -size : size, size, 1);
+        entry.mesh.scale.set(placement.flipX ? -width : width, height, 1);
         entry.mesh.visible = true;
         entry.uniforms.u_map.value = this.textures[placement.spriteIndex - 1] ?? this.textures[0];
         entry.uniforms.u_opacity.value = placement.opacity;
