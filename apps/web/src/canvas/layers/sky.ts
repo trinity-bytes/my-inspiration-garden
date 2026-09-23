@@ -9,8 +9,12 @@ export interface SkyLayerOptions {
   parallax: number;
 }
 
-/** One tile covers roughly 2.5 viewports on the larger axis. */
-const TILE_VIEWPORTS = 2.5;
+/**
+ * One tile covers roughly 1.3 viewports on the larger axis — closer to the
+ * texture's native resolution (3548px) at a typical desktop width (1440px)
+ * than the original 2.5, which read as over-magnified/blurry.
+ */
+const TILE_VIEWPORTS = 1.3;
 
 /**
  * Full-screen tiled sky background with a subtle drifting lavender/apricot
