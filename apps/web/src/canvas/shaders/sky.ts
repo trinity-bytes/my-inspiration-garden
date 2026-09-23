@@ -19,10 +19,21 @@ varying vec2 vUv;
 ${NOISE_GLSL}
 
 void main() {
-  vec2 screenPx = (vUv - 0.5) * u_resolution;
-  vec2 worldPx = screenPx + u_worldOffset * u_parallax;
+  // Screen space in the engine's ONE coordinate convention (canvas/coords.ts):
+  // x right, y DOWN, CSS px, origin at viewport center. \`vUv\` (from a
+  // standard PlaneGeometry, unrotated) has y=1 at the TOP of the screen, so
+  // this flips it — using vUv.y directly here previously mixed a y-UP
+  // (clip-space) screenPx with the engine's y-DOWN worldOffset, inverting
+  // both navigation and, once mixed into the texture UV below, the image
+  // itself.
+  vec2 screenPx = vec2((vUv.x - 0.5) * u_resolution.x, (0.5 - vUv.y) * u_resolution.y);
+  // screenToWorld(screen, offset, parallax) = screen - offset*parallax (coords.ts).
+  vec2 worldPx = screenPx - u_worldOffset * u_parallax;
 
-  vec2 tileUv = worldPx / vec2(u_tileWidth, u_tileWidth * u_tileAspect);
+  // Texture v increases upward (three.js default flipY=true), but worldPx.y
+  // increases downward (this engine's convention) — negate y only for the
+  // texture lookup so the image's TOP renders at the screen's top.
+  vec2 tileUv = vec2(worldPx.x / u_tileWidth, -worldPx.y / (u_tileWidth * u_tileAspect));
   vec3 sky = texture2D(u_skyTex, tileUv).rgb;
 
   float n = fbm(worldPx * 0.00006 + vec2(u_time * 0.004, -u_time * 0.003));

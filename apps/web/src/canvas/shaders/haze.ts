@@ -15,8 +15,11 @@ varying vec2 vUv;
 ${NOISE_GLSL}
 
 void main() {
-  vec2 screenPx = (vUv - 0.5) * u_resolution;
-  vec2 worldPx = screenPx + u_worldOffset * u_parallax;
+  // Same y-down screen convention as sky.ts (canvas/coords.ts); see its
+  // comment. No texture is sampled here, so only the parallax-motion
+  // direction matters (no extra v-flip needed for procedural noise).
+  vec2 screenPx = vec2((vUv.x - 0.5) * u_resolution.x, (0.5 - vUv.y) * u_resolution.y);
+  vec2 worldPx = screenPx - u_worldOffset * u_parallax;
   vec2 p = worldPx * 0.0009 + vec2(u_time * 0.012, u_time * 0.007);
 
   float f = fbm(p);
