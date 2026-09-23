@@ -14,11 +14,14 @@ export type Actor =
 
 export interface AppBindings {
   DB: D1Database;
+  MEDIA: R2Bucket;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
   OWNER_EMAIL?: string;
   DEV_OWNER_BYPASS?: string;
   CORS_ORIGINS?: string;
+  MAX_IMAGE_BYTES?: string;
+  MAX_VIDEO_BYTES?: string;
 }
 
 export interface AppVariables {
@@ -30,4 +33,6 @@ export type AppEnv = { Bindings: AppBindings; Variables: AppVariables };
 /** Dependencies injectable for tests; production wiring supplies defaults. */
 export interface AppDeps {
   verifyAccessJwt?: VerifyAccessJwt;
+  /** Fetch implementation used for remote image import and link unfurl; tests inject fixtures. */
+  fetchImpl?: typeof fetch;
 }

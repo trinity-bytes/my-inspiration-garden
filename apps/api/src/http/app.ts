@@ -4,8 +4,10 @@ import { createActorMiddleware } from "./middleware/actor";
 import { createCorsMiddleware } from "./middleware/cors";
 import { registerCategoryRoutes } from "./routes/categories";
 import { registerItemRoutes } from "./routes/items";
+import { registerMediaRoutes } from "./routes/media";
 import { registerTagRoutes } from "./routes/tags";
 import { registerTokenRoutes } from "./routes/tokens";
+import { registerUnfurlRoutes } from "./routes/unfurl";
 import type { AppDeps, AppEnv } from "./types";
 
 /** Builds the Hono app. `deps` lets tests inject a fake `verifyAccessJwt` (no network JWKS calls). */
@@ -21,6 +23,8 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   registerCategoryRoutes(app);
   registerTagRoutes(app);
   registerTokenRoutes(app);
+  registerMediaRoutes(app, deps);
+  registerUnfurlRoutes(app, deps);
 
   app.onError((err, c) => {
     if (err instanceof AppError) {

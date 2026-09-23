@@ -27,7 +27,11 @@
     "OWNER_EMAIL": "owner@example.com",
     // Comma-separated allowlist for CORS; supports a trailing `*` wildcard
     // (e.g. "chrome-extension://*", "moz-extension://*").
-    "CORS_ORIGINS": "http://localhost:5173"
+    "CORS_ORIGINS": "http://localhost:5173",
+    // Max upload/import size in bytes per media kind (POST /api/media,
+    // /api/media/import). Defaults in code: 15 MB images, 50 MB video.
+    "MAX_IMAGE_BYTES": "15728640",
+    "MAX_VIDEO_BYTES": "52428800"
     // DEV_OWNER_BYPASS is intentionally NOT set here — it only belongs in
     // a local, gitignored `.dev.vars` file (see `.dev.vars.example`).
   }
