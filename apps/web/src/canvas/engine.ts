@@ -71,9 +71,9 @@ function cloudLayerConfig(
   };
 }
 
-const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 800, 0.18);
-const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 650, 0.16);
-const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 520, 0.14);
+const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 800, 0.24);
+const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 650, 0.2);
+const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 520, 0.17);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax

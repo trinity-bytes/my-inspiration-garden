@@ -31,12 +31,12 @@ describe("cloudDepthStyle", () => {
     expect(nearest.atmosphereMix).toBe(0);
   });
 
-  it("the farthest layer (depth=0) reads as hazy: opacity ~0.45-0.55, atmosphereMix ~0.5-0.6", () => {
+  it("the farthest layer (depth=0) reads as hazy but still perceptible: opacity ~0.6-0.7, atmosphereMix ~0.35-0.45", () => {
     const farthest = cloudDepthStyle(0);
-    expect(farthest.opacity).toBeGreaterThanOrEqual(0.45);
-    expect(farthest.opacity).toBeLessThanOrEqual(0.55);
-    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.5);
-    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.6);
+    expect(farthest.opacity).toBeGreaterThanOrEqual(0.6);
+    expect(farthest.opacity).toBeLessThanOrEqual(0.7);
+    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.35);
+    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.45);
   });
 
   it("keeps the parallax range consistent with the existing far/near values (~0.3 .. ~0.7)", () => {

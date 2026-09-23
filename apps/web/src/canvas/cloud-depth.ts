@@ -23,9 +23,9 @@ export interface CloudDepthStyle {
 
 const PARALLAX_FAR = 0.3;
 const PARALLAX_NEAR = 0.7;
-const OPACITY_FAR = 0.5;
+const OPACITY_FAR = 0.65;
 const OPACITY_NEAR = 1;
-const ATMOSPHERE_MIX_FAR = 0.55;
+const ATMOSPHERE_MIX_FAR = 0.4;
 const ATMOSPHERE_MIX_NEAR = 0;
 const SIZE_SCALE_FAR = 0.85;
 const SIZE_SCALE_NEAR = 1.2;
