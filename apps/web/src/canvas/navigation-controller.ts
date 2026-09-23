@@ -15,9 +15,9 @@ export interface NavigationControllerOptions {
   /** The focusable canvas host element; drag and keyboard panning are scoped to it. */
   container: HTMLElement;
   getViewportSize: () => { width: number; height: number };
-  /** World units / second reached at the viewport edge for cursor drift. Default 220. */
+  /** World units / second reached at the viewport edge for cursor drift. Default DEFAULT_MAX_SPEED. */
   maxSpeed?: number;
-  /** World units / second for keyboard panning. Default 260. */
+  /** World units / second for keyboard panning. Default DEFAULT_KEYBOARD_SPEED. */
   keyboardSpeed?: number;
   /** Inertia smoothing constant (higher = snappier). Default 6. */
   smoothingK?: number;
@@ -26,8 +26,10 @@ export interface NavigationControllerOptions {
   reducedMotion?: boolean;
 }
 
-const DEFAULT_MAX_SPEED = 220;
-const DEFAULT_KEYBOARD_SPEED = 260;
+// Exported so the constants are easy to find and re-tune later (owner
+// feedback 2026-09-23: the previous 220/260 felt slow).
+export const DEFAULT_MAX_SPEED = 380;
+export const DEFAULT_KEYBOARD_SPEED = 420;
 const DEFAULT_SMOOTHING_K = 6;
 const DEFAULT_DRAG_DECAY_HALF_LIFE = 0.35;
 const RELEASE_STOP_EPSILON = 0.05;
