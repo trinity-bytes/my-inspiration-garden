@@ -1,0 +1,38 @@
+import type { Vec2 } from "./types";
+
+/**
+ * Subtle spherical-feel barrel distortion applied as a full-screen
+ * post-process (see `post/barrel.ts`). `k` is small on purpose — content
+ * should barely bend.
+ */
+export const DEFAULT_BARREL_K = 0.06;
+
+/** Forward barrel distortion in normalized device-ish space (centered at 0). */
+export function barrelForward(p: Vec2, k: number): Vec2 {
+  const r2 = p.x * p.x + p.y * p.y;
+  const factor = 1 + k * r2;
+  return { x: p.x * factor, y: p.y * factor };
+}
+
+/**
+ * Inverse of `barrelForward`, solved by Newton iteration on the radius
+ * (the mapping is radially symmetric: `r_d = r_u * (1 + k * r_u^2)`).
+ * Used by T8b to map a pointer position through the distortion to world
+ * space for hit-testing.
+ */
+export function barrelInverse(p: Vec2, k: number, iterations = 8): Vec2 {
+  const rd = Math.hypot(p.x, p.y);
+  if (rd === 0 || k === 0) {
+    return { x: p.x, y: p.y };
+  }
+
+  let ru = rd;
+  for (let i = 0; i < iterations; i++) {
+    const f = ru * (1 + k * ru * ru) - rd;
+    const fPrime = 1 + 3 * k * ru * ru;
+    ru -= f / fPrime;
+  }
+
+  const scale = ru / rd;
+  return { x: p.x * scale, y: p.y * scale };
+}
