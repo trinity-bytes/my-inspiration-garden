@@ -46,7 +46,7 @@ describe("NavigationController", () => {
     controller.dispose();
   });
 
-  it("drifts toward the pointer direction outside the dead zone", () => {
+  it("invariant (ii) — pointer right of center: you travel right, so the world offset moves opposite (content recedes toward where you look)", () => {
     const controller = new NavigationController({
       container,
       getViewportSize: () => ({ width: 1000, height: 1000 }),
@@ -62,8 +62,33 @@ describe("NavigationController", () => {
     }
 
     const offset = controller.getWorldOffset();
-    expect(offset.x).toBeGreaterThan(0);
+    // worldOffset feeds coords.ts's worldToScreen(world, offset, parallax) =
+    // world + offset*parallax; a negative offset.x here means a world-fixed
+    // point's screen x decreases — content moves left — for "pointer right".
+    expect(offset.x).toBeLessThan(0);
     expect(Math.abs(offset.y)).toBeLessThan(1);
+
+    controller.dispose();
+  });
+
+  it("invariant (ii) — pointer below center: you travel down, so the world offset moves opposite (content moves up on screen)", () => {
+    const controller = new NavigationController({
+      container,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+      maxSpeed: 300,
+      smoothingK: 10,
+    });
+    controller.mount();
+
+    dispatchPointerMove(window, 500, 700); // below center
+
+    for (let i = 0; i < 60; i++) {
+      controller.update(1 / 60);
+    }
+
+    const offset = controller.getWorldOffset();
+    expect(offset.y).toBeLessThan(0);
+    expect(Math.abs(offset.x)).toBeLessThan(1);
 
     controller.dispose();
   });
@@ -235,7 +260,7 @@ describe("NavigationController", () => {
     controller.dispose();
   });
 
-  it("pans with arrow keys while the container is focused", () => {
+  it("invariant (iii) — ArrowRight travels right, so the world offset moves opposite, matching drift's sign", () => {
     const controller = new NavigationController({
       container,
       getViewportSize: () => ({ width: 1000, height: 1000 }),
@@ -249,9 +274,41 @@ describe("NavigationController", () => {
       controller.update(1 / 60);
     }
 
-    expect(controller.getWorldOffset().x).toBeGreaterThan(0);
+    expect(controller.getWorldOffset().x).toBeLessThan(0);
 
     controller.dispose();
+  });
+
+  it("invariant (iii) — ArrowDown/S travels down (world offset decreases, content moves up); ArrowUp/W travels up (offset increases, content moves down)", () => {
+    const down = new NavigationController({
+      container,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+      keyboardSpeed: 120,
+    });
+    down.mount();
+    container.focus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    for (let i = 0; i < 30; i++) {
+      down.update(1 / 60);
+    }
+    expect(down.getWorldOffset().y).toBeLessThan(0);
+    down.dispose();
+
+    const upContainer = makeContainer();
+    const up = new NavigationController({
+      container: upContainer,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+      keyboardSpeed: 120,
+    });
+    up.mount();
+    upContainer.focus();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "w", bubbles: true }));
+    for (let i = 0; i < 30; i++) {
+      up.update(1 / 60);
+    }
+    expect(up.getWorldOffset().y).toBeGreaterThan(0);
+    up.dispose();
+    upContainer.remove();
   });
 
   it("ignores keyboard input when the container is not focused", () => {

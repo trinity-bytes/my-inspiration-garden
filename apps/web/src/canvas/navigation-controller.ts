@@ -168,9 +168,19 @@ export class NavigationController {
 
     const target = this.computeIdleTargetVelocity();
     this.velocity = approachVec2(this.velocity, target, dt, this.smoothingK);
+    // Idle-state velocity (drift + keyboard) points toward where you're
+    // looking/traveling (computeDriftVelocity/keyboardVelocity, unchanged).
+    // The world offset integrates the OPPOSITE way: coords.ts's
+    // worldToScreen(world, offset, parallax) = world + offset*parallax, and
+    // "you travel toward the pointer" must make the ambient world recede
+    // from you (content scrolls opposite your travel direction — the
+    // standard camera-dolly effect; see the T8a "Y axis inverted"
+    // correction). Drag (below, "dragging"/"releasing" states) is the
+    // opposite interaction — grab-and-move content 1:1 — and is
+    // deliberately NOT negated here.
     this.worldOffset = {
-      x: this.worldOffset.x + this.velocity.x * dt,
-      y: this.worldOffset.y + this.velocity.y * dt,
+      x: this.worldOffset.x - this.velocity.x * dt,
+      y: this.worldOffset.y - this.velocity.y * dt,
     };
   }
 
