@@ -1,8 +1,55 @@
-# API: ingestion endpoints (T6)
+# API: endpoints
 
 Base URL: the deployed Worker origin. Auth: owner (Access session) or a
 `write`-scope bearer token, unless noted otherwise. See `apps/api/src/http/routes`
 for the full implementation.
+
+## Auth (T7b)
+
+Same-origin topology: the web app and the API share one hostname, and the
+Worker serves both `/api/*` and `/auth/*`. Cloudflare Access protects
+**only** `GET /auth/login` (configured in the Cloudflare dashboard, not in
+code — see "Deploy notes" below); `/api/*` is otherwise public so anonymous
+visitors can browse and filter.
+
+- **Owner session**: the browser visits `/auth/login`; Access authenticates
+  it and sets the `CF_Authorization` session cookie, then the handler
+  redirects to `/`. From then on every same-origin request automatically
+  carries that cookie. The API's actor middleware resolves the owner from
+  `Cf-Access-Jwt-Assertion` when that header is present (non-browser /
+  server-to-server callers), otherwise from the `CF_Authorization` cookie —
+  same verification either way (signature, `alg`, `exp`, `iss`, `aud`, then
+  `email === OWNER_EMAIL`).
+- **Bearer tokens**: `read` | `read+write` scoped tokens for the extension,
+  PWA and agents, via `Authorization: Bearer <token>`. Individually
+  revocable (`/api/tokens`, owner only).
+- **`GET /api/session`** — public. `{ "role": "owner" | "visitor" }`, positive
+  proof only (owner exactly when the actor resolved to the owner; a valid
+  bearer token still reports `"visitor"` here — this endpoint answers "is
+  this browser the owner", not "is this request authorized to write").
+  Never returns the email or any credential data. `Cache-Control: no-store`;
+  `Vary: Cookie, Cf-Access-Jwt-Assertion`.
+- **`GET /auth/login`** — Access-protected at deploy. Once Access has
+  authenticated the owner, redirects `302` to `/`. Accepts no redirect
+  target from the request (no `next` param), so there is nothing for an
+  open-redirect attack to target.
+- **Logout**: `/cdn-cgi/access/logout` (Cloudflare's built-in Access logout
+  route — clears the session cookie).
+- **CSRF**: unsafe methods (`POST`/`PUT`/`PATCH`/`DELETE`) on `/api/*`
+  require, whenever the write could succeed on an ambient credential (the
+  owner via Access, header or cookie, or any request carrying a
+  `CF_Authorization` cookie while the local dev bypass is off) — **both**:
+  - `Origin` exactly matching an entry in `CORS_ORIGINS`;
+  - `X-Garden-Client` present (any value; being a non-CORS-safelisted
+    header, it forces a preflight a cross-site request can't satisfy).
+  A bearer-token write is exempt (never ambient — the caller must know and
+  attach the token explicitly). Failure: `403 forbidden`, standard error
+  envelope. Safe methods (`GET`/`HEAD`/`OPTIONS`) are untouched.
+- **CORS**: same-origin needs no credentialed CORS, so
+  `Access-Control-Allow-Credentials` is never sent. `CORS_ORIGINS` (a
+  comma-separated allowlist, trailing `*` wildcard supported) is only for
+  cross-origin, non-cookie clients (extension, PWA, local dev on a
+  different port).
 
 ## Media
 
@@ -47,3 +94,28 @@ for the full implementation.
   (`ItemsRepository`), fully replacing the previous set on every update
   (including a revision restore). `GET /api/items?color=#RRGGBB` matches
   against these rows.
+
+## Deploy notes (T13)
+
+Cloudflare setup this feature's auth model depends on (do at deploy time,
+not automated here):
+
+- **Routes**: the Worker (`garden-api`) and the Pages/Worker-served web app
+  share one hostname; route `/api/*` and `/auth/*` to the Worker, everything
+  else to the web app.
+- **Access application**: create one Cloudflare Access application scoped
+  to **only** `/auth/login` on that hostname (not `/api/*`, not the rest of
+  the site) — this is what makes the owner login flow work while keeping
+  the gallery public.
+  - Set the Access app's session cookie **`SameSite=Lax`** (Access defaults
+    to `SameSite=None`, which needs `Secure` and behaves differently across
+    browsers for a same-origin app — `Lax` is simpler and correct here
+    since the cookie is only ever read same-origin).
+  - Leave the cookie's **`Path`** attribute disabled/default so it's sent
+    on every `/api/*` request, not just `/auth/login`.
+- **`ACCESS_AUD`**: set to that Access application's AUD tag (`wrangler.jsonc`
+  `vars.ACCESS_AUD`, or a deployment secret).
+- **`OWNER_EMAIL`**: the exact email Access will report for the owner.
+- **Logout**: no separate route needed — Cloudflare serves
+  `/cdn-cgi/access/logout` automatically for any hostname with an Access
+  application; the web app's "Sign out" link just points there.
