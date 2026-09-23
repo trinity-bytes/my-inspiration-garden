@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { cloudDepthStyle, cloudOpacityRange } from "./cloud-depth";
 import { DEFAULT_BARREL_K } from "./distortion";
 import type { CloudLayerRuntimeConfig } from "./layers/clouds";
 import { CloudLayer } from "./layers/clouds";
@@ -30,43 +31,49 @@ const DPR_CAP = 2;
 // world offset. Smaller = more distant/slower.
 const SKY_PARALLAX = 0.05;
 const HAZE_PARALLAX = 0.12;
-const CLOUD_FAR_PARALLAX = 0.35;
-const CLOUD_NEAR_PARALLAX = 0.65;
 
-// Opacity ranges per parent visual QA (2026-09-23): the original 0.25-0.45 /
-// 0.55-0.85 barely read against the sky, worsened by the color-pipeline bug
-// above. Sizes reduced again per owner feedback (2026-09-23, round 2): big
-// clouds read as blurry from magnification past the source texture's own
-// resolution — see max-sprite-size.ts, applied per-sprite in clouds.ts.
-const FAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
-  layerId: 0,
-  cellSize: 620,
-  density: 0.32,
-  scaleMin: 0.7,
-  scaleMax: 1.0,
-  opacityMin: 0.45,
-  opacityMax: 0.6,
-  parallax: CLOUD_FAR_PARALLAX,
-  marginCells: 1,
-  maxPoolSize: 40,
-  zDepth: 5,
-  baseSpriteSizePx: 380,
-};
+// Aerial perspective (owner feedback, T8a): three cloud depths (far/mid/
+// near) built from cloudDepthStyle so speed, opacity, atmospheric tint,
+// size and draw order all come from the SAME depth value — a nearer,
+// faster layer is always more solid, less tinted, larger, and drawn over
+// a farther, slower, hazier one. cellSize/density/scaleMin/scaleMax/
+// baseSpriteSizePx stay hand-tuned per layer (not depth-derived) to keep
+// ~3-5 clouds visible at 1440x900 without clutter.
+const CLOUD_DEPTH_FAR = 0;
+const CLOUD_DEPTH_MID = 0.5;
+const CLOUD_DEPTH_NEAR = 1;
+const CLOUD_BASE_SPRITE_SIZE_PX = 480;
 
-const NEAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
-  layerId: 1,
-  cellSize: 480,
-  density: 0.26,
-  scaleMin: 0.8,
-  scaleMax: 1.2,
-  opacityMin: 0.8,
-  opacityMax: 0.95,
-  parallax: CLOUD_NEAR_PARALLAX,
-  marginCells: 1,
-  maxPoolSize: 40,
-  zDepth: 4,
-  baseSpriteSizePx: 520,
-};
+function cloudLayerConfig(
+  layerId: number,
+  depth: number,
+  cellSize: number,
+  density: number,
+): CloudLayerRuntimeConfig {
+  const style = cloudDepthStyle(depth);
+  const opacityRange = cloudOpacityRange(depth);
+  return {
+    layerId,
+    cellSize,
+    density,
+    scaleMin: 0.85,
+    scaleMax: 1.15,
+    opacityMin: opacityRange.min,
+    opacityMax: opacityRange.max,
+    parallax: style.parallax,
+    marginCells: 1,
+    maxPoolSize: 40,
+    zDepth: 7 - depth * 2,
+    baseSpriteSizePx: CLOUD_BASE_SPRITE_SIZE_PX,
+    sizeScale: style.sizeScale,
+    atmosphereMix: style.atmosphereMix,
+    renderOrder: style.renderOrder,
+  };
+}
+
+const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 800, 0.18);
+const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 650, 0.16);
+const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 520, 0.14);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax
@@ -97,6 +104,7 @@ export class CanvasEngine {
   private sky: SkyLayer | null = null;
   private haze: HazeLayer | null = null;
   private cloudsFar: CloudLayer | null = null;
+  private cloudsMid: CloudLayer | null = null;
   private cloudsNear: CloudLayer | null = null;
   private boundTextures: THREE.Texture[] = [];
 
@@ -205,11 +213,13 @@ export class CanvasEngine {
     this.sky?.dispose();
     this.haze?.dispose();
     this.cloudsFar?.dispose();
+    this.cloudsMid?.dispose();
     this.cloudsNear?.dispose();
     this.barrelPass?.dispose();
     this.sky = null;
     this.haze = null;
     this.cloudsFar = null;
+    this.cloudsMid = null;
     this.cloudsNear = null;
     this.barrelPass = null;
 
@@ -286,9 +296,19 @@ export class CanvasEngine {
       this.sky = new SkyLayer({ texture: skyTexture, parallax: SKY_PARALLAX });
       this.haze = new HazeLayer({ parallax: HAZE_PARALLAX });
       this.cloudsFar = new CloudLayer([cloud1, cloud2, cloud3, cloud4], FAR_CLOUD_CONFIG);
+      this.cloudsMid = new CloudLayer([cloud1, cloud2, cloud3, cloud4], MID_CLOUD_CONFIG);
       this.cloudsNear = new CloudLayer([cloud1, cloud2, cloud3, cloud4], NEAR_CLOUD_CONFIG);
 
-      this.scene.add(this.sky.mesh, this.haze.mesh, this.cloudsFar.group, this.cloudsNear.group);
+      // Draw order far -> mid -> near also matches insertion order here;
+      // renderOrder (set per layer from cloud-depth.ts) is what actually
+      // guarantees it regardless of insertion or z position.
+      this.scene.add(
+        this.sky.mesh,
+        this.haze.mesh,
+        this.cloudsFar.group,
+        this.cloudsMid.group,
+        this.cloudsNear.group,
+      );
 
       this.texturesLoaded = true;
     } catch (error) {
@@ -367,6 +387,34 @@ export class CanvasEngine {
     this.options.onReady?.();
   }
 
+  /**
+   * coords.ts: worldToScreen(world, offset, parallax) = world + offset*parallax.
+   * A cloud's own cell position is fixed ("world"); the group translation
+   * realizes "+offset*parallax" directly (x matches three.js's scene x; y
+   * is negated — scene space is y-up, this engine's world convention is
+   * y-down, see coords.ts and clouds.ts). visibleCellRange (inside
+   * `update`) needs "which world point is at screen center", i.e.
+   * screenToWorld(0, offset, parallax) = -offset*parallax.
+   */
+  private updateCloudLayer(
+    layer: CloudLayer | null,
+    parallax: number,
+    world: Vec2,
+    viewport: { width: number; height: number },
+  ): void {
+    if (!layer) {
+      return;
+    }
+    layer.group.position.x = world.x * parallax;
+    layer.group.position.y = -(world.y * parallax);
+    layer.update(
+      { x: -world.x * parallax, y: -world.y * parallax },
+      viewport.width,
+      viewport.height,
+      this.dpr,
+    );
+  }
+
   private readonly tick = (now: number): void => {
     if (this.disposed) {
       return;
@@ -405,33 +453,9 @@ export class CanvasEngine {
     this.sky?.update(viewport, world, this.elapsedTime);
     this.haze?.update(viewport, world, this.elapsedTime);
 
-    // coords.ts: worldToScreen(world, offset, parallax) = world + offset*parallax.
-    // A cloud's own cell position is fixed ("world"); the group translation
-    // realizes "+offset*parallax" directly (x matches three.js's scene x;
-    // y is negated — scene space is y-up, this engine's world convention is
-    // y-down, see coords.ts and clouds.ts).
-    if (this.cloudsFar) {
-      this.cloudsFar.group.position.x = world.x * CLOUD_FAR_PARALLAX;
-      this.cloudsFar.group.position.y = -(world.y * CLOUD_FAR_PARALLAX);
-      // visibleCellRange needs "which world point is at screen center", i.e.
-      // screenToWorld(0, offset, parallax) = -offset*parallax (coords.ts).
-      this.cloudsFar.update(
-        { x: -world.x * CLOUD_FAR_PARALLAX, y: -world.y * CLOUD_FAR_PARALLAX },
-        viewport.width,
-        viewport.height,
-        this.dpr,
-      );
-    }
-    if (this.cloudsNear) {
-      this.cloudsNear.group.position.x = world.x * CLOUD_NEAR_PARALLAX;
-      this.cloudsNear.group.position.y = -(world.y * CLOUD_NEAR_PARALLAX);
-      this.cloudsNear.update(
-        { x: -world.x * CLOUD_NEAR_PARALLAX, y: -world.y * CLOUD_NEAR_PARALLAX },
-        viewport.width,
-        viewport.height,
-        this.dpr,
-      );
-    }
+    this.updateCloudLayer(this.cloudsFar, FAR_CLOUD_CONFIG.parallax, world, viewport);
+    this.updateCloudLayer(this.cloudsMid, MID_CLOUD_CONFIG.parallax, world, viewport);
+    this.updateCloudLayer(this.cloudsNear, NEAR_CLOUD_CONFIG.parallax, world, viewport);
 
     this.renderer.setRenderTarget(this.renderTarget);
     this.renderer.render(this.scene, this.worldCamera);

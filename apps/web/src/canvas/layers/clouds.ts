@@ -11,7 +11,7 @@ import { CLOUD_FRAGMENT_GLSL, CLOUD_VERTEX_GLSL } from "../shaders/cloud";
 import type { Vec2 } from "../types";
 
 export interface CloudLayerRuntimeConfig extends CloudLayerConfig {
-  /** Parallax factor relative to the world offset (near = larger/faster). */
+  /** Parallax factor relative to the world offset (near = larger/faster). From cloud-depth.ts. */
   parallax: number;
   /** Extra cells rendered beyond the viewport so sprites don't pop in. */
   marginCells: number;
@@ -19,11 +19,18 @@ export interface CloudLayerRuntimeConfig extends CloudLayerConfig {
   /** World-space z depth (used only for consistent render/sort order). */
   zDepth: number;
   baseSpriteSizePx: number;
+  /** Multiplier applied to every sprite's requested size. From cloud-depth.ts. */
+  sizeScale: number;
+  /** How much sprite color mixes toward the atmosphere color, in [0, 1]. From cloud-depth.ts. */
+  atmosphereMix: number;
+  /** three.js renderOrder: strictly increasing with depth so nearer layers always draw on top. From cloud-depth.ts. */
+  renderOrder: number;
 }
 
 interface CloudUniforms {
   u_map: { value: THREE.Texture };
   u_opacity: { value: number };
+  u_atmosphereMix: { value: number };
   [key: string]: THREE.IUniform;
 }
 
@@ -59,6 +66,11 @@ export class CloudLayer {
     this.config = config;
     this.group = new THREE.Group();
     this.group.position.z = config.zDepth;
+    // Explicit draw order (depthTest is off): three.js sorts transparent
+    // objects by renderOrder ascending, so a strictly-increasing-with-depth
+    // value here guarantees a nearer layer always draws over a farther one,
+    // independent of z position or camera distance.
+    this.group.renderOrder = config.renderOrder;
     // Each quad keeps its texture's aspect ratio, so both dimensions are
     // needed; a missing image falls back to a square of the base size.
     this.textureSizes = textures.map((texture) => {
@@ -74,6 +86,7 @@ export class CloudLayer {
       const uniforms: CloudUniforms = {
         u_map: { value: this.textures[0] },
         u_opacity: { value: 1 },
+        u_atmosphereMix: { value: this.config.atmosphereMix },
       };
       const material = new THREE.ShaderMaterial({
         vertexShader: CLOUD_VERTEX_GLSL,
@@ -89,6 +102,7 @@ export class CloudLayer {
       });
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
       mesh.visible = false;
+      mesh.renderOrder = this.config.renderOrder;
       this.group.add(mesh);
       this.pool.push({ mesh, material, uniforms });
     }
@@ -101,7 +115,7 @@ export class CloudLayer {
    * sprite's on-screen size to its texture's own resolution.
    */
   update(centerWorld: Vec2, viewportWidth: number, viewportHeight: number, dpr: number): void {
-    const { cellSize, marginCells, maxPoolSize, baseSpriteSizePx } = this.config;
+    const { cellSize, marginCells, maxPoolSize, baseSpriteSizePx, sizeScale } = this.config;
     const range = visibleCellRange(
       {
         centerX: centerWorld.x,
@@ -130,7 +144,7 @@ export class CloudLayer {
 
         const worldX = (cellX + placement.offsetX) * cellSize;
         const worldY = (cellY + placement.offsetY) * cellSize;
-        const requestedWidth = baseSpriteSizePx * placement.scale;
+        const requestedWidth = baseSpriteSizePx * sizeScale * placement.scale;
         const texture = this.textureSizes[placement.spriteIndex - 1] ?? {
           width: baseSpriteSizePx,
           height: baseSpriteSizePx,
