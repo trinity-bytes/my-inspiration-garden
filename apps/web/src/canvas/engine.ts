@@ -33,34 +33,38 @@ const HAZE_PARALLAX = 0.12;
 const CLOUD_FAR_PARALLAX = 0.35;
 const CLOUD_NEAR_PARALLAX = 0.65;
 
+// Opacity ranges per parent visual QA (2026-09-23): the original 0.25-0.45 /
+// 0.55-0.85 barely read against the sky, worsened by the color-pipeline bug
+// above. Cell size and sprite size also nudged so ~2-4 clouds are reliably
+// visible in a 1440x900 view without clutter.
 const FAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
   layerId: 0,
-  cellSize: 900,
-  density: 0.28,
+  cellSize: 850,
+  density: 0.3,
   scaleMin: 0.7,
   scaleMax: 1.0,
-  opacityMin: 0.25,
-  opacityMax: 0.45,
+  opacityMin: 0.45,
+  opacityMax: 0.6,
   parallax: CLOUD_FAR_PARALLAX,
   marginCells: 1,
   maxPoolSize: 40,
   zDepth: 5,
-  baseSpriteSizePx: 640,
+  baseSpriteSizePx: 680,
 };
 
 const NEAR_CLOUD_CONFIG: CloudLayerRuntimeConfig = {
   layerId: 1,
-  cellSize: 700,
-  density: 0.22,
+  cellSize: 650,
+  density: 0.24,
   scaleMin: 1.0,
   scaleMax: 1.6,
-  opacityMin: 0.55,
-  opacityMax: 0.85,
+  opacityMin: 0.8,
+  opacityMax: 0.95,
   parallax: CLOUD_NEAR_PARALLAX,
   marginCells: 1,
   maxPoolSize: 40,
   zDepth: 4,
-  baseSpriteSizePx: 900,
+  baseSpriteSizePx: 950,
 };
 
 /**
