@@ -71,9 +71,19 @@ function cloudLayerConfig(
   };
 }
 
-const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 800, 0.24);
-const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 650, 0.2);
-const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 520, 0.17);
+// Exported so cloud-visibility.test.ts can verify actual on-screen
+// placement against the exact constants the engine renders with (no
+// risk of the test's copy silently drifting from production).
+//
+// cellSize bug (T8a): 800/650/520 were each comparable to or larger than
+// the 900px viewport height, so a cell's own footprint almost always
+// straddled a screen edge — no cell was ever geometrically guaranteed to
+// land on screen, and the density-selected cells' random offsets landed
+// off-screen far more often than on. Densities are unchanged; cellSize
+// reduced so most cells are meaningfully smaller than the viewport.
+export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 550, 0.24);
+export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 450, 0.2);
+export const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 450, 0.17);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax
