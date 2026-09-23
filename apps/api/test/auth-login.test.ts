@@ -26,7 +26,11 @@ describe("GET /auth/login", () => {
   });
 
   it("ignores a next param that tries a protocol-relative redirect", async () => {
-    const res = await app.request("/auth/login?next=//evil.example.com", { redirect: "manual" }, env);
+    const res = await app.request(
+      "/auth/login?next=//evil.example.com",
+      { redirect: "manual" },
+      env,
+    );
     expect(res.headers.get("Location")).toBe("/");
   });
 });

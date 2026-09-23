@@ -7,7 +7,7 @@ import type { AppEnv } from "../types";
  * every other entry must match exactly. `CORS_ORIGINS` is a comma-separated
  * list of such entries.
  */
-function originAllowed(origin: string, allowlist: string[]): boolean {
+export function originAllowed(origin: string, allowlist: string[]): boolean {
   return allowlist.some((entry) => {
     if (entry.endsWith("*")) return origin.startsWith(entry.slice(0, -1));
     return entry === origin;
@@ -16,8 +16,13 @@ function originAllowed(origin: string, allowlist: string[]): boolean {
 
 /**
  * Reflects the request `Origin` back (with the usual CORS headers) when it
- * matches `CORS_ORIGINS`. Credentials are not needed: auth is bearer-token
- * or Access-JWT header based, never cookies.
+ * matches `CORS_ORIGINS`. Same-origin topology: the web app and the API
+ * share one hostname, so the owner's Access session cookie is same-origin
+ * and never needs credentialed CORS — `Access-Control-Allow-Credentials` is
+ * intentionally never sent. Cross-origin clients (extension, PWA, agents)
+ * authenticate with a bearer token instead of a cookie, so they don't need
+ * it either. `X-Garden-Client` stays an allowed request header for both;
+ * the CSRF guard (`./csrf.ts`) reuses `CORS_ORIGINS` as its own allowlist.
  */
 export function createCorsMiddleware() {
   return createMiddleware<AppEnv>(async (c, next) => {

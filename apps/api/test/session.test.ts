@@ -1,8 +1,8 @@
 import { applyD1Migrations, env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/http/app";
-import { hashHex, insertApiToken } from "./helpers";
 import { signAccessJwt, TEST_AUD, testVerifyAccessJwt } from "./access-jwt-fixture";
+import { hashHex, insertApiToken } from "./helpers";
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);

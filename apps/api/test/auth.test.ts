@@ -74,7 +74,13 @@ describe("write auth matrix (POST /api/items)", () => {
 
   it("201s a valid owner Access JWT", async () => {
     const jwt = await signAccessJwt({ email: OWNER_EMAIL });
-    const res = await postItem({ "Cf-Access-Jwt-Assertion": jwt });
+    const res = await postItem({
+      "Cf-Access-Jwt-Assertion": jwt,
+      // Access-authenticated writes go through the CSRF guard too (see
+      // test/csrf.test.ts for the dedicated coverage); satisfy it here.
+      Origin: "http://localhost:5173",
+      "X-Garden-Client": "web",
+    });
     expect(res.status).toBe(201);
     const body = await res.json<{ source: string }>();
     expect(body.source).toBe("web");

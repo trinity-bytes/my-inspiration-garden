@@ -21,7 +21,13 @@ function testEnv() {
 
 async function ownerHeaders() {
   const jwt = await signAccessJwt({ email: OWNER_EMAIL });
-  return { "Cf-Access-Jwt-Assertion": jwt };
+  return {
+    "Cf-Access-Jwt-Assertion": jwt,
+    // Owner writes go through the CSRF guard (see test/csrf.test.ts); these
+    // headers are harmless on the GET calls that reuse this helper too.
+    Origin: "http://localhost:5173",
+    "X-Garden-Client": "web",
+  };
 }
 
 describe("POST /api/tokens", () => {

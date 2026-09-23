@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { AppError, errorBody } from "../lib/errors";
 import { createActorMiddleware } from "./middleware/actor";
 import { createCorsMiddleware } from "./middleware/cors";
+import { createCsrfMiddleware } from "./middleware/csrf";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerCategoryRoutes } from "./routes/categories";
 import { registerItemRoutes } from "./routes/items";
@@ -18,6 +19,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   app.use("*", createCorsMiddleware());
   app.use("*", createActorMiddleware(deps));
+  app.use("/api/*", createCsrfMiddleware());
 
   app.get("/api/health", (c) => c.json({ ok: true }));
 
