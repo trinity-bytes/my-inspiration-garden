@@ -14,7 +14,7 @@ export function App() {
   return (
     <div className="app" data-owner-session={ownerSession.status}>
       <CanvasHost />
-      <Navbar />
+      <Navbar isOwner={ownerSession.status === "owner"} />
       <LoadingScreen ready={CANVAS_READY} message="Growing the garden…" />
     </div>
   );

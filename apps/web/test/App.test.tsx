@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 
@@ -39,5 +39,23 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByTestId("loading-screen")).toBeInTheDocument();
+  });
+
+  it("does not show a sign-out link for a visitor session", async () => {
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("link", { name: "Sign out" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("shows a sign-out link once the owner session resolves", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ role: "owner" }), { status: 200 }));
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByRole("link", { name: "Sign out" })).toBeInTheDocument());
   });
 });

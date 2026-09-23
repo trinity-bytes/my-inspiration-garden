@@ -32,4 +32,15 @@ describe("Navbar", () => {
     fireEvent.click(filtersButton);
     expect(filtersButton).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("does not show a sign-out link by default (not the owner)", () => {
+    render(<Navbar />);
+    expect(screen.queryByRole("link", { name: "Sign out" })).not.toBeInTheDocument();
+  });
+
+  it("shows a sign-out link to the Access logout route when the owner", () => {
+    render(<Navbar isOwner />);
+    const signOut = screen.getByRole("link", { name: "Sign out" });
+    expect(signOut).toHaveAttribute("href", "/cdn-cgi/access/logout");
+  });
 });
