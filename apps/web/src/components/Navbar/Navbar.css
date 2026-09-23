@@ -1,0 +1,96 @@
+.navbar {
+  position: fixed;
+  top: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: 30;
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+
+  /* Frosted glass: translucent surface + blur/saturate the content behind
+     it. Falls back to a near-solid surface when backdrop-filter is
+     unsupported, so the navbar stays legible either way. */
+  background: var(--glass-surface-fallback);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .navbar {
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+}
+
+.navbar__brand {
+  flex: 0 0 auto;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heading-strong);
+  white-space: nowrap;
+}
+
+.navbar__search {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.navbar__search-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.navbar__search-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.navbar__search-hint {
+  position: absolute;
+  right: var(--space-3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.navbar__filters-button {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  font-weight: var(--font-weight-label);
+  letter-spacing: var(--tracking-label);
+}
+
+.navbar__filters-button[aria-expanded="true"] {
+  background: var(--color-accent-strong);
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    flex-wrap: wrap;
+    top: var(--space-2);
+    left: var(--space-2);
+    right: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .navbar__search {
+    order: 3;
+    flex-basis: 100%;
+  }
+}

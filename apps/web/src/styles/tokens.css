@@ -1,0 +1,91 @@
+/**
+ * Design tokens — light theme only.
+ * Palette derived from the owner's sunset photo (lavender/purple, apricot
+ * accent, no pink) — see `odd/tasks/garden-mvp.md` "Visual theme".
+ */
+:root {
+  /* Palette (raw scale — prefer the semantic tokens below in components) */
+  --garden-lavender-50: #f6f3fa;
+  --garden-lavender-100: #e9e3f3;
+  --garden-lavender-200: #d5cbe8;
+  --garden-lavender-300: #b3a3d1;
+  --garden-lavender-400: #8f7bb5;
+  --garden-lavender-500: #5e4c82;
+  --garden-ink: #2a2140;
+  --garden-accent: #f29a6b;
+  --garden-accent-strong: #e0784e;
+  --garden-accent-soft: #fce3d3;
+  --garden-white: #ffffff;
+
+  /* Semantic: surfaces */
+  --color-surface: var(--garden-lavender-50);
+  --color-surface-raised: var(--garden-white);
+  --color-border: var(--garden-lavender-200);
+
+  /* Semantic: text */
+  --color-text: var(--garden-ink);
+  --color-text-muted: var(--garden-lavender-500);
+  --color-text-on-accent: var(--garden-ink); /* white on accent fails AA; ink passes */
+
+  /* Semantic: accent */
+  --color-accent: var(--garden-accent);
+  --color-accent-strong: var(--garden-accent-strong);
+  --color-accent-soft: var(--garden-accent-soft);
+
+  /* Semantic: focus */
+  --color-focus-ring: var(--garden-accent-strong);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Frosted glass */
+  --glass-surface: rgb(246 243 250 / 65%);
+  --glass-surface-fallback: rgb(246 243 250 / 96%);
+  --glass-border: rgb(255 255 255 / 45%);
+  --glass-blur: 18px;
+  --glass-saturate: 180%;
+  --glass-shadow: 0 8px 32px rgb(42 33 64 / 16%);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  /* Typography */
+  --font-family-base: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-weight-body: 400;
+  --font-weight-label: 500;
+  --font-weight-heading: 600;
+  --font-weight-heading-strong: 700;
+  --tracking-label: 0.02em;
+
+  /* Motion */
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 250ms;
+  --motion-duration-slow: 500ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0.01ms;
+    --motion-duration-base: 0.01ms;
+    --motion-duration-slow: 0.01ms;
+  }
+}

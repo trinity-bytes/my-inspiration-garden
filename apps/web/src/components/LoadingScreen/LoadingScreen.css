@@ -1,0 +1,51 @@
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--space-7);
+
+  background-color: var(--garden-lavender-50);
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: cover;
+  background-image: image-set(
+    url("/images/landscape-1280.avif") type("image/avif"),
+    url("/images/landscape-1280.webp") type("image/webp")
+  );
+
+  opacity: 1;
+  transition: opacity var(--motion-duration-slow) var(--motion-easing-standard);
+}
+
+@media (min-width: 1024px) {
+  .loading-screen {
+    background-image: image-set(
+      url("/images/landscape-2560.avif") type("image/avif"),
+      url("/images/landscape-2560.webp") type("image/webp")
+    );
+  }
+}
+
+.loading-screen--ready {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-screen__message {
+  background: var(--glass-surface-fallback);
+  color: var(--color-text);
+  font-weight: var(--font-weight-label);
+  letter-spacing: var(--tracking-label);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  box-shadow: var(--glass-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-screen {
+    transition-duration: 0.01ms;
+  }
+}
