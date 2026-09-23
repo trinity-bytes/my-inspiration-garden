@@ -136,6 +136,15 @@ export class CanvasEngine {
 
     this.canvas = canvas;
     this.renderer = renderer;
+    // SRGBColorSpace is the only valid renderer.outputColorSpace (NoColorSpace
+    // throws inside three.js's internal drawing-buffer lookup — confirmed via
+    // a headless-chromium repro, see the T8a QA-correction commit). It is
+    // also a harmless default: a canvas's drawing buffer is sRGB either way,
+    // and this setting only matters to three.js's built-in materials'
+    // `<colorspace_fragment>` chunk, which our custom ShaderMaterials never
+    // include. The actual color-pipeline fix is on the INPUT side: every
+    // texture below stays NoColorSpace (raw sRGB-encoded bytes, no hardware
+    // decode-on-sample) so texture2D() reads match the source image bytes.
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setClearColor(0x000000, 1);
     canvas.style.width = "100%";
@@ -263,9 +272,9 @@ export class CanvasEngine {
         return;
       }
 
-      for (const texture of [cloud1, cloud2, cloud3, cloud4]) {
-        texture.colorSpace = THREE.SRGBColorSpace;
-      }
+      // NoColorSpace (default) throughout — see the renderer.outputColorSpace
+      // comment in mount(). The cloud sprite shader also composites in raw
+      // sRGB-encoded byte space, so no per-texture conversion here either.
       this.boundTextures = [skyTexture, cloud1, cloud2, cloud3, cloud4];
 
       this.sky = new SkyLayer({ texture: skyTexture, parallax: SKY_PARALLAX });
@@ -314,9 +323,12 @@ export class CanvasEngine {
     const rtWidth = Math.max(1, Math.round(width * dpr));
     const rtHeight = Math.max(1, Math.round(height * dpr));
     if (!this.renderTarget) {
-      this.renderTarget = new THREE.WebGLRenderTarget(rtWidth, rtHeight, {
-        colorSpace: THREE.SRGBColorSpace,
-      });
+      // No colorSpace option (defaults to NoColorSpace): the barrel pass
+      // samples this render target with a raw texture2D(), so an
+      // SRGBColorSpace render target here would ask the GPU to sRGB-encode
+      // on write and decode on read — an extra, unwanted transform on top
+      // of the NoColorSpace pipeline described in mount().
+      this.renderTarget = new THREE.WebGLRenderTarget(rtWidth, rtHeight);
       if (this.postScene) {
         this.barrelPass = new BarrelPass(this.renderTarget.texture, this.distortionK);
         this.postScene.add(this.barrelPass.mesh);

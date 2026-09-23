@@ -39,7 +39,17 @@ export class SkyLayer {
 
     options.texture.wrapS = THREE.RepeatWrapping;
     options.texture.wrapT = THREE.RepeatWrapping;
-    options.texture.colorSpace = THREE.SRGBColorSpace;
+    // NoColorSpace (not SRGBColorSpace): this custom ShaderMaterial samples
+    // the texture with a raw texture2D() and writes gl_FragColor directly,
+    // with no `<colorspace_fragment>` re-encode step (that chunk only runs
+    // for three.js's built-in materials). Marking the texture SRGBColorSpace
+    // made the GPU hardware-decode it to linear on sample while nothing
+    // re-encoded on the way out, which measured ~16% too dark against the
+    // source image. Keeping it NoColorSpace end-to-end (see engine.ts'
+    // renderer.outputColorSpace) means every stage works directly in the
+    // texture's already-sRGB-encoded byte values — correct for this flat
+    // 2D compositing, no physically-based lighting involved.
+    options.texture.colorSpace = THREE.NoColorSpace;
 
     this.uniforms = {
       u_skyTex: { value: options.texture },
