@@ -1,0 +1,5 @@
+# Copy to .dev.vars (gitignored) for local `wrangler dev`.
+# Local-only owner escape hatch: when "true", every request is treated as
+# the owner, bypassing Cloudflare Access and bearer tokens entirely.
+# NEVER set this in wrangler.jsonc `vars` or any deployed environment.
+DEV_OWNER_BYPASS=true

@@ -1,0 +1,33 @@
+import type { TokenScope } from "@garden/shared";
+import type { VerifyAccessJwt } from "./auth/access-jwt";
+
+export type Actor =
+  | { type: "anonymous" }
+  | { type: "owner"; via: "access" | "dev-bypass" }
+  | {
+      type: "token";
+      tokenId: string;
+      name: string;
+      scope: TokenScope;
+      client?: "extension" | "pwa";
+    };
+
+export interface AppBindings {
+  DB: D1Database;
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
+  OWNER_EMAIL?: string;
+  DEV_OWNER_BYPASS?: string;
+  CORS_ORIGINS?: string;
+}
+
+export interface AppVariables {
+  actor: Actor;
+}
+
+export type AppEnv = { Bindings: AppBindings; Variables: AppVariables };
+
+/** Dependencies injectable for tests; production wiring supplies defaults. */
+export interface AppDeps {
+  verifyAccessJwt?: VerifyAccessJwt;
+}

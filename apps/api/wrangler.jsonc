@@ -17,5 +17,18 @@
       "binding": "MEDIA",
       "bucket_name": "inspiration-garden-media"
     }
-  ]
+  ],
+  "vars": {
+    // Cloudflare Access team domain, e.g. "your-team.cloudflareaccess.com".
+    "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
+    // Access application AUD tag for this app.
+    "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
+    // Only this Access-authenticated email is treated as the owner.
+    "OWNER_EMAIL": "owner@example.com",
+    // Comma-separated allowlist for CORS; supports a trailing `*` wildcard
+    // (e.g. "chrome-extension://*", "moz-extension://*").
+    "CORS_ORIGINS": "http://localhost:5173"
+    // DEV_OWNER_BYPASS is intentionally NOT set here — it only belongs in
+    // a local, gitignored `.dev.vars` file (see `.dev.vars.example`).
+  }
 }
