@@ -60,23 +60,30 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
 }
 
 /**
- * Typed fetch wrapper for the Garden API's read/write endpoints. Always
- * sends `credentials: "include"` so a Cloudflare Access owner session cookie
- * reaches the API on a cross-origin deployment. Validates the response body
- * against `schema`; any failure (network, non-2xx status, unexpected shape)
- * is surfaced as a typed {@link ApiError}, never as a raw `fetch`/parsing
- * exception.
+ * Typed fetch wrapper for the Garden API's read/write endpoints. The web app
+ * and the API share one hostname (same-origin topology, see `docs/api.md`),
+ * so `credentials: "same-origin"` is enough for the owner's Access session
+ * cookie to reach the API — no cross-origin credentialed CORS needed. Every
+ * request also carries `X-Garden-Client: web`, which both identifies the web
+ * client to the API (`source` tracking, `docs/api.md`) and — being a
+ * non-CORS-safelisted header — is required input to the API's CSRF guard on
+ * writes. Validates the response body against `schema`; any failure
+ * (network, non-2xx status, unexpected shape) is surfaced as a typed
+ * {@link ApiError}, never as a raw `fetch`/parsing exception.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions<T>): Promise<T> {
   const url = buildRequestUrl(resolveApiBaseUrl(), path, options.searchParams);
   const hasBody = options.body !== undefined;
 
+  const headers = new Headers({ "X-Garden-Client": "web" });
+  if (hasBody) headers.set("Content-Type", "application/json");
+
   let response: Response;
   try {
     response = await fetch(url, {
       method: options.method ?? "GET",
-      credentials: "include",
-      headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+      credentials: "same-origin",
+      headers,
       body: hasBody ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     });

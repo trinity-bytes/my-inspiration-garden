@@ -54,7 +54,7 @@ describe("apiFetch", () => {
     vi.restoreAllMocks();
   });
 
-  it("sends credentials and parses a validated response", async () => {
+  it("sends same-origin credentials, the X-Garden-Client header, and parses a validated response", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), {
@@ -69,7 +69,26 @@ describe("apiFetch", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/probe");
-    expect(init.credentials).toBe("include");
+    expect(init.credentials).toBe("same-origin");
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Garden-Client")).toBe("web");
+  });
+
+  it("sends the X-Garden-Client header even on a bodyless GET request", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await apiFetch("/api/probe", { schema: echoSchema });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Garden-Client")).toBe("web");
+    expect(headers.get("Content-Type")).toBeNull();
   });
 
   it("maps a non-ok response to a typed http ApiError carrying the server code", async () => {
