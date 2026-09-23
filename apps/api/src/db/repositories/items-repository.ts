@@ -3,8 +3,10 @@ import type {
   Item,
   ItemKind,
   ItemListQuery,
+  PaletteColor,
   UpdateItemInput,
 } from "@garden/shared";
+import { normalizePalette } from "@garden/shared";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { isColorMatch } from "../../lib/color";
 import { decodeCursor, encodeCursor } from "../../lib/cursor";
@@ -114,6 +116,43 @@ async function upsertTagsByName(db: Db, names: string[]): Promise<{ id: string; 
     await db.insert(tags).values(created);
   }
   return [...existing, ...created];
+}
+
+/**
+ * Derives the `item_colors` rows for an item from its kind-specific `data`:
+ * `image` items index `data.palette` (client-extracted via
+ * `packages/shared/src/palette.ts`); `palette` items index `data.colors`
+ * directly so color filtering also finds standalone palette items. Every
+ * other kind has no colors.
+ */
+function deriveItemColors(kind: string, data: unknown): PaletteColor[] {
+  if (kind === "image") {
+    const palette = (data as { palette?: unknown }).palette;
+    if (Array.isArray(palette) && palette.length > 0) {
+      return normalizePalette(palette as (string | { hex: string; weight?: number })[]);
+    }
+    return [];
+  }
+  if (kind === "palette") {
+    const colors = (data as { colors?: { hex: string }[] }).colors;
+    if (Array.isArray(colors) && colors.length > 0) {
+      return colors.map((c) => ({ hex: c.hex, weight: 1 / colors.length }));
+    }
+  }
+  return [];
+}
+
+function replaceItemColorsStatements(db: Db, itemId: string, colors: PaletteColor[]) {
+  return [
+    db.delete(itemColors).where(eq(itemColors.itemId, itemId)),
+    ...(colors.length > 0
+      ? [
+          db
+            .insert(itemColors)
+            .values(colors.map((c) => ({ itemId, hex: c.hex, weight: c.weight }))),
+        ]
+      : []),
+  ];
 }
 
 async function assertCategoriesExist(db: Db, categoryIds: string[]): Promise<void> {
@@ -266,6 +305,7 @@ export class ItemsRepository {
     };
 
     const item = rowToItem(row, input.categoryIds, input.tags);
+    const colors = deriveItemColors(input.kind, input.data);
 
     await this.db.batch([
       this.db.insert(items).values(row),
@@ -278,6 +318,13 @@ export class ItemsRepository {
         : []),
       ...(tagRows.length > 0
         ? [this.db.insert(itemTags).values(tagRows.map((t) => ({ itemId: id, tagId: t.id })))]
+        : []),
+      ...(colors.length > 0
+        ? [
+            this.db
+              .insert(itemColors)
+              .values(colors.map((c) => ({ itemId: id, hex: c.hex, weight: c.weight }))),
+          ]
         : []),
       this.db.insert(itemRevisions).values({
         id: crypto.randomUUID(),
@@ -337,9 +384,11 @@ export class ItemsRepository {
       updatedAt: row.updatedAt,
     };
     if (tagsProvided) setValues.searchText = row.searchText;
+    const colors = deriveItemColors(existing.kind, row.data);
 
     await this.db.batch([
       this.db.update(items).set(setValues).where(eq(items.id, id)),
+      ...replaceItemColorsStatements(this.db, id, colors),
       ...(categoryIdsProvided
         ? [
             this.db.delete(itemCategories).where(eq(itemCategories.itemId, id)),
@@ -481,6 +530,7 @@ export class ItemsRepository {
           deletedAt: null,
         })
         .where(eq(items.id, id)),
+      ...replaceItemColorsStatements(this.db, id, deriveItemColors(restored.kind, restored.data)),
       this.db.delete(itemCategories).where(eq(itemCategories.itemId, id)),
       ...(validCategoryIds.length > 0
         ? [
