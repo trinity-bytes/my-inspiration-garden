@@ -1,5 +1,6 @@
 import { applyD1Migrations, env, SELF } from "cloudflare:test";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createApp } from "../src/http/app";
 import { hashHex, insertApiToken } from "./helpers";
 
 beforeAll(async () => {
@@ -94,6 +95,148 @@ describe("POST /api/media", () => {
     } finally {
       envVars.MAX_IMAGE_BYTES = previous;
     }
+  });
+});
+
+describe("POST /api/media/import", () => {
+  function redirectResponse(location: string, status = 302): Response {
+    return new Response(null, { status, headers: { location } });
+  }
+
+  it("fetches, validates, and stores a safe remote image", async () => {
+    const auth = await writeToken("media-import-ok", "ig_media_import_ok");
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(PNG_BYTES, { status: 200, headers: { "content-type": "image/png" } }),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://cdn.example.com/hero.png" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json<{ r2Key: string; mime: string }>();
+    expect(body.mime).toBe("image/png");
+    expect(await env.MEDIA.get(body.r2Key)).not.toBeNull();
+  });
+
+  it("rejects a directly unsafe url before ever fetching", async () => {
+    const auth = await writeToken("media-import-unsafe", "ig_media_import_unsafe");
+    const fetchImpl = vi.fn();
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "http://169.254.169.254/latest/meta-data" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("requests with redirect: manual (never delegates redirect-following to the platform)", async () => {
+    const auth = await writeToken("media-import-manual-mode", "ig_media_import_manual_mode");
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(PNG_BYTES, { status: 200, headers: { "content-type": "image/png" } }),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/start" }),
+      },
+      env,
+    );
+    // `redirect: "follow"` would let the platform silently auto-follow a
+    // redirect to a private/loopback/link-local address, bypassing
+    // isSafeFetchUrl entirely, since the caller never sees the intermediate
+    // 3xx or its Location. Requesting "manual" is what makes each hop
+    // observable and revalidatable.
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ redirect: "manual" }),
+    );
+  });
+
+  it("rejects a remote image fetch that 302-redirects to a private/loopback address (SSRF via redirect)", async () => {
+    const auth = await writeToken("media-import-redirect-ssrf", "ig_media_import_redirect_ssrf");
+    const fetchImpl = vi.fn(async () =>
+      redirectResponse("http://169.254.169.254/latest/meta-data"),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/redirect" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(422);
+    // the unsafe hop is validated before it is ever fetched a second time
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a redirect chain longer than the configured cap, walking every hop manually", async () => {
+    const auth = await writeToken("media-import-too-many-redirects", "ig_media_import_redirects");
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      return redirectResponse(`https://public.example.com/hop-${calls}`);
+    });
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/start" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(422);
+    // proves the redirect chain was actually walked hop by hop (maxRedirects(5) + 1 initial
+    // request) rather than bailing out after a single non-2xx response
+    expect(calls).toBe(6);
+  });
+
+  it("follows a safe redirect chain to the final image", async () => {
+    const auth = await writeToken("media-import-safe-redirect", "ig_media_import_safe_redirect");
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) return redirectResponse("https://cdn.example.com/final.png");
+      return new Response(PNG_BYTES, { status: 200, headers: { "content-type": "image/png" } });
+    });
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/media/import",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/start" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(201);
   });
 });
 

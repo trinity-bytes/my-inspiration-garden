@@ -4,6 +4,7 @@ import { AppError } from "../../lib/errors";
 import { IMAGE_MIME_TYPES, sniffMime, VIDEO_MIME_TYPES } from "../../lib/magic-bytes";
 import { maxBytesForMime } from "../../lib/media-limits";
 import { buildMediaKey } from "../../lib/r2-key";
+import { fetchSafe } from "../../lib/safe-fetch";
 import { requireAuth } from "../middleware/require";
 import type { AppDeps, AppEnv } from "../types";
 
@@ -73,15 +74,12 @@ export function registerMediaRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void
       throw AppError.badRequest("invalid_url", "url must be a safe, well-formed http(s) URL");
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
-    let response: Response;
-    try {
-      response = await fetchImpl(url, { signal: controller.signal, redirect: "follow" });
-    } catch {
-      throw AppError.unprocessable("fetch_failed", "could not fetch the remote image");
-    } finally {
-      clearTimeout(timeout);
+    const response = await fetchSafe(fetchImpl, url);
+    if (!response) {
+      throw AppError.unprocessable(
+        "fetch_failed",
+        "could not fetch the remote image (unreachable, timed out, or redirected to an unsafe address)",
+      );
     }
     if (!response.ok) {
       throw AppError.unprocessable("fetch_failed", `remote server responded ${response.status}`);

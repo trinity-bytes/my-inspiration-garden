@@ -8,10 +8,10 @@ import {
 } from "@garden/shared";
 import type { Hono } from "hono";
 import { AppError } from "../../lib/errors";
+import { fetchSafe } from "../../lib/safe-fetch";
 import { requireAuth } from "../middleware/require";
 import type { AppDeps, AppEnv } from "../types";
 
-const FETCH_TIMEOUT_MS = 10_000;
 const MAX_HTML_BYTES = 512 * 1024;
 
 function oembedUrlFor(platform: LinkPlatform, pageUrl: string): string | null {
@@ -34,17 +34,15 @@ function oembedUrlFor(platform: LinkPlatform, pageUrl: string): string | null {
   }
 }
 
+/**
+ * Fetches `url` through `fetchSafe` (manual-mode redirect walking with
+ * per-hop `isSafeFetchUrl` revalidation — see `lib/safe-fetch.ts` — so a
+ * safe-looking URL can't 302 its way to a private/loopback/link-local
+ * address) and normalizes any failure/non-2xx result to `null`.
+ */
 async function fetchWithTimeout(fetchImpl: typeof fetch, url: string): Promise<Response | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetchImpl(url, { signal: controller.signal });
-    return res.ok ? res : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const res = await fetchSafe(fetchImpl, url);
+  return res?.ok ? res : null;
 }
 
 async function fetchOembed(

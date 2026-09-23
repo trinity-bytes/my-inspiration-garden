@@ -162,6 +162,87 @@ describe("POST /api/unfurl", () => {
     expect(body.title).toBeUndefined();
   });
 
+  it("requests with redirect: manual for the HTML/OG fetch (never delegates redirect-following)", async () => {
+    const auth = await writeToken("unfurl-manual-mode", "ig_unfurl_manual_mode");
+    const fetchImpl = vi.fn(
+      async () => new Response("<html></html>", { headers: { "content-type": "text/html" } }),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    await app.request(
+      "https://example.com/api/unfurl",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://plain.example.com" }),
+      },
+      env,
+    );
+    // `redirect: "follow"` (the fetch default) would let the platform
+    // silently auto-follow a redirect to a private/loopback/link-local
+    // address, bypassing isSafeFetchUrl entirely, since the caller never
+    // sees the intermediate 3xx or its Location.
+    expect(fetchImpl).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ redirect: "manual" }),
+    );
+  });
+
+  it("rejects an HTML/OG fetch that 302-redirects to a private/loopback address (SSRF via redirect)", async () => {
+    const auth = await writeToken("unfurl-redirect-ssrf", "ig_unfurl_redirect_ssrf");
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "http://169.254.169.254/latest/meta-data" },
+        }),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/unfurl",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/redirect" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200); // unfurl never throws; returns partial metadata
+    const body = await res.json<{ title?: string; previewImage?: string }>();
+    expect(body.title).toBeUndefined();
+    expect(body.previewImage).toBeUndefined();
+    // the unsafe hop is validated before it is ever fetched a second time
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives up an HTML/OG redirect chain longer than the configured cap, walking every hop manually", async () => {
+    const auth = await writeToken("unfurl-too-many-redirects", "ig_unfurl_redirects");
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls += 1;
+      return new Response(null, {
+        status: 302,
+        headers: { location: `https://public.example.com/hop-${calls}` },
+      });
+    });
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/unfurl",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://public.example.com/start" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    // proves the redirect chain was actually walked hop by hop (maxRedirects(5) + 1
+    // initial request) rather than bailing out after a single non-2xx response
+    expect(calls).toBe(6);
+  });
+
   it("400s on a missing/invalid body", async () => {
     const auth = await writeToken("unfurl-badbody", "ig_unfurl_badbody");
     const res = await SELF.fetch("https://example.com/api/unfurl", {
