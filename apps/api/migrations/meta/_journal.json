@@ -15,6 +15,13 @@
       "when": 1790145716177,
       "tag": "0001_fuzzy_captain_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790146014010,
+      "tag": "0002_items_fts5",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 migrations apply inspiration-garden --local"
+    "db:migrate:local": "wrangler d1 migrations apply inspiration-garden --local",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@garden/shared": "workspace:*",

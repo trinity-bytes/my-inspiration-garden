@@ -1,3 +1,4 @@
+-- Custom SQL migration file, put your code below! --
 -- Hand-written migration: drizzle-kit cannot model SQLite virtual tables, so
 -- the FTS5 index and its sync triggers are written directly.
 --
