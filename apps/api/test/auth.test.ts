@@ -80,11 +80,14 @@ describe("write auth matrix (POST /api/items)", () => {
     expect(body.source).toBe("web");
   });
 
-  it("401s an Access JWT for the wrong aud", async () => {
-    // signAccessJwt always signs for TEST_AUD; simulate "wrong aud" by asserting
-    // against an env whose ACCESS_AUD differs from what the token carries via a
-    // structurally invalid token instead (wrong signature/claims -> verify throws).
+  it("401s a malformed Access JWT", async () => {
     const res = await postItem({ "Cf-Access-Jwt-Assertion": "not-a-real-jwt" });
+    expect(res.status).toBe(401);
+  });
+
+  it("401s an Access JWT signed for the wrong aud", async () => {
+    const jwt = await signAccessJwt({ email: OWNER_EMAIL }, { audience: "wrong-aud" });
+    const res = await postItem({ "Cf-Access-Jwt-Assertion": jwt });
     expect(res.status).toBe(401);
   });
 
@@ -98,6 +101,14 @@ describe("write auth matrix (POST /api/items)", () => {
     const res = await postItem({}, { DEV_OWNER_BYPASS: "true" });
     expect(res.status).toBe(201);
   });
+
+  it.each(["1", "false", "TRUE", "yes", " true", "true "])(
+    'does NOT bypass for DEV_OWNER_BYPASS=%j (only exact "true" qualifies)',
+    async (value) => {
+      const res = await postItem({}, { DEV_OWNER_BYPASS: value });
+      expect(res.status).toBe(401);
+    },
+  );
 });
 
 describe("token client header source rule", () => {
