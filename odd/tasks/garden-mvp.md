@@ -37,12 +37,12 @@ Inspiration found across the web (Dribbble, Pinterest, X, sites) is scattered. T
 ## TDD
 
 - Mode: **on** — source: explicit user choice (2026-09-23). RED → GREEN → REFACTOR per behavior; UI/canvas apply TDD to extractable logic (drift math, virtualization, filters), not to pure styling.
-- Runner: Vitest (`@cloudflare/vitest-pool-workers` for the API); exact commands fixed in T1.
+- Runner: Vitest 4 (`@cloudflare/vitest-plugin` for the API). Commands: `mise exec -- pnpm test`, `mise exec -- pnpm typecheck`, `mise exec -- pnpm lint`.
 
 ## Delivery
 
 - Forecast: ~4,000+ authored changed lines → exceeds the ~400-line budget. Strategy: `ask-on-risk`; chain strategy: **stacked-to-main** (user, 2026-09-23). Each ~400-line slice lands on `main` when verified. Commits local; push/PRs are the user's decision.
-- Repository not yet initialized; `git init` + feature branch at T1.
+- Branches stack: `feat/t1-scaffold` → `feat/t2-t3-domain-db` → … each slice branched from the previous one; merges to `main` are the user's call.
 - Toolchain: Node 26 + pnpm 10 pinned via `mise.toml` (brew unavailable on this machine).
 - RDD: off (default) → ordinary checks, no review ceremony.
 - Gate: **T7 requires the user's art direction** (references, palette, typography, glass intensity) before any UI styling.
