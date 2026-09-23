@@ -47,9 +47,11 @@ visitors can browse and filter.
   envelope. Safe methods (`GET`/`HEAD`/`OPTIONS`) are untouched.
 - **CORS**: same-origin needs no credentialed CORS, so
   `Access-Control-Allow-Credentials` is never sent. `CORS_ORIGINS` (a
-  comma-separated allowlist, trailing `*` wildcard supported) is only for
-  cross-origin, non-cookie clients (extension, PWA, local dev on a
-  different port).
+  comma-separated allowlist, trailing `*` wildcard supported) serves two
+  purposes: CORS for cross-origin, non-cookie clients (extension, PWA, local
+  dev on a different port) **and** the CSRF guard's `Origin` check. Browsers
+  send `Origin` on same-origin `POST`/`PUT`/`PATCH`/`DELETE` too, so the
+  site's own origin must be listed or every owner write returns `403`.
 
 ## Media
 
@@ -116,6 +118,10 @@ not automated here):
 - **`ACCESS_AUD`**: set to that Access application's AUD tag (`wrangler.jsonc`
   `vars.ACCESS_AUD`, or a deployment secret).
 - **`OWNER_EMAIL`**: the exact email Access will report for the owner.
+- **`CORS_ORIGINS`**: must include the production site's own origin
+  (e.g. `https://garden.example.com`, exact, no trailing slash) — the CSRF
+  guard checks owner writes against it — plus any extension/PWA origins.
+  Never add a broad wildcard to "fix" a `403 csrf check failed`.
 - **Logout**: no separate route needed — Cloudflare serves
   `/cdn-cgi/access/logout` automatically for any hostname with an Access
   application; the web app's "Sign out" link just points there.
