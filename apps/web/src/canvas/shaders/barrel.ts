@@ -34,8 +34,11 @@ void main() {
 
   vec2 sampleUv = worldNdc * 0.5 + 0.5;
 
+  // \`length(ndc)\` is 1.0 at the midpoint of every edge and sqrt(2) at the
+  // corners; fading only starts well past the edges so the falloff stays
+  // limited to the far corners instead of dimming most of the screen.
   float edge = length(ndc);
-  float edgeFade = 1.0 - smoothstep(0.92, 1.15, edge);
+  float edgeFade = 1.0 - smoothstep(1.2, 1.8, edge);
 
   vec4 color = texture2D(u_scene, clamp(sampleUv, 0.0, 1.0));
   gl_FragColor = vec4(color.rgb * edgeFade, 1.0);
