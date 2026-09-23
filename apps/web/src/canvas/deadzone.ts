@@ -1,11 +1,12 @@
 /**
  * The dead-zone is the circle around the viewport center inside which
  * cursor movement does not drive drift (garden-mvp.md "Canvas": "~100px
- * diameter, responsive").
+ * diameter, responsive"). Formula corrected 2026-09-23 (parent visual QA):
+ * ~99px at 1440x900, ~72px (clamped) at 390x844.
  */
-export const DEAD_ZONE_MIN_PX = 64;
-export const DEAD_ZONE_MAX_PX = 120;
-export const DEAD_ZONE_VIEWPORT_FACTOR = 0.07;
+export const DEAD_ZONE_MIN_PX = 72;
+export const DEAD_ZONE_MAX_PX = 140;
+export const DEAD_ZONE_VIEWPORT_FACTOR = 0.11;
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);

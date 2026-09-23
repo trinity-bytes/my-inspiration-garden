@@ -22,16 +22,21 @@ describe("clamp", () => {
 });
 
 describe("deadZoneDiameter", () => {
-  it("clamps to the minimum on a small viewport (formula gives 63 < 64)", () => {
-    expect(deadZoneDiameter(1440, 900)).toBe(DEAD_ZONE_MIN_PX);
+  it("is ~99px at a typical desktop viewport (1440x900)", () => {
+    expect(deadZoneDiameter(1440, 900)).toBeCloseTo(99, 5);
+  });
+
+  it("clamps to the minimum on a small viewport (formula gives 42.9 < 72), ~72px at 390x844", () => {
+    expect(deadZoneDiameter(390, 844)).toBe(DEAD_ZONE_MIN_PX);
+    expect(deadZoneDiameter(390, 844)).toBeCloseTo(72, 5);
   });
 
   it("clamps to the maximum on a very large viewport", () => {
     expect(deadZoneDiameter(2000, 2000)).toBe(DEAD_ZONE_MAX_PX);
   });
 
-  it("uses the unclamped formula (0.07 * min(vw, vh)) in the middle range", () => {
-    expect(deadZoneDiameter(1000, 1000)).toBeCloseTo(70, 5);
+  it("uses the unclamped formula (0.11 * min(vw, vh)) in the middle range", () => {
+    expect(deadZoneDiameter(1000, 1000)).toBeCloseTo(110, 5);
   });
 
   it("uses the smaller of width/height", () => {
