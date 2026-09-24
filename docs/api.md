@@ -125,3 +125,7 @@ not automated here):
 - **Logout**: no separate route needed — Cloudflare serves
   `/cdn-cgi/access/logout` automatically for any hostname with an Access
   application; the web app's "Sign out" link just points there.
+
+## Local dev reseed
+
+`apps/api/scripts/reseed-dev-items.sql` refreshes the local-only seed data (opaque photos instead of the canvas's transparent cloud sprites, 3-5 realistic items per kind) — run with `pnpm exec wrangler d1 execute inspiration-garden --local --file=scripts/reseed-dev-items.sql` from `apps/api`; never pass `--remote`.
