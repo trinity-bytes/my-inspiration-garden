@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CLOUD_MAX_UPSCALE_FACTOR } from "../../src/canvas/layers/clouds";
 import {
   clampSpriteCssSize,
   maxSpriteCssSize,
@@ -49,19 +50,23 @@ describe("clampSpriteCssSize", () => {
 
   // T8b-3 owner feedback: soft, blurred atmospheric cloud sprites tolerate a
   // bounded upscale past their texture's native resolution better than
-  // crisp cards do — clouds (layers/clouds.ts) pass a maxUpscaleFactor of
-  // 1.5; cards (layers/cards.ts) omit it, keeping the strict 1x default.
+  // crisp cards do — clouds (layers/clouds.ts) pass CLOUD_MAX_UPSCALE_FACTOR;
+  // cards (layers/cards.ts) omit it, keeping the strict 1x default. Bound to
+  // the real exported constant (T9 carried follow-up), not a hardcoded copy.
   describe("with an explicit maxUpscaleFactor (clouds' bounded upscale)", () => {
     it("defaults to no upscale (max = texturePx / dpr) when maxUpscaleFactor is omitted", () => {
       expect(clampSpriteCssSize(5000, 1200, 1)).toBeCloseTo(1200, 8);
     });
 
     it("allows on-screen device px to exceed the texture's own resolution up to maxUpscaleFactor", () => {
-      expect(clampSpriteCssSize(5000, 1200, 2, 1.5)).toBeCloseTo((1200 * 1.5) / 2, 8);
+      expect(clampSpriteCssSize(5000, 1200, 2, CLOUD_MAX_UPSCALE_FACTOR)).toBeCloseTo(
+        (1200 * CLOUD_MAX_UPSCALE_FACTOR) / 2,
+        8,
+      );
     });
 
     it("still clamps a smaller request through unchanged (upscale only kicks in past the raised ceiling)", () => {
-      expect(clampSpriteCssSize(300, 1200, 2, 1.5)).toBeCloseTo(300, 8);
+      expect(clampSpriteCssSize(300, 1200, 2, CLOUD_MAX_UPSCALE_FACTOR)).toBeCloseTo(300, 8);
     });
   });
 });
@@ -89,8 +94,8 @@ describe("spriteQuadCssSize", () => {
   });
 
   it("with a maxUpscaleFactor, clamps by texturePx * maxUpscaleFactor instead (clouds' bounded upscale)", () => {
-    const { width, height } = spriteQuadCssSize(5000, 1600, 879, 2, 1.5);
-    expect(width * 2).toBeCloseTo(1600 * 1.5, 6);
+    const { width, height } = spriteQuadCssSize(5000, 1600, 879, 2, CLOUD_MAX_UPSCALE_FACTOR);
+    expect(width * 2).toBeCloseTo(1600 * CLOUD_MAX_UPSCALE_FACTOR, 6);
     expect(width / height).toBeCloseTo(1600 / 879, 8);
   });
 });

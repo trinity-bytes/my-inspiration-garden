@@ -61,7 +61,16 @@ function axisProgress(
   // Distance from the card's outer edge to the viewport edge; negative once it pokes out.
   const insideDepth = halfViewport - Math.abs(center) - halfSize;
   const extent = halfSize * 2;
-  return clamp01((insideDepth + extent) / (extent + Math.max(inset, 0)));
+  const denominator = extent + Math.max(inset, 0);
+  if (denominator <= 0) {
+    // Degenerate: a zero-size rect (extent === 0) combined with a
+    // non-positive fade inset leaves nothing to ramp over — the raw
+    // formula would divide by zero (± Infinity, or exactly 0/0 => NaN when
+    // the rect sits precisely on the viewport edge). Treat the point as
+    // fully entered once it is inside the viewport, fully exited otherwise.
+    return insideDepth >= 0 ? 1 : 0;
+  }
+  return clamp01((insideDepth + extent) / denominator);
 }
 
 /**
@@ -94,6 +103,32 @@ export function cardEntryScale(progress: number, reducedMotion: boolean): number
 }
 
 /**
+ * The entry scale for a card at `worldRect` right now (see `cardEntryScale`)
+ * — the single function BOTH rendering (`layers/cards.ts`) and hit-testing
+ * (`entryScaledWorldRect`, used by `engine.ts`'s `hitTestableCards`) call,
+ * so a shrunk edge card is always clickable exactly where it is drawn. T9
+ * carried follow-up (T8b): previously each site independently chained
+ * `cardScreenRect` -> `cardEntryProgress` -> `cardEntryScale` with the same
+ * arguments — mathematically equal, but a future edit to one call site
+ * could silently diverge from the other. Extracting this one function (and
+ * having `entryScaledWorldRect` below call it, and `layers/cards.ts` call
+ * it directly) makes that divergence structurally impossible.
+ */
+export function entryScaleForCard(
+  worldRect: CardWorldRect,
+  worldOffset: Vec2,
+  viewport: { width: number; height: number },
+  reducedMotion: boolean,
+): number {
+  const progress = cardEntryProgress(
+    cardScreenRect(worldRect, worldOffset, 1),
+    viewport.width,
+    viewport.height,
+  );
+  return cardEntryScale(progress, reducedMotion);
+}
+
+/**
  * The card's world rect shrunk around its own center by its entry scale —
  * the single source of truth shared by rendering (`layers/cards.ts`) and
  * hit-testing, so a shrunk edge card is only clickable where it is drawn.
@@ -104,12 +139,7 @@ export function entryScaledWorldRect(
   viewport: { width: number; height: number },
   reducedMotion: boolean,
 ): CardWorldRect {
-  const progress = cardEntryProgress(
-    cardScreenRect(worldRect, worldOffset, 1),
-    viewport.width,
-    viewport.height,
-  );
-  const scale = cardEntryScale(progress, reducedMotion);
+  const scale = entryScaleForCard(worldRect, worldOffset, viewport, reducedMotion);
   if (scale === 1) {
     return worldRect;
   }

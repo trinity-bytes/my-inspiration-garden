@@ -131,6 +131,123 @@ describe("columnPeriod", () => {
     // "usually" — see item-layout.ts's `columnPhase`/`columnStep`).
     expect(distinctPairs).toBe(totalPairs);
   });
+
+  // T9 carried follow-up (T8b): the collision-free property above was true
+  // only by luck of the tuned hash constants for ONE fixed item count (24)
+  // over a small column range — it was never actually enforced. This is a
+  // real property test: a wide range of item counts (including small ones,
+  // where a birthday-paradox collision is far more likely) and a wide
+  // column-index range, always starting at a negative offset so the "first
+  // column ever computed" case is exercised too (columnPhase has no prior
+  // neighbor to compare against there).
+  it.each([1, 2, 3, 4, 5, 6, 8, 13, 24, 40, 60, 100, 150])(
+    "property: adjacent columns never start with the same item, for any item count (%i items)",
+    (itemCount) => {
+      const items = seedItems(itemCount);
+      let previous = columnPeriod(items, 220, -50).order[0];
+      for (let c = -49; c <= 50; c++) {
+        const current = columnPeriod(items, 220, c).order[0];
+        if (itemCount > 1) {
+          expect(current).not.toBe(previous);
+        }
+        previous = current;
+      }
+    },
+  );
+});
+
+// T9 carried follow-up: memoize columnPeriod by (columnIndex, columnWidth,
+// itemCount), invalidated the same way as the engine's card-instance cache
+// (see engine.ts's `columnPeriodCache`, cleared on `setItems` and on a
+// column-width change from a resize).
+describe("columnPeriod caching", () => {
+  it("accepts an optional cache and reuses (does not recompute) a hit", () => {
+    const items = seedItems();
+    const cache = new Map<string, ReturnType<typeof columnPeriod>>();
+    const cacheAdapter = {
+      get: (key: string) => cache.get(key),
+      set: (key: string, value: ReturnType<typeof columnPeriod>) => {
+        cache.set(key, value);
+      },
+    };
+
+    const first = columnPeriod(items, 220, 3, cacheAdapter);
+    expect(cache.size).toBe(1);
+    const second = columnPeriod(items, 220, 3, cacheAdapter);
+    // Cache hit: the exact same object identity is returned, not merely an
+    // equal value — proof it was not recomputed.
+    expect(second).toBe(first);
+  });
+
+  it("keys the cache by columnIndex, columnWidth AND itemCount (a change in any of them is a cache miss)", () => {
+    const items = seedItems();
+    const cache = new Map<string, ReturnType<typeof columnPeriod>>();
+    const cacheAdapter = {
+      get: (key: string) => cache.get(key),
+      set: (key: string, value: ReturnType<typeof columnPeriod>) => {
+        cache.set(key, value);
+      },
+    };
+
+    columnPeriod(items, 220, 3, cacheAdapter);
+    columnPeriod(items, 250, 3, cacheAdapter); // different columnWidth
+    columnPeriod(items, 220, 4, cacheAdapter); // different columnIndex
+    columnPeriod(items.slice(0, -1), 220, 3, cacheAdapter); // different itemCount
+    expect(cache.size).toBe(4);
+  });
+
+  it("without a cache, still returns a correct (uncached) result", () => {
+    const items = seedItems();
+    expect(columnPeriod(items, 220, 3)).toEqual(columnPeriod(items, 220, 3));
+  });
+
+  // T9 carried follow-up: "resize cache-invalidation test". A resize
+  // changes columnWidth; a shared cache must never hand back a period
+  // computed for the OLD width (stale card heights/positions) for the NEW
+  // width — the cache key includes columnWidth precisely so this can't
+  // happen, exercised here through the same `visibleCardInstances` entry
+  // point the engine calls every frame.
+  it("visibleCardInstances: a shared periodCache never serves a stale period across a columnWidth change (resize)", () => {
+    const items = seedItems();
+    const cache = new Map<string, ReturnType<typeof columnPeriod>>();
+    const periodCache = {
+      get: (key: string) => cache.get(key),
+      set: (key: string, value: ReturnType<typeof columnPeriod>) => {
+        cache.set(key, value);
+      },
+    };
+
+    const before = visibleCardInstances(
+      items,
+      { x: 0, y: 0 },
+      1440,
+      900,
+      220,
+      0,
+      DEFAULT_MAX_CARD_POOL_SIZE,
+      undefined,
+      [],
+      periodCache,
+    );
+    expect(before.every((instance) => instance.worldRect.width === 220)).toBe(true);
+
+    // Simulated resize: a different columnWidth, same shared periodCache
+    // (as the engine reuses one cache instance across frames/resizes).
+    const after = visibleCardInstances(
+      items,
+      { x: 0, y: 0 },
+      1440,
+      900,
+      260,
+      0,
+      DEFAULT_MAX_CARD_POOL_SIZE,
+      undefined,
+      [],
+      periodCache,
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every((instance) => instance.worldRect.width === 260)).toBe(true);
+  });
 });
 
 describe("cardAssignmentKey", () => {

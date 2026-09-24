@@ -1,6 +1,6 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
-import { cardEntryProgress, cardEntryScale, cardOpacity, cardScreenRect } from "../card-fade";
+import { cardEntryProgress, cardOpacity, cardScreenRect, entryScaleForCard } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
@@ -237,8 +237,14 @@ export class CardLayer {
       );
       const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
       const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
-      // Same entry scale `entryScaledWorldRect` feeds hit-testing (engine.ts).
-      const entryScale = cardEntryScale(progress, reducedMotion);
+      // Same function `entryScaledWorldRect` feeds hit-testing (engine.ts) —
+      // see card-fade.ts's `entryScaleForCard` doc.
+      const entryScale = entryScaleForCard(
+        instance.worldRect,
+        worldOffset,
+        { width: viewportWidth, height: viewportHeight },
+        reducedMotion,
+      );
       const scaleFactor = (clampedWidth / instance.worldRect.width) * entryScale * hover.scale;
       const width = instance.worldRect.width * scaleFactor;
       const height = instance.worldRect.height * scaleFactor;

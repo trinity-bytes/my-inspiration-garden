@@ -11,6 +11,7 @@ import {
   type CardInstance,
   DEFAULT_CARD_MARGIN_PX,
   DEFAULT_MAX_CARD_POOL_SIZE,
+  type ItemPeriod,
   visibleCardInstances,
 } from "./item-layout";
 import { CardLayer } from "./layers/cards";
@@ -208,6 +209,8 @@ export class CanvasEngine {
     CARD_INSTANCE_CACHE_SIZE,
     () => {},
   );
+  /** Memoizes `columnPeriod` results by `(columnIndex, columnWidth, itemCount)` (T9 carried follow-up) — cleared alongside `cardInstanceCache` (same invalidation triggers: `setItems`, and a resize that changes `columnWidth`), since a period is only valid for the items/column-width it was computed from. */
+  private readonly columnPeriodCache = new LruCache<ItemPeriod>(CARD_INSTANCE_CACHE_SIZE, () => {});
   private lastDomMirrorSignature = "";
   /** The column width `visibleCardInstances` was last called with — a resize changes it, which invalidates every cached `CardInstance` (their `worldRect.width`/`x` are only valid for the column width they were computed with). */
   private lastColumnWidth = -1;
@@ -238,6 +241,7 @@ export class CanvasEngine {
   setItems(items: Item[]): void {
     this.items = items;
     this.cardInstanceCache.clear();
+    this.columnPeriodCache.clear();
   }
 
   /** Pans instantly so the card identified by `key` (see `CardInstance.key` / `dom-mirror.ts`) is centered on screen. A no-op if that card is not among the currently-known instances. */
@@ -673,6 +677,11 @@ export class CanvasEngine {
       // wrong size/position until it scrolls out of the render margin.
       this.lastColumnWidth = columnWidth;
       this.cardInstanceCache.clear();
+      // Not strictly necessary for correctness (columnPeriodCache's key
+      // already includes columnWidth, so a stale-width entry is simply
+      // never hit again), but clears out entries for the old width that
+      // would otherwise sit in the cache until evicted by size pressure.
+      this.columnPeriodCache.clear();
     }
 
     const cardCenterWorld: Vec2 = { x: -world.x, y: -world.y };
@@ -686,6 +695,7 @@ export class CanvasEngine {
       DEFAULT_MAX_CARD_POOL_SIZE,
       this.cardInstanceCache,
       this.lastCardInstances,
+      this.columnPeriodCache,
     );
 
     this.cards.group.position.x = world.x;

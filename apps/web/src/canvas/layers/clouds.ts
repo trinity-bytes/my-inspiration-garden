@@ -18,8 +18,12 @@ import type { Vec2 } from "../types";
  * T8b-3 base sprite size well short of its intended on-screen size (see
  * max-sprite-size.ts's `maxUpscaleFactor`). Cards (layers/cards.ts) keep
  * the strict default (1, no upscale) — this constant is cloud-only.
+ *
+ * Exported (T9 carried follow-up) so `cloud-visibility.test.ts` and
+ * `max-sprite-size.test.ts` assert against this real constant instead of a
+ * hardcoded `1.5` copy that could silently drift out of sync with it.
  */
-const CLOUD_MAX_UPSCALE_FACTOR = 1.5;
+export const CLOUD_MAX_UPSCALE_FACTOR = 1.5;
 
 export interface CloudLayerRuntimeConfig extends CloudLayerConfig {
   /** Parallax factor relative to the world offset (near = larger/faster). From cloud-depth.ts. */

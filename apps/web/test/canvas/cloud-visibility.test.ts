@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { cloudForCell, visibleCellRange } from "../../src/canvas/cloud-field";
 import { cloudScreenRect, rectOverlapsViewport } from "../../src/canvas/cloud-screen-rect";
 import { FAR_CLOUD_CONFIG, MID_CLOUD_CONFIG, SKY_PARALLAX } from "../../src/canvas/engine";
-import type { CloudLayerRuntimeConfig } from "../../src/canvas/layers/clouds";
+import {
+  CLOUD_MAX_UPSCALE_FACTOR,
+  type CloudLayerRuntimeConfig,
+} from "../../src/canvas/layers/clouds";
 import { clampSpriteCssSize, spriteQuadCssSize } from "../../src/canvas/max-sprite-size";
 
 // Real texture dimensions (public/images/cloud-{1..4}.webp), so the sprite
@@ -119,18 +122,20 @@ describe("T8b-3 far/mid cloud retune #2 (realism: barely-faster speed, bigger ag
     expect(MID_CLOUD_CONFIG.sizeScale).toBeGreaterThan(FAR_CLOUD_CONFIG.sizeScale);
   });
 
-  it("clouds (not cards) may upscale past their texture's native resolution at high DPR, bounded to 1.5x", () => {
+  it("clouds (not cards) may upscale past their texture's native resolution at high DPR, bounded to CLOUD_MAX_UPSCALE_FACTOR", () => {
     // Same real cloud texture (1464px, the narrowest — the tightest clamp
     // case) at DPR=2: a card's clampSpriteCssSize call (no 4th arg, see
     // layers/cards.ts) still caps at texturePx/dpr; a cloud's
-    // spriteQuadCssSize call (layers/clouds.ts) may go up to 1.5x that.
+    // spriteQuadCssSize call (layers/clouds.ts) may go up to
+    // CLOUD_MAX_UPSCALE_FACTOR times that (bound to the real exported
+    // constant, not a hardcoded copy — T9 carried follow-up).
     const texturePx = 1464;
     const dpr = 2;
     const hugeRequest = 5000; // deliberately beyond both caps, to probe them
     const cardWidth = clampSpriteCssSize(hugeRequest, texturePx, dpr);
-    const cloudWidth = clampSpriteCssSize(hugeRequest, texturePx, dpr, 1.5);
+    const cloudWidth = clampSpriteCssSize(hugeRequest, texturePx, dpr, CLOUD_MAX_UPSCALE_FACTOR);
     expect(cardWidth).toBeCloseTo(texturePx / dpr, 6);
-    expect(cloudWidth).toBeCloseTo((texturePx * 1.5) / dpr, 6);
+    expect(cloudWidth).toBeCloseTo((texturePx * CLOUD_MAX_UPSCALE_FACTOR) / dpr, 6);
     expect(cloudWidth).toBeGreaterThan(cardWidth);
   });
 

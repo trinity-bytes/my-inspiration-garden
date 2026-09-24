@@ -115,6 +115,8 @@ export function cardHeightForItem(item: Item, columnWidth: number): number {
 
 const STEP_CHANNEL = 180_077;
 const PHASE_CHANNEL = 966_859;
+/** Only used to re-roll `columnPhase` away from a collision with its left neighbor (see `columnPhase`) — a distinct hash channel gives a fresh, still-deterministic candidate rather than a predictable "+1" shift. */
+const PHASE_FALLBACK_CHANNEL = 725_453;
 
 /**
  * A full-period step for this column's item permutation: `(phase + k*step)
@@ -140,12 +142,78 @@ function columnStep(columnIndex: number, itemCount: number): number {
   return step;
 }
 
-/** This column's starting item (period position 0), independently hashed from `columnStep` so two columns rarely start AND step alike. */
+function rawColumnPhase(columnIndex: number, itemCount: number, channel: number): number {
+  return hash32(columnIndex, 0, channel) % itemCount;
+}
+
+/**
+ * Below this item count, hash-based collision avoidance is the wrong tool:
+ * the birthday paradox makes a raw hash collision the COMMON case (at
+ * itemCount=2 a fresh 32-bit hash mod 2 collides with its neighbor roughly
+ * half the time, and genuine 3+, 4+, ... long collision *chains* are
+ * realistic, not rare), and any fixed-depth chain-resolution scheme built
+ * from independently-called, per-column pure functions runs into a real
+ * mathematical limit: each `columnPhase(columnIndex, ...)` call must be
+ * evaluable on its own (no shared state across calls — this stays a pure
+ * function of its arguments, correctly memoizable/cacheable — see
+ * `columnPeriod`'s cache below), so it can only ever look at a FIXED set of
+ * relative offsets from `columnIndex`. Two independently-called columns
+ * that are OFF BY ONE necessarily examine those offsets from different
+ * absolute anchor points, so any fixed-depth "resolve the collision chain"
+ * construction is only self-consistent up to however deep an actual chain
+ * runs — which is unbounded in the worst case, and, at these item counts,
+ * not vanishingly rare. Below `SMALL_ITEM_COUNT_THRESHOLD`, use a trivial
+ * closed form instead: `columnIndex mod itemCount` trivially differs for
+ * every pair of adjacent columns (consecutive integers are never congruent
+ * mod N for N >= 2), fully sidestepping the hash-collision problem. It is
+ * not hash-shuffled (a plain per-column offset, not independently
+ * "random"), but with this few items every column cycles through nearly
+ * all of them within a couple of rows regardless of starting phase, so the
+ * shuffled-looking placement a hash buys elsewhere is not visually
+ * meaningful at this scale anyway.
+ */
+const SMALL_ITEM_COUNT_THRESHOLD = 6;
+
+/**
+ * This column's starting item (period position 0), independently hashed
+ * from `columnStep` so two columns rarely start AND step alike — PLUS an
+ * explicit, enforced collision guard (T9 carried follow-up) against its
+ * immediate left neighbor: a column's own raw hash candidate is compared
+ * against `columnIndex - 1`'s raw hash (`leftRaw`) and, when `leftRaw`
+ * itself collided with ITS OWN left neighbor (`columnIndex - 2`, so
+ * `columnIndex - 1`'s TRUE resolved phase is actually its re-rolled
+ * fallback, not `leftRaw`), that fallback is used as the true left phase
+ * instead. On a collision with the true left phase, this column re-rolls
+ * through a second, independent hash channel; if that also collides
+ * (needing three consecutive raw hashes to agree on both channels — rare
+ * once `itemCount` clears `SMALL_ITEM_COUNT_THRESHOLD`), a plain `+1`
+ * guarantees a distinct value whenever `itemCount > 1`. This — plus the
+ * `SMALL_ITEM_COUNT_THRESHOLD` special case above for the item counts
+ * where even this two-level guard is not enough — makes "adjacent columns
+ * never start with the same item" an enforced property, not an accident of
+ * how the tuned hash constants happen to behave for one specific item
+ * count (previously true only by luck at exactly 24 items — see
+ * item-layout.test.ts's property test across many item counts).
+ */
 function columnPhase(columnIndex: number, itemCount: number): number {
-  if (itemCount === 0) {
+  if (itemCount <= 1) {
     return 0;
   }
-  return hash32(columnIndex, 0, PHASE_CHANNEL) % itemCount;
+  if (itemCount <= SMALL_ITEM_COUNT_THRESHOLD) {
+    return mod(columnIndex, itemCount);
+  }
+
+  const candidate = rawColumnPhase(columnIndex, itemCount, PHASE_CHANNEL);
+  const leftRaw = rawColumnPhase(columnIndex - 1, itemCount, PHASE_CHANNEL);
+  const leftLeftRaw = rawColumnPhase(columnIndex - 2, itemCount, PHASE_CHANNEL);
+  const leftFallback = rawColumnPhase(columnIndex - 1, itemCount, PHASE_FALLBACK_CHANNEL);
+  const leftPhase = leftRaw === leftLeftRaw ? leftFallback : leftRaw;
+
+  if (candidate !== leftPhase) {
+    return candidate;
+  }
+  const fallback = rawColumnPhase(columnIndex, itemCount, PHASE_FALLBACK_CHANNEL);
+  return fallback !== leftPhase ? fallback : mod(candidate + 1, itemCount);
 }
 
 export interface ItemPeriod {
@@ -160,22 +228,44 @@ export interface ItemPeriod {
   periodHeight: number;
 }
 
+/** Minimal get/set surface a hot-path caller can plug in to reuse `ItemPeriod`s across calls instead of recomputing them (see `engine.ts`'s `columnPeriodCache`, an `LruCache`, which already satisfies this shape). */
+export interface ColumnPeriodCache {
+  get(key: string): ItemPeriod | undefined;
+  set(key: string, value: ItemPeriod): void;
+}
+
+/** The cache key `columnPeriod` memoizes under: T9 carried follow-up — a column's period depends on all three of `columnIndex`, `columnWidth` (a resize changes card heights) and `itemCount` (a shorter/longer items array changes the whole permutation), so all three must be part of the key. */
+function columnPeriodCacheKey(columnIndex: number, columnWidth: number, itemCount: number): string {
+  return `${columnIndex},${columnWidth},${itemCount}`;
+}
+
 /**
  * The full, precomputed item period for one column: a deterministic
  * permutation of `items` (see `columnStep`/`columnPhase`) plus the
  * cumulative heights `rowForWorldY`'s binary search needs. Pure —
  * `columnIndex` (and `items`/`columnWidth`) fully determine the result, so
- * two calls with the same arguments are `toEqual`.
+ * two calls with the same arguments are `toEqual`. `cache`, when supplied,
+ * memoizes by `(columnIndex, columnWidth, itemCount)` (T9 carried
+ * follow-up) — every visible column's period was previously recomputed
+ * from scratch every frame in `visibleCardInstances`'s hot path.
  */
 export function columnPeriod(
   items: readonly Item[],
   columnWidth: number,
   columnIndex: number,
+  cache?: ColumnPeriodCache,
 ): ItemPeriod {
   const itemCount = items.length;
   if (itemCount === 0) {
     return { itemCount: 0, order: [], heights: [], tops: [], periodHeight: 0 };
   }
+
+  const cacheKey = columnPeriodCacheKey(columnIndex, columnWidth, itemCount);
+  const cached = cache?.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const step = columnStep(columnIndex, itemCount);
   const phase = columnPhase(columnIndex, itemCount);
   const order: number[] = new Array(itemCount);
@@ -191,7 +281,9 @@ export function columnPeriod(
     tops[k] = cursor;
     cursor += height + COLUMN_GUTTER_PX;
   }
-  return { itemCount, order, heights, tops, periodHeight: cursor };
+  const period: ItemPeriod = { itemCount, order, heights, tops, periodHeight: cursor };
+  cache?.set(cacheKey, period);
+  return period;
 }
 
 interface RowPlacement {
@@ -300,6 +392,7 @@ export function visibleCardInstances(
   maxPoolSize: number = DEFAULT_MAX_CARD_POOL_SIZE,
   cache?: CardInstanceCache,
   out: CardInstance[] = [],
+  periodCache?: ColumnPeriodCache,
 ): CardInstance[] {
   out.length = 0;
   if (items.length === 0 || columnWidth <= 0) {
@@ -322,7 +415,7 @@ export function visibleCardInstances(
       continue;
     }
 
-    const period = columnPeriod(items, columnWidth, columnIndex);
+    const period = columnPeriod(items, columnWidth, columnIndex, periodCache);
     if (period.itemCount === 0) {
       continue;
     }
