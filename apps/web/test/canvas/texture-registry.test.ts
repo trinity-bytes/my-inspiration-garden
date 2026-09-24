@@ -155,7 +155,7 @@ describe("TextureRegistry", () => {
       expect(registry.has("shared-key")).toBe(false);
     });
 
-    it("a fresh load() after a completed one starts a new loader", () => {
+    it("a load() after a completed one is served from cache, not a new loader", () => {
       const registry = new TextureRegistry<string>({ maxSize: 3, dispose: () => {} });
       const start = vi.fn((onLoadInner: (value: string) => void) => onLoadInner("A"));
 
@@ -165,6 +165,72 @@ describe("TextureRegistry", () => {
       // Cached now — a further load() call is served from cache, not a new start().
       registry.load("a", start, vi.fn(), vi.fn());
       expect(start).toHaveBeenCalledTimes(1);
+    });
+
+    it("a resolve arriving after clear() disposes the value instead of caching it", () => {
+      const disposed: string[] = [];
+      const registry = new TextureRegistry<string>({
+        maxSize: 3,
+        dispose: (v) => disposed.push(v),
+      });
+      let resolve!: (value: string) => void;
+      const start = vi.fn((onLoadInner: (value: string) => void) => {
+        resolve = onLoadInner;
+      });
+      const onLoad = vi.fn();
+      registry.load("a", start, onLoad, vi.fn());
+
+      registry.clear(); // torn down while "a" is still in flight
+
+      resolve("late-value");
+
+      expect(disposed).toEqual(["late-value"]);
+      expect(registry.has("a")).toBe(false);
+      expect(onLoad).not.toHaveBeenCalled();
+    });
+
+    it("a reject arriving after clear() does not notify the (torn-down) waiters", () => {
+      const registry = new TextureRegistry<string>({ maxSize: 3, dispose: () => {} });
+      let reject!: () => void;
+      const start = vi.fn((_onLoad: (value: string) => void, onErrorInner: () => void) => {
+        reject = onErrorInner;
+      });
+      const onError = vi.fn();
+      registry.load("a", start, vi.fn(), onError);
+
+      registry.clear();
+      reject();
+
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    it("a stale resolve for a superseded (cleared) load does not clobber a newer load's pending waiter record", () => {
+      const registry = new TextureRegistry<string>({ maxSize: 3, dispose: () => {} });
+
+      let resolveA!: (value: string) => void;
+      const startA = vi.fn((onLoadInner: (value: string) => void) => {
+        resolveA = onLoadInner;
+      });
+      registry.load("a", startA, vi.fn(), vi.fn());
+
+      registry.clear(); // "a"'s in-flight load A is now stale/orphaned
+
+      let resolveB!: (value: string) => void;
+      const startB = vi.fn((onLoadInner: (value: string) => void) => {
+        resolveB = onLoadInner;
+      });
+      registry.load("a", startB, vi.fn(), vi.fn()); // fresh load B starts for the same key
+
+      resolveA("stale-from-A"); // late resolve of the superseded/cleared load
+
+      // A third caller must still be deduped onto B, not start a fresh loader C.
+      const startC = vi.fn();
+      const onLoadC = vi.fn();
+      registry.load("a", startC, onLoadC, vi.fn());
+      expect(startC).not.toHaveBeenCalled();
+
+      resolveB("value-from-B");
+      expect(onLoadC).toHaveBeenCalledWith("value-from-B");
     });
 
     it("a failed load lets a later load() retry (does not leave a stuck pending entry)", () => {

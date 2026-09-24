@@ -28,6 +28,20 @@ interface PendingLoad<V> {
  *   cached value for that key — replacing a key with itself (the
  *   error-fallback path re-caching an already-cached placeholder) must
  *   never dispose the very value being kept.
+ * - `clear()` (full teardown, e.g. `layers/cards.ts`'s `dispose()`) does not
+ *   cancel loads already in flight — the underlying loader (e.g.
+ *   `THREE.TextureLoader`) has no cancel hook. A `generation` counter bumped
+ *   on every `clear()` lets `load()` recognize its own in-flight load as
+ *   superseded once its resolve/reject finally arrives: the late value is
+ *   disposed instead of resurrected into the torn-down cache, and waiters
+ *   (torn down along with the registry) are not notified.
+ * - Each in-flight load's resolve/reject only deletes its OWN `pending`
+ *   entry (`pending.get(key) === waiters` identity check), never a newer
+ *   load's. Without it, a stale resolve/reject arriving after `clear()` —
+ *   while a fresh `load()` for the same key has already started a new
+ *   pending record — would delete that NEWER record, so a third caller
+ *   would wrongly start yet another loader instead of joining the one
+ *   actually in flight.
  */
 export class TextureRegistry<V> {
   private readonly maxSize: number;
@@ -35,6 +49,7 @@ export class TextureRegistry<V> {
   private readonly entries = new Map<string, V>();
   private readonly pins = new Map<string, number>();
   private readonly pending = new Map<string, PendingLoad<V>>();
+  private generation = 0;
 
   constructor(options: TextureRegistryOptions<V>) {
     this.maxSize = options.maxSize;
@@ -147,18 +162,37 @@ export class TextureRegistry<V> {
     }
 
     const waiters: PendingLoad<V> = { onLoad: [onLoad], onError: [onError] };
+    const startGeneration = this.generation;
     this.pending.set(key, waiters);
 
     start(
       (value) => {
-        this.pending.delete(key);
+        // Only remove this load's OWN pending record — a `clear()` in
+        // between may already have let a newer `load()` for the same key
+        // install its own record, which must survive this late arrival.
+        if (this.pending.get(key) === waiters) {
+          this.pending.delete(key);
+        }
+        if (startGeneration !== this.generation) {
+          // This registry was `clear()`-ed while this load was still in
+          // flight. It is superseded: dispose the late value instead of
+          // resurrecting it into the torn-down cache, and skip notifying
+          // waiters (torn down along with the registry).
+          this.disposeValue(value);
+          return;
+        }
         this.set(key, value);
         for (const callback of waiters.onLoad) {
           callback(value);
         }
       },
       () => {
-        this.pending.delete(key);
+        if (this.pending.get(key) === waiters) {
+          this.pending.delete(key);
+        }
+        if (startGeneration !== this.generation) {
+          return;
+        }
         for (const callback of waiters.onError) {
           callback();
         }
@@ -166,8 +200,9 @@ export class TextureRegistry<V> {
     );
   }
 
-  /** Disposes every remaining entry and empties the cache, ignoring pins (full teardown). */
+  /** Disposes every remaining entry and empties the cache, ignoring pins (full teardown). Bumps `generation` so any load already in flight is recognized as superseded once it resolves/rejects late. */
   clear(): void {
+    this.generation++;
     for (const value of this.entries.values()) {
       this.disposeValue(value);
     }
