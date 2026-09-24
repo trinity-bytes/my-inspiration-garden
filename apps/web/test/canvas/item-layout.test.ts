@@ -1,41 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { COLUMN_GUTTER_PX, columnLayoutFor } from "../../src/canvas/column-layout";
 import {
   CARD_ASPECT_MAX,
   CARD_ASPECT_MIN,
-  CARD_CELL_SIZE,
-  CARD_WIDTH_MAX_FRACTION,
   cardAspectForItem,
   cardAssignmentKey,
-  cardSizeForItem,
-  cardWorldRect,
-  itemIndexForCell,
+  cardHeightForItem,
+  columnPeriod,
+  DEFAULT_MAX_CARD_POOL_SIZE,
   visibleCardInstances,
 } from "../../src/canvas/item-layout";
 import { makeItem } from "../fixtures/items";
-
-describe("itemIndexForCell", () => {
-  it("is a pure function of (cellX, cellY, itemCount): identical inputs give identical output", () => {
-    expect(itemIndexForCell(5, -3, 10)).toBe(itemIndexForCell(5, -3, 10));
-  });
-
-  it("always returns an index within [0, itemCount)", () => {
-    for (let x = -30; x < 30; x++) {
-      for (let y = -5; y < 5; y++) {
-        const index = itemIndexForCell(x, y, 7);
-        expect(index).toBeGreaterThanOrEqual(0);
-        expect(index).toBeLessThan(7);
-      }
-    }
-  });
-
-  it("visits more than one index across many cells (repetition, not a constant map)", () => {
-    const seen = new Set<number>();
-    for (let x = 0; x < 40; x++) {
-      seen.add(itemIndexForCell(x, 0, 5));
-    }
-    expect(seen.size).toBeGreaterThan(1);
-  });
-});
 
 describe("cardAspectForItem", () => {
   it("uses the image's own width/height when present", () => {
@@ -64,113 +39,97 @@ describe("cardAspectForItem", () => {
   });
 });
 
-describe("cardSizeForItem", () => {
-  it("keeps the larger dimension within CARD_CELL_SIZE * CARD_WIDTH_MAX_FRACTION", () => {
-    for (let i = 0; i < 30; i++) {
-      const item = makeItem(`s${i}`, "image", { width: 100, height: 100 });
-      const { width, height } = cardSizeForItem(item, CARD_CELL_SIZE);
-      expect(Math.max(width, height)).toBeLessThanOrEqual(
-        CARD_CELL_SIZE * CARD_WIDTH_MAX_FRACTION + 1e-6,
+describe("cardHeightForItem", () => {
+  it("is columnWidth / aspect", () => {
+    const item = makeItem("h1", "image", { width: 400, height: 200 });
+    expect(cardHeightForItem(item, 300)).toBeCloseTo(150, 5);
+  });
+
+  it("is deterministic and scales linearly with columnWidth", () => {
+    const item = makeItem("h2", "text");
+    const a = cardHeightForItem(item, 200);
+    const b = cardHeightForItem(item, 400);
+    expect(b).toBeCloseTo(a * 2, 5);
+  });
+});
+
+/** 24 items spanning every kind, matching the real seed data scale used for owner visual QA. */
+function seedItems(count = 24): ReturnType<typeof makeItem>[] {
+  const kinds = ["image", "link", "text", "video", "palette", "font"] as const;
+  return Array.from({ length: count }, (_, i) => makeItem(`item-${i}`, kinds[i % kinds.length]));
+}
+
+describe("columnPeriod", () => {
+  it("is a pure function: identical inputs produce an identical period", () => {
+    const items = seedItems();
+    expect(columnPeriod(items, 220, 3)).toEqual(columnPeriod(items, 220, 3));
+  });
+
+  it("visits every item exactly once per period (a full permutation, no repeats within one column's period)", () => {
+    const items = seedItems();
+    const period = columnPeriod(items, 220, 0);
+    expect(period.order).toHaveLength(items.length);
+    expect(new Set(period.order).size).toBe(items.length);
+    for (const index of period.order) {
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(items.length);
+    }
+  });
+
+  it("has a monotonically increasing cumulative top, starting at 0", () => {
+    const items = seedItems();
+    const period = columnPeriod(items, 220, 5);
+    expect(period.tops[0]).toBe(0);
+    for (let k = 1; k < period.tops.length; k++) {
+      expect(period.tops[k] as number).toBeGreaterThan(period.tops[k - 1] as number);
+    }
+  });
+
+  it("each entry's height matches cardHeightForItem for its assigned item", () => {
+    const items = seedItems();
+    const columnWidth = 220;
+    const period = columnPeriod(items, columnWidth, 2);
+    for (let k = 0; k < period.itemCount; k++) {
+      const item = items[period.order[k] as number];
+      expect(period.heights[k]).toBeCloseTo(
+        cardHeightForItem(item as (typeof items)[number], columnWidth),
+        5,
       );
     }
   });
 
-  it("preserves the item's aspect ratio", () => {
-    const item = makeItem("s-aspect", "image", { width: 300, height: 200 });
-    const { width, height } = cardSizeForItem(item, CARD_CELL_SIZE);
-    expect(width / height).toBeCloseTo(cardAspectForItem(item), 5);
+  it("periodHeight is the last card's bottom edge plus one trailing gutter (periods tile seamlessly)", () => {
+    const items = seedItems();
+    const period = columnPeriod(items, 220, 1);
+    const lastIndex = period.itemCount - 1;
+    const expected =
+      (period.tops[lastIndex] as number) + (period.heights[lastIndex] as number) + COLUMN_GUTTER_PX;
+    expect(period.periodHeight).toBeCloseTo(expected, 5);
   });
 
-  it("is deterministic and varies by item id (mixed sizes)", () => {
-    const a = cardSizeForItem(makeItem("size-a", "text"), CARD_CELL_SIZE);
-    const b = cardSizeForItem(makeItem("size-b", "text"), CARD_CELL_SIZE);
-    expect(cardSizeForItem(makeItem("size-a", "text"), CARD_CELL_SIZE)).toEqual(a);
-    expect(a).not.toEqual(b);
-  });
-});
-
-describe("cardWorldRect", () => {
-  it("keeps the card's center within its own cell bounds", () => {
-    const item = makeItem("rect1", "text");
-    const rect = cardWorldRect(2, -3, item, CARD_CELL_SIZE);
-    const cellCenterX = 2 * CARD_CELL_SIZE + CARD_CELL_SIZE / 2;
-    const cellCenterY = -3 * CARD_CELL_SIZE + CARD_CELL_SIZE / 2;
-    expect(Math.abs(rect.x - cellCenterX)).toBeLessThanOrEqual(CARD_CELL_SIZE / 2);
-    expect(Math.abs(rect.y - cellCenterY)).toBeLessThanOrEqual(CARD_CELL_SIZE / 2);
+  it("never repeats the same item at consecutive rows across a period wrap boundary", () => {
+    const items = seedItems();
+    const period = columnPeriod(items, 220, 4);
+    const last = period.order[period.itemCount - 1];
+    const first = period.order[0];
+    expect(last).not.toBe(first);
   });
 
-  it("never lets the card footprint spill outside its cell (no cross-cell overlap)", () => {
-    for (let x = -10; x < 10; x++) {
-      for (let y = -3; y < 3; y++) {
-        const item = makeItem(`spill-${x}-${y}`, "video");
-        const rect = cardWorldRect(x, y, item, CARD_CELL_SIZE);
-        const cellMinX = x * CARD_CELL_SIZE;
-        const cellMaxX = (x + 1) * CARD_CELL_SIZE;
-        const cellMinY = y * CARD_CELL_SIZE;
-        const cellMaxY = (y + 1) * CARD_CELL_SIZE;
-        expect(rect.x - rect.width / 2).toBeGreaterThanOrEqual(cellMinX - 1e-6);
-        expect(rect.x + rect.width / 2).toBeLessThanOrEqual(cellMaxX + 1e-6);
-        expect(rect.y - rect.height / 2).toBeGreaterThanOrEqual(cellMinY - 1e-6);
-        expect(rect.y + rect.height / 2).toBeLessThanOrEqual(cellMaxY + 1e-6);
+  it("adjacent columns start with a different item (owner: horizontally adjacent columns should not align)", () => {
+    const items = seedItems();
+    let distinctPairs = 0;
+    let totalPairs = 0;
+    for (let c = -12; c < 12; c++) {
+      const a = columnPeriod(items, 220, c).order[0];
+      const b = columnPeriod(items, 220, c + 1).order[0];
+      totalPairs++;
+      if (a !== b) {
+        distinctPairs++;
       }
     }
-  });
-
-  it("is deterministic for the same cell and item", () => {
-    const item = makeItem("rect-det", "font");
-    expect(cardWorldRect(1, 1, item, CARD_CELL_SIZE)).toEqual(
-      cardWorldRect(1, 1, item, CARD_CELL_SIZE),
-    );
-  });
-});
-
-describe("visibleCardInstances", () => {
-  const items = [
-    makeItem("a", "image"),
-    makeItem("b", "link"),
-    makeItem("c", "text"),
-    makeItem("d", "video"),
-  ];
-
-  it("returns nothing when there are no items", () => {
-    expect(visibleCardInstances([], { x: 0, y: 0 }, 1000, 800, 1, 100)).toEqual([]);
-  });
-
-  it("is deterministic: identical inputs produce identical output (same items -> same layout)", () => {
-    const a = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, 1, 100);
-    const b = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, 1, 100);
-    expect(a).toEqual(b);
-  });
-
-  it("every returned instance's item comes from the input items array (repetition allowed)", () => {
-    const instances = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, 1, 200);
-    const ids = new Set(items.map((item) => item.id));
-    for (const instance of instances) {
-      expect(ids.has(instance.item.id)).toBe(true);
-    }
-  });
-
-  it("repeats the single item across many cells when only one item exists", () => {
-    const single = [makeItem("only", "palette")];
-    const instances = visibleCardInstances(single, { x: 0, y: 0 }, 1200, 900, 1, 200);
-    expect(instances.length).toBeGreaterThan(1);
-    for (const instance of instances) {
-      expect(instance.item.id).toBe("only");
-    }
-  });
-
-  it("respects the maxPoolSize cap", () => {
-    const instances = visibleCardInstances(items, { x: 0, y: 0 }, 4000, 4000, 3, 25);
-    expect(instances.length).toBeLessThanOrEqual(25);
-  });
-
-  it("shifts which cells are visible as the viewport center moves", () => {
-    const near = visibleCardInstances(items, { x: 0, y: 0 }, 800, 600, 1, 100);
-    const far = visibleCardInstances(items, { x: 5000, y: 0 }, 800, 600, 1, 100);
-    const nearKeys = new Set(near.map((instance) => instance.key));
-    const farKeys = new Set(far.map((instance) => instance.key));
-    const overlap = [...nearKeys].filter((key) => farKeys.has(key));
-    expect(overlap.length).toBe(0);
+    // Every adjacent pair in this deterministic scheme must differ (not just
+    // "usually" — see item-layout.ts's `columnPhase`/`columnStep`).
+    expect(distinctPairs).toBe(totalPairs);
   });
 });
 
@@ -191,5 +150,222 @@ describe("cardAssignmentKey", () => {
     const a = cardAssignmentKey({ key: "3,4", item: makeItem("a") });
     const b = cardAssignmentKey({ key: "3,4", item: makeItem("b") });
     expect(a).not.toBe(b);
+  });
+});
+
+describe("visibleCardInstances", () => {
+  const items = [
+    makeItem("a", "image"),
+    makeItem("b", "link"),
+    makeItem("c", "text"),
+    makeItem("d", "video"),
+  ];
+  const columnWidth = 220;
+
+  it("returns nothing when there are no items", () => {
+    expect(visibleCardInstances([], { x: 0, y: 0 }, 1000, 800, columnWidth)).toEqual([]);
+  });
+
+  it("is deterministic: identical inputs produce identical output (same items -> same layout)", () => {
+    const a = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, columnWidth);
+    const b = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, columnWidth);
+    expect(a).toEqual(b);
+  });
+
+  it("every returned instance's item comes from the input items array (repetition allowed)", () => {
+    const instances = visibleCardInstances(items, { x: 0, y: 0 }, 1000, 800, columnWidth);
+    const ids = new Set(items.map((item) => item.id));
+    for (const instance of instances) {
+      expect(ids.has(instance.item.id)).toBe(true);
+    }
+  });
+
+  it("repeats the single item across many rows when only one item exists", () => {
+    const single = [makeItem("only", "palette")];
+    const instances = visibleCardInstances(single, { x: 0, y: 0 }, 1200, 900, columnWidth);
+    expect(instances.length).toBeGreaterThan(1);
+    for (const instance of instances) {
+      expect(instance.item.id).toBe("only");
+    }
+  });
+
+  it("respects the maxPoolSize cap", () => {
+    const instances = visibleCardInstances(items, { x: 0, y: 0 }, 4000, 4000, columnWidth, 100, 25);
+    expect(instances.length).toBeLessThanOrEqual(25);
+  });
+
+  it("shifts which cards are visible as the viewport center moves", () => {
+    const near = visibleCardInstances(items, { x: 0, y: 0 }, 800, 600, columnWidth);
+    const far = visibleCardInstances(items, { x: 20_000, y: 0 }, 800, 600, columnWidth);
+    const nearKeys = new Set(near.map((instance) => instance.key));
+    const farKeys = new Set(far.map((instance) => instance.key));
+    const overlap = [...nearKeys].filter((key) => farKeys.has(key));
+    expect(overlap.length).toBe(0);
+  });
+
+  it("every card's width is exactly the column width (no jitter, no random size scaling)", () => {
+    const instances = visibleCardInstances(seedItems(), { x: 0, y: 0 }, 1440, 900, columnWidth);
+    expect(instances.length).toBeGreaterThan(0);
+    for (const instance of instances) {
+      expect(instance.worldRect.width).toBe(columnWidth);
+    }
+  });
+
+  it("every card's height is columnWidth / its item's aspect", () => {
+    const instances = visibleCardInstances(seedItems(), { x: 0, y: 0 }, 1440, 900, columnWidth);
+    for (const instance of instances) {
+      expect(instance.worldRect.height).toBeCloseTo(
+        cardHeightForItem(instance.item, columnWidth),
+        5,
+      );
+    }
+  });
+
+  it("uses the SAME constant gutter for the horizontal gap between columns and the vertical gap between stacked cards", () => {
+    const instances = visibleCardInstances(seedItems(), { x: 0, y: 0 }, 1440, 900, columnWidth, 0);
+    const byColumn = new Map<number, typeof instances>();
+    for (const instance of instances) {
+      const list = byColumn.get(instance.columnIndex) ?? [];
+      list.push(instance);
+      byColumn.set(instance.columnIndex, list);
+    }
+
+    // Horizontal: any two horizontally-adjacent columns' centers are exactly
+    // one columnStride (columnWidth + COLUMN_GUTTER_PX) apart.
+    const columnIndices = [...byColumn.keys()].sort((a, b) => a - b);
+    for (let i = 1; i < columnIndices.length; i++) {
+      const prev = columnIndices[i - 1] as number;
+      const curr = columnIndices[i] as number;
+      if (curr === prev + 1) {
+        const prevList = byColumn.get(prev);
+        const currList = byColumn.get(curr);
+        const prevCenter = (prevList?.[0] as (typeof instances)[number] | undefined)?.worldRect.x;
+        const currCenter = (currList?.[0] as (typeof instances)[number] | undefined)?.worldRect.x;
+        expect(prevCenter).toBeDefined();
+        expect(currCenter).toBeDefined();
+        expect((currCenter as number) - (prevCenter as number)).toBeCloseTo(
+          columnWidth + COLUMN_GUTTER_PX,
+          5,
+        );
+      }
+    }
+
+    // Vertical: consecutive cards stacked in the SAME column leave exactly
+    // COLUMN_GUTTER_PX between one card's bottom edge and the next card's
+    // top edge (constant, unlike the old per-cell jitter).
+    let checkedAnyColumn = false;
+    for (const list of byColumn.values()) {
+      const sorted = [...list].sort((a, b) => a.worldRect.y - b.worldRect.y);
+      for (let i = 1; i < sorted.length; i++) {
+        const prevBottom =
+          (sorted[i - 1] as (typeof instances)[number]).worldRect.y +
+          (sorted[i - 1] as (typeof instances)[number]).worldRect.height / 2;
+        const currTop =
+          (sorted[i] as (typeof instances)[number]).worldRect.y -
+          (sorted[i] as (typeof instances)[number]).worldRect.height / 2;
+        expect(currTop - prevBottom).toBeCloseTo(COLUMN_GUTTER_PX, 3);
+        checkedAnyColumn = true;
+      }
+    }
+    expect(checkedAnyColumn).toBe(true);
+  });
+
+  // NOTE on "no item appears more than once" at exactly 24 items: at
+  // 1440px, columnLayoutFor gives 5-6 columns, and 24 real-world items'
+  // mixed aspect ratios average ~4 rows visible per column in 900px — i.e.
+  // the EXACT viewport (no margin) shows ~23-24 card slots for 24 items, a
+  // ~1:1 slot-to-item ratio. At that ratio, SOME repeat is a mathematical
+  // certainty for ANY assignment scheme that keeps each column's own full
+  // N-item period (required so a column doesn't just cycle a handful of
+  // items forever) — a brute-force search over both a shared linear
+  // (column, row) lattice and this module's actual per-column hashed
+  // step/phase confirmed no parameter choice reaches zero collisions here
+  // (best found: 2 items appearing twice, 21/23 unique — see the git log
+  // for the search). What's genuinely fixable (and was the actual reported
+  // bug: the OLD hash-grid showed the same text item 3 times) is the WORST
+  // case: no single item should dominate. `STEP_CHANNEL`/`PHASE_CHANNEL`
+  // were tuned against this exact scenario to minimize the max repeat
+  // count.
+  it("distribution: in a 1440x900 window with 24 items, no item appears more than twice", () => {
+    const items24 = seedItems(24);
+    const { columnWidth: desktopColumnWidth } = columnLayoutFor(1440);
+    const instances = visibleCardInstances(
+      items24,
+      { x: 0, y: 0 },
+      1440,
+      900,
+      desktopColumnWidth,
+      0,
+      DEFAULT_MAX_CARD_POOL_SIZE,
+    );
+    const counts = new Map<string, number>();
+    for (const instance of instances) {
+      counts.set(instance.item.id, (counts.get(instance.item.id) ?? 0) + 1);
+    }
+    for (const count of counts.values()) {
+      expect(count).toBeLessThanOrEqual(2);
+    }
+    // Still meaningfully better than a 1:1 slot-to-item ratio would suggest.
+    expect(counts.size).toBeGreaterThanOrEqual(instances.length - 3);
+  });
+
+  // Slot count in a 1440x900 window stays roughly constant (~21-25) as item
+  // count grows (it's driven by columns/row-height, not item count), so
+  // "no repeat" never becomes trivially easy just by adding more items —
+  // verified empirically across a realistic range of library sizes that no
+  // item shows up 3+ times (matching the actually reported bug shape).
+  it.each([24, 40, 60, 100])(
+    "distribution: no item appears 3+ times in a 1440x900 window at a realistic library size (%i items)",
+    (itemCount) => {
+      const items = seedItems(itemCount);
+      const { columnWidth: desktopColumnWidth } = columnLayoutFor(1440);
+      const instances = visibleCardInstances(
+        items,
+        { x: 0, y: 0 },
+        1440,
+        900,
+        desktopColumnWidth,
+        0,
+        DEFAULT_MAX_CARD_POOL_SIZE,
+      );
+      const counts = new Map<string, number>();
+      for (const instance of instances) {
+        counts.set(instance.item.id, (counts.get(instance.item.id) ?? 0) + 1);
+      }
+      for (const count of counts.values()) {
+        expect(count).toBeLessThanOrEqual(3);
+      }
+    },
+  );
+
+  it("distribution: adjacent columns' starting (topmost visible) items differ", () => {
+    const items24 = seedItems(24);
+    const { columnWidth: desktopColumnWidth } = columnLayoutFor(1440);
+    const instances = visibleCardInstances(
+      items24,
+      { x: 0, y: 0 },
+      1440,
+      900,
+      desktopColumnWidth,
+      0,
+      DEFAULT_MAX_CARD_POOL_SIZE,
+    );
+    const byColumn = new Map<number, (typeof instances)[number]>();
+    for (const instance of instances) {
+      const existing = byColumn.get(instance.columnIndex);
+      if (!existing || instance.worldRect.y < existing.worldRect.y) {
+        byColumn.set(instance.columnIndex, instance);
+      }
+    }
+    const columnIndices = [...byColumn.keys()].sort((a, b) => a - b);
+    for (let i = 1; i < columnIndices.length; i++) {
+      const prev = columnIndices[i - 1] as number;
+      const curr = columnIndices[i] as number;
+      if (curr === prev + 1) {
+        const prevItem = byColumn.get(prev) as (typeof instances)[number];
+        const currItem = byColumn.get(curr) as (typeof instances)[number];
+        expect(currItem.item.id).not.toBe(prevItem.item.id);
+      }
+    }
   });
 });

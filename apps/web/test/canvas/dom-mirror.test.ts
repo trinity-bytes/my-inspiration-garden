@@ -6,8 +6,8 @@ import { makeItem } from "../fixtures/items";
 function instance(key: string, x: number, y: number): CardInstance {
   return {
     key,
-    cellX: 0,
-    cellY: 0,
+    columnIndex: 0,
+    row: 0,
     item: makeItem(key, "text"),
     worldRect: { x, y, width: 100, height: 100 },
   };

@@ -8,7 +8,7 @@ import type { Vec2 } from "./types";
  * or mutable animation state — cards are pooled and reassigned to different
  * items every frame, like `layers/clouds.ts`), so opacity is a function of
  * how deep a card sits inside the viewport right now. A card at the outer
- * edge of the virtualization margin (see `item-layout.ts`'s `marginCells`)
+ * edge of the virtualization margin (see `item-layout.ts`'s `marginPx`)
  * is fully transparent; a card fully inside the viewport is fully solid;
  * in between it ramps.
  */
@@ -32,7 +32,7 @@ export function cardScreenRect(
   };
 }
 
-/** Matches the render margin cards get before popping into existence (see `item-layout.ts`'s `CARD_CELL_SIZE * DEFAULT_CARD_MARGIN_CELLS`, kept independent so the fade band can be tuned without moving the virtualization boundary). */
+/** Matches the render margin cards get before popping into existence (see `item-layout.ts`'s `DEFAULT_CARD_MARGIN_PX`, kept independent so the fade band can be tuned without moving the virtualization boundary). */
 export const DEFAULT_FADE_MARGIN_PX = 140;
 
 /**

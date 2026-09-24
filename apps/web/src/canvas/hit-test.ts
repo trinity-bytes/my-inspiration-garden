@@ -92,7 +92,7 @@ function pointInRect(
  * The topmost card under the pointer, or `null`. "Topmost" = last match in
  * `cards` (callers pass cards in draw order, matching the engine's render
  * order — see `layers/cards.ts`); by design cards rarely overlap (each is
- * confined to its own layout cell, see `item-layout.ts`), but the tie-break
+ * confined to its own column slot, see `item-layout.ts`), but the tie-break
  * is still well-defined.
  */
 export function hitTestCard(

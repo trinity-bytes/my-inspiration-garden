@@ -2,12 +2,13 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { cloudDepthStyle, cloudOpacityRange } from "./cloud-depth";
+import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
 import { selectDomMirrorCards } from "./dom-mirror";
 import { hitTestCard } from "./hit-test";
 import {
   type CardInstance,
-  DEFAULT_CARD_MARGIN_CELLS,
+  DEFAULT_CARD_MARGIN_PX,
   DEFAULT_MAX_CARD_POOL_SIZE,
   visibleCardInstances,
 } from "./item-layout";
@@ -172,6 +173,8 @@ export class CanvasEngine {
     () => {},
   );
   private lastDomMirrorSignature = "";
+  /** The column width `visibleCardInstances` was last called with — a resize changes it, which invalidates every cached `CardInstance` (their `worldRect.width`/`x` are only valid for the column width they were computed with). */
+  private lastColumnWidth = -1;
   private hoveredCardKey: string | null = null;
   /** Click-vs-drag / hover-suppression state machine (see `pointer-gesture.ts`). */
   private pointerGesture: PointerGestureState = IDLE_POINTER_GESTURE;
@@ -623,13 +626,24 @@ export class CanvasEngine {
       return;
     }
 
+    const { columnWidth } = columnLayoutFor(viewport.width);
+    if (columnWidth !== this.lastColumnWidth) {
+      // A resize changes column geometry, so every previously cached
+      // CardInstance's worldRect (computed for the OLD column width) is
+      // stale — clear rather than let it silently keep rendering at the
+      // wrong size/position until it scrolls out of the render margin.
+      this.lastColumnWidth = columnWidth;
+      this.cardInstanceCache.clear();
+    }
+
     const cardCenterWorld: Vec2 = { x: -world.x, y: -world.y };
     visibleCardInstances(
       this.items,
       cardCenterWorld,
       viewport.width,
       viewport.height,
-      DEFAULT_CARD_MARGIN_CELLS,
+      columnWidth,
+      DEFAULT_CARD_MARGIN_PX,
       DEFAULT_MAX_CARD_POOL_SIZE,
       this.cardInstanceCache,
       this.lastCardInstances,
