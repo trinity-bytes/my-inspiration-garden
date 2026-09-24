@@ -2,10 +2,11 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { cardEntryProgress, cardOpacity, cardScreenRect, entryScaleForCard } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
+import { paintItemCardCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
 import { clampSpriteCssSize } from "../max-sprite-size";
-import { createPlaceholderTexture } from "../placeholder-texture";
+import { createPlaceholderTexture, paintPlaceholderCanvas } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
 import { TextureRegistry } from "../texture-registry";
 import { thumbnailUrlForItem } from "../thumbnail-source";
@@ -116,17 +117,32 @@ export class CardLayer {
     this.textures.pin(key);
   }
 
-  /**
-   * Loads (or reuses from cache) the texture for `item`, applying it to
-   * `entry` only if it is still assigned to the same instance by the time
-   * an async load resolves (stale-load guard via `loadToken`). Goes through
-   * `TextureRegistry.load` (dedupes concurrent loads for the same key — the
-   * layout repeats items across cells, so several entries can miss the
-   * cache for the same key in the same frame) and pins the key `entry`
-   * currently wants (so it's never evicted/disposed while this entry still
-   * renders it — see `texture-registry.ts`).
-   */
+  /** Dispatches to the raw full-bleed photo path (`image` — "no chrome", see `odd/tasks/garden-mvp.md`'s T9 scope) or the composed per-kind painted path (every other kind, `card-painters.ts`). */
   private assignTexture(entry: PoolEntry, item: Item, widthPx: number, heightPx: number): void {
+    if (item.kind === "image") {
+      this.assignPhotoTexture(entry, item, widthPx, heightPx);
+      return;
+    }
+    this.assignComposedTexture(entry, item, widthPx, heightPx);
+  }
+
+  /**
+   * Loads (or reuses from cache) the raw photo texture for an `image` item,
+   * applying it to `entry` only if it is still assigned to the same
+   * instance by the time an async load resolves (stale-load guard via
+   * `loadToken`). Goes through `TextureRegistry.load` (dedupes concurrent
+   * loads for the same key — the layout repeats items across cells, so
+   * several entries can miss the cache for the same key in the same frame)
+   * and pins the key `entry` currently wants (so it's never
+   * evicted/disposed while this entry still renders it — see
+   * `texture-registry.ts`).
+   */
+  private assignPhotoTexture(
+    entry: PoolEntry,
+    item: Item,
+    widthPx: number,
+    heightPx: number,
+  ): void {
     const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
     const cacheKey = thumbnailUrl ?? `placeholder:${item.id}`;
     const token = entry.loadToken;
@@ -186,6 +202,53 @@ export class CardLayer {
           () => {},
         );
       },
+    );
+  }
+
+  /**
+   * Composes the rich per-kind card texture (link/video/text/palette/font,
+   * `card-painters.ts`) on a 2D canvas and wraps it as a
+   * `THREE.CanvasTexture`, applying it only if `entry` is still assigned to
+   * the same instance (stale-load guard, same convention as
+   * `assignPhotoTexture`). `paintItemCardCanvas` never rejects — it falls
+   * back to the generic placeholder internally — so the registry's error
+   * path here is defensive only.
+   */
+  private assignComposedTexture(
+    entry: PoolEntry,
+    item: Item,
+    widthPx: number,
+    heightPx: number,
+  ): void {
+    const cacheKey = `composed:${item.kind}:${item.id}`;
+    const token = entry.loadToken;
+
+    this.pinEntryTexture(entry, cacheKey);
+
+    this.textures.load(
+      cacheKey,
+      (resolve) => {
+        paintItemCardCanvas(item, widthPx, heightPx)
+          .then((canvas) => {
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.NoColorSpace;
+            texture.needsUpdate = true;
+            resolve(texture);
+          })
+          .catch(() => {
+            const canvas = paintPlaceholderCanvas(item, widthPx, heightPx);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.NoColorSpace;
+            texture.needsUpdate = true;
+            resolve(texture);
+          });
+      },
+      (texture) => {
+        if (!isStaleLoadCallback(entry.loadToken, token)) {
+          entry.uniforms.u_map.value = texture;
+        }
+      },
+      () => {},
     );
   }
 

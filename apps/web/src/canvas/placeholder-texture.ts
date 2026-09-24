@@ -1,6 +1,7 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { placeholderStyleForItem } from "./placeholder-style";
+import { wrapText } from "./wrap-text";
 
 /**
  * Paints a generic placeholder card (title + kind, Geist, palette tokens —
@@ -9,20 +10,27 @@ import { placeholderStyleForItem } from "./placeholder-style";
  * has no real 2D canvas/text rendering (see the test setup's "Not
  * implemented: getContext()" warnings elsewhere in this suite); covered by
  * `pnpm --filter web build` + manual visual QA, like the rest of the GPU
- * glue in this directory.
+ * glue in this directory. Also the fallback for every per-kind painter
+ * (`card-painters.ts`, T9) when its own content can't be painted.
  */
-const DEVICE_PIXEL_SIZE = 512;
+export const DEVICE_PIXEL_SIZE = 512;
 const CORNER_RADIUS_FRACTION = 0.06;
+
+/** A `<canvas>` sized so its longer edge is `DEVICE_PIXEL_SIZE` device px, preserving `widthPx`/`heightPx`'s aspect ratio — the resolution budget every per-kind card texture (placeholder or rich) paints at, independent of the card's exact on-screen CSS size (which varies with viewport/column width). */
+export function createDeviceCanvas(widthPx: number, heightPx: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  const scale = DEVICE_PIXEL_SIZE / Math.max(widthPx, heightPx, 1);
+  canvas.width = Math.max(1, Math.round(widthPx * scale));
+  canvas.height = Math.max(1, Math.round(heightPx * scale));
+  return canvas;
+}
 
 export function paintPlaceholderCanvas(
   item: Item,
   widthPx: number,
   heightPx: number,
 ): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  const scale = DEVICE_PIXEL_SIZE / Math.max(widthPx, heightPx);
-  canvas.width = Math.max(1, Math.round(widthPx * scale));
-  canvas.height = Math.max(1, Math.round(heightPx * scale));
+  const canvas = createDeviceCanvas(widthPx, heightPx);
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
@@ -50,40 +58,20 @@ export function paintPlaceholderCanvas(
   ctx.globalAlpha = 1;
 
   ctx.font = `600 ${Math.round(canvas.width * 0.07)}px "Geist Variable", system-ui, sans-serif`;
-  wrapText(ctx, style.displayTitle, padding, canvas.height - padding, canvas.width - padding * 2);
+  const maxWidth = canvas.width - padding * 2;
+  const { lines } = wrapText(
+    (text) => ctx.measureText(text).width,
+    style.displayTitle,
+    maxWidth,
+    3,
+  );
+  const lineHeight = Math.round(maxWidth * 0.12) || 28;
+  const startY = canvas.height - padding - (lines.length - 1) * lineHeight;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, padding, startY + i * lineHeight);
+  });
 
   return canvas;
-}
-
-/** Simple greedy word-wrap, capped at 3 lines (a placeholder card, not a text reader). */
-function wrapText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  bottomY: number,
-  maxWidth: number,
-): void {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (ctx.measureText(candidate).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
-
-  const maxLines = 3;
-  const shown = lines.slice(0, maxLines);
-  const lineHeight = Math.round(maxWidth * 0.12) || 28;
-  const startY = bottomY - (shown.length - 1) * lineHeight;
-  shown.forEach((line, i) => {
-    ctx.fillText(line, x, startY + i * lineHeight);
-  });
 }
 
 export function createPlaceholderTexture(
