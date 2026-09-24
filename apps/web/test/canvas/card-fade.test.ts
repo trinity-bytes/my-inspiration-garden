@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { cardEntryProgress, cardOpacity, cardScreenRect } from "../../src/canvas/card-fade";
+import {
+  cardEntryProgress,
+  cardEntryScale,
+  cardOpacity,
+  cardScreenRect,
+  entryScaledWorldRect,
+  MIN_ENTRY_SCALE,
+} from "../../src/canvas/card-fade";
 
 describe("cardScreenRect", () => {
   it("centers the rect at the world position offset by the world offset (parallax 1)", () => {
@@ -68,5 +75,60 @@ describe("cardOpacity", () => {
     expect(cardOpacity(0, true)).toBe(0);
     expect(cardOpacity(0.001, true)).toBe(1);
     expect(cardOpacity(1, true)).toBe(1);
+  });
+});
+
+describe("cardEntryScale (watch-face style grow/shrink at the edges)", () => {
+  it("is full size once the card is fully entered", () => {
+    expect(cardEntryScale(1, false)).toBe(1);
+  });
+
+  it("shrinks to MIN_ENTRY_SCALE for a card that has not entered yet", () => {
+    expect(MIN_ENTRY_SCALE).toBeGreaterThan(0.4);
+    expect(MIN_ENTRY_SCALE).toBeLessThan(0.8);
+    expect(cardEntryScale(0, false)).toBeCloseTo(MIN_ENTRY_SCALE, 10);
+  });
+
+  it("grows monotonically with the same eased ramp as the opacity", () => {
+    const mid = cardEntryScale(0.5, false);
+    expect(mid).toBeCloseTo(MIN_ENTRY_SCALE + (1 - MIN_ENTRY_SCALE) * cardOpacity(0.5, false), 10);
+    expect(cardEntryScale(0.25, false)).toBeLessThan(mid);
+    expect(cardEntryScale(0.75, false)).toBeGreaterThan(mid);
+  });
+
+  it("never scales under reduced motion", () => {
+    expect(cardEntryScale(0, true)).toBe(1);
+    expect(cardEntryScale(0.3, true)).toBe(1);
+  });
+});
+
+describe("entryScaledWorldRect", () => {
+  const viewport = { width: 1000, height: 800 };
+  const origin = { x: 0, y: 0 };
+
+  it("keeps a fully entered card unchanged", () => {
+    const rect = { x: 0, y: 0, width: 100, height: 100 };
+    expect(entryScaledWorldRect(rect, origin, viewport, false)).toEqual(rect);
+  });
+
+  it("shrinks an edge card around its own center, matching what is rendered", () => {
+    const rect = { x: 450, y: 0, width: 100, height: 100 };
+    const progress = cardEntryProgress(
+      cardScreenRect(rect, origin, 1),
+      viewport.width,
+      viewport.height,
+    );
+    const scale = cardEntryScale(progress, false);
+    const scaled = entryScaledWorldRect(rect, origin, viewport, false);
+    expect(scale).toBeLessThan(1);
+    expect(scaled.x).toBe(450);
+    expect(scaled.y).toBe(0);
+    expect(scaled.width).toBeCloseTo(100 * scale, 10);
+    expect(scaled.height).toBeCloseTo(100 * scale, 10);
+  });
+
+  it("does not shrink under reduced motion", () => {
+    const rect = { x: 450, y: 0, width: 100, height: 100 };
+    expect(entryScaledWorldRect(rect, origin, viewport, true)).toEqual(rect);
   });
 });

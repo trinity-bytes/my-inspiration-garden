@@ -1,6 +1,6 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
-import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
+import { cardEntryProgress, cardEntryScale, cardOpacity, cardScreenRect } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
@@ -235,9 +235,13 @@ export class CardLayer {
         textureImage?.width ?? instance.worldRect.width,
         dpr,
       );
-      const scaleFactor = clampedWidth / instance.worldRect.width;
-      const width = instance.worldRect.width * scaleFactor * hover.scale;
-      const height = instance.worldRect.height * scaleFactor * hover.scale;
+      const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
+      const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
+      // Same entry scale `entryScaledWorldRect` feeds hit-testing (engine.ts).
+      const entryScale = cardEntryScale(progress, reducedMotion);
+      const scaleFactor = (clampedWidth / instance.worldRect.width) * entryScale * hover.scale;
+      const width = instance.worldRect.width * scaleFactor;
+      const height = instance.worldRect.height * scaleFactor;
 
       // Y negated: mesh position is scene space (y-up); worldRect is this
       // engine's y-down world convention (coords.ts), same as clouds.ts.
@@ -245,8 +249,6 @@ export class CardLayer {
       entry.mesh.scale.set(width, height, 1);
       entry.mesh.visible = true;
 
-      const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
-      const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
       entry.uniforms.u_opacity.value = cardOpacity(progress, reducedMotion);
       entry.uniforms.u_aspect.value = width / height;
       entry.uniforms.u_highlight.value = hover.highlight;

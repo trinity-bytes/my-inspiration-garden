@@ -77,3 +77,41 @@ export function cardOpacity(progress: number, reducedMotion: boolean): number {
   }
   return smoothstep(progress);
 }
+
+/**
+ * Smallest scale a card shrinks to at the viewport edge — the smartwatch
+ * app-grid feel: cards grow to full size as they enter and shrink as they
+ * leave, on the same ramp as the opacity.
+ */
+export const MIN_ENTRY_SCALE = 0.6;
+
+/** Size multiplier for `progress` (see `cardEntryProgress`); reduced motion keeps cards at full size. */
+export function cardEntryScale(progress: number, reducedMotion: boolean): number {
+  if (reducedMotion) {
+    return 1;
+  }
+  return MIN_ENTRY_SCALE + (1 - MIN_ENTRY_SCALE) * smoothstep(progress);
+}
+
+/**
+ * The card's world rect shrunk around its own center by its entry scale —
+ * the single source of truth shared by rendering (`layers/cards.ts`) and
+ * hit-testing, so a shrunk edge card is only clickable where it is drawn.
+ */
+export function entryScaledWorldRect(
+  worldRect: CardWorldRect,
+  worldOffset: Vec2,
+  viewport: { width: number; height: number },
+  reducedMotion: boolean,
+): CardWorldRect {
+  const progress = cardEntryProgress(
+    cardScreenRect(worldRect, worldOffset, 1),
+    viewport.width,
+    viewport.height,
+  );
+  const scale = cardEntryScale(progress, reducedMotion);
+  if (scale === 1) {
+    return worldRect;
+  }
+  return { ...worldRect, width: worldRect.width * scale, height: worldRect.height * scale };
+}
