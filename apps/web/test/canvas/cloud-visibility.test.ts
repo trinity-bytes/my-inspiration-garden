@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cloudForCell, visibleCellRange } from "../../src/canvas/cloud-field";
 import { cloudScreenRect, rectOverlapsViewport } from "../../src/canvas/cloud-screen-rect";
-import { FAR_CLOUD_CONFIG, MID_CLOUD_CONFIG, NEAR_CLOUD_CONFIG } from "../../src/canvas/engine";
+import { FAR_CLOUD_CONFIG, MID_CLOUD_CONFIG } from "../../src/canvas/engine";
 import type { CloudLayerRuntimeConfig } from "../../src/canvas/layers/clouds";
 import { spriteQuadCssSize } from "../../src/canvas/max-sprite-size";
 
@@ -63,15 +63,15 @@ describe("cloud layers are actually visible at rest (1440x900, worldOffset=0)", 
   it("each layer places at least one cloud that overlaps the viewport", () => {
     expect(countOnScreenClouds(FAR_CLOUD_CONFIG)).toBeGreaterThanOrEqual(1);
     expect(countOnScreenClouds(MID_CLOUD_CONFIG)).toBeGreaterThanOrEqual(1);
-    expect(countOnScreenClouds(NEAR_CLOUD_CONFIG)).toBeGreaterThanOrEqual(1);
   });
 
-  it("the three layers together place a reasonable total (3-6, not 0-2 and not a cluttered dozen+)", () => {
-    const total =
-      countOnScreenClouds(FAR_CLOUD_CONFIG) +
-      countOnScreenClouds(MID_CLOUD_CONFIG) +
-      countOnScreenClouds(NEAR_CLOUD_CONFIG);
-    expect(total).toBeGreaterThanOrEqual(3);
-    expect(total).toBeLessThanOrEqual(6);
+  // T8b owner feedback: the near (fastest, most opaque) cloud layer was
+  // removed — cards now supply the depth cue. Far/mid are unchanged, so
+  // their combined total is a smaller slice of the old 3-6 (three-layer)
+  // range.
+  it("the two layers together place a reasonable total (2-4, not 0-1 and not a cluttered dozen+)", () => {
+    const total = countOnScreenClouds(FAR_CLOUD_CONFIG) + countOnScreenClouds(MID_CLOUD_CONFIG);
+    expect(total).toBeGreaterThanOrEqual(2);
+    expect(total).toBeLessThanOrEqual(4);
   });
 });

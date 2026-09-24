@@ -58,22 +58,27 @@ const DPR_CAP = 2;
 const SKY_PARALLAX = 0.05;
 const HAZE_PARALLAX = 0.12;
 
-// Aerial perspective (owner feedback, T8a): three cloud depths (far/mid/
-// near) built from cloudDepthStyle so speed, opacity, atmospheric tint,
-// size and draw order all come from the SAME depth value — a nearer,
-// faster layer is always more solid, less tinted, larger, and drawn over
-// a farther, slower, hazier one. cellSize/density/scaleMin/scaleMax/
-// baseSpriteSizePx stay hand-tuned per layer (not depth-derived) to keep
-// ~3-5 clouds visible at 1440x900 without clutter.
+// Aerial perspective (owner feedback, T8a): two cloud depths (far/mid)
+// built from cloudDepthStyle so speed, opacity, atmospheric tint, size and
+// draw order all come from the SAME depth value — a nearer, faster layer
+// is always more solid, less tinted, larger, and drawn over a farther,
+// slower, hazier one. cellSize/density/scaleMin/scaleMax/baseSpriteSizePx
+// stay hand-tuned per layer (not depth-derived) to keep a few clouds
+// visible at 1440x900 without clutter.
+//
+// T8b owner feedback: the near (fastest, most opaque) cloud layer was
+// REMOVED — cards now supply the depth cue, and a solid near cloud layer
+// competed with them visually. Far/mid are unchanged (the owner likes how
+// far blends into the sky via the atmospheric effect) — only retune if
+// asked.
 const CLOUD_DEPTH_FAR = 0;
 const CLOUD_DEPTH_MID = 0.5;
-const CLOUD_DEPTH_NEAR = 1;
 const CLOUD_BASE_SPRITE_SIZE_PX = 480;
 
 // Cards draw above every cloud layer (decision recorded in
-// odd/tasks/garden-mvp.md: "cards above clouds ... near layer still behind
-// cards"). Cloud renderOrder tops out at 100 (cloudDepthStyle's
-// RENDER_ORDER_SCALE), so 200 leaves headroom.
+// odd/tasks/garden-mvp.md: "cards above clouds"). Cloud renderOrder tops
+// out at 100 (cloudDepthStyle's RENDER_ORDER_SCALE), so 200 leaves
+// headroom.
 const CARD_RENDER_ORDER = 200;
 const CARD_TEXTURE_CACHE_SIZE = 120;
 // A CardInstance's content is a pure, deterministic function of its cell
@@ -124,7 +129,6 @@ function cloudLayerConfig(
 // reduced so most cells are meaningfully smaller than the viewport.
 export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 550, 0.24);
 export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 450, 0.2);
-export const NEAR_CLOUD_CONFIG = cloudLayerConfig(2, CLOUD_DEPTH_NEAR, 450, 0.17);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax
@@ -156,7 +160,6 @@ export class CanvasEngine {
   private haze: HazeLayer | null = null;
   private cloudsFar: CloudLayer | null = null;
   private cloudsMid: CloudLayer | null = null;
-  private cloudsNear: CloudLayer | null = null;
   private cards: CardLayer | null = null;
   private boundTextures: THREE.Texture[] = [];
 
@@ -311,14 +314,12 @@ export class CanvasEngine {
     this.haze?.dispose();
     this.cloudsFar?.dispose();
     this.cloudsMid?.dispose();
-    this.cloudsNear?.dispose();
     this.cards?.dispose();
     this.barrelPass?.dispose();
     this.sky = null;
     this.haze = null;
     this.cloudsFar = null;
     this.cloudsMid = null;
-    this.cloudsNear = null;
     this.cards = null;
     this.barrelPass = null;
 
@@ -402,18 +403,11 @@ export class CanvasEngine {
       this.haze = new HazeLayer({ parallax: HAZE_PARALLAX });
       this.cloudsFar = new CloudLayer([cloud1, cloud2, cloud3, cloud4], FAR_CLOUD_CONFIG);
       this.cloudsMid = new CloudLayer([cloud1, cloud2, cloud3, cloud4], MID_CLOUD_CONFIG);
-      this.cloudsNear = new CloudLayer([cloud1, cloud2, cloud3, cloud4], NEAR_CLOUD_CONFIG);
 
-      // Draw order far -> mid -> near also matches insertion order here;
+      // Draw order far -> mid also matches insertion order here;
       // renderOrder (set per layer from cloud-depth.ts) is what actually
       // guarantees it regardless of insertion or z position.
-      this.scene.add(
-        this.sky.mesh,
-        this.haze.mesh,
-        this.cloudsFar.group,
-        this.cloudsMid.group,
-        this.cloudsNear.group,
-      );
+      this.scene.add(this.sky.mesh, this.haze.mesh, this.cloudsFar.group, this.cloudsMid.group);
 
       this.texturesLoaded = true;
     } catch (error) {
@@ -701,7 +695,6 @@ export class CanvasEngine {
 
     this.updateCloudLayer(this.cloudsFar, FAR_CLOUD_CONFIG.parallax, world, viewport);
     this.updateCloudLayer(this.cloudsMid, MID_CLOUD_CONFIG.parallax, world, viewport);
-    this.updateCloudLayer(this.cloudsNear, NEAR_CLOUD_CONFIG.parallax, world, viewport);
 
     this.updateCards(world, viewport);
 
