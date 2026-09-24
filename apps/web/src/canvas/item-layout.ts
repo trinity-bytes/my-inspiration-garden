@@ -33,7 +33,7 @@ import type { Vec2 } from "./types";
 export const CARD_ASPECT_MIN = 0.5;
 export const CARD_ASPECT_MAX = 2;
 export const DEFAULT_MAX_CARD_POOL_SIZE = 240;
-/** Extra world px rendered beyond the viewport so cards fade in before popping (see `card-fade.ts`'s smaller `DEFAULT_FADE_MARGIN_PX`, which stays well inside this). Chosen to comfortably exceed one column's worth of content, matching the old per-cell grid's `1 cell` margin convention. */
+/** Extra world px rendered beyond the viewport so cards exist before they reach the viewport edge, where `card-fade.ts` ramps them in. Chosen to comfortably exceed one column's worth of content, matching the old per-cell grid's `1 cell` margin convention. */
 export const DEFAULT_CARD_MARGIN_PX = 340;
 
 export interface CardWorldRect {

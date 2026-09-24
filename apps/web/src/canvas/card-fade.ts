@@ -7,10 +7,10 @@ import type { Vec2 } from "./types";
  * Fade transparent → solid entering view: purely spatial (no per-card timer
  * or mutable animation state — cards are pooled and reassigned to different
  * items every frame, like `layers/clouds.ts`), so opacity is a function of
- * how deep a card sits inside the viewport right now. A card at the outer
- * edge of the virtualization margin (see `item-layout.ts`'s `marginPx`)
- * is fully transparent; a card fully inside the viewport is fully solid;
- * in between it ramps.
+ * where a card sits relative to the viewport edge right now. The ramp runs
+ * across the visible edge band — a card entirely outside is transparent, a
+ * card whose outer edge is `fadeInsetPx` inside the viewport is solid — so
+ * the fade is actually seen as cards enter and leave the screen.
  */
 
 /** A card's on-screen bounding rect, CSS px, y-down, relative to the viewport center — same shape as `cloud-screen-rect.ts`'s `ScreenRect`. */
@@ -32,32 +32,36 @@ export function cardScreenRect(
   };
 }
 
-/** Matches the render margin cards get before popping into existence (see `item-layout.ts`'s `DEFAULT_CARD_MARGIN_PX`, kept independent so the fade band can be tuned without moving the virtualization boundary). */
-export const DEFAULT_FADE_MARGIN_PX = 140;
+/** How far inside the viewport edge a card's outer edge must be before it is fully solid. */
+export const DEFAULT_FADE_INSET_PX = 80;
 
 /**
- * How far "inside" the viewport a card is, in [0, 1]: 1 = fully inside the
- * viewport rect, 0 = the card's nearest point is `fadeMarginPx` or more
- * past the viewport edge, ramping linearly in between. Checked
- * independently on both axes (the larger overshoot wins), so a card
- * exceeding the margin on either axis fades out.
+ * Per axis, in [0, 1]: 0 when the card lies entirely past the viewport
+ * edge, 1 once its outer edge is `fadeInsetPx` inside, ramping linearly in
+ * between (so a card flush with the edge, or half past it, is visibly
+ * translucent). The most-faded axis wins.
  */
 export function cardEntryProgress(
   rect: CardScreenRect,
   viewportWidth: number,
   viewportHeight: number,
-  fadeMarginPx: number = DEFAULT_FADE_MARGIN_PX,
+  fadeInsetPx: number = DEFAULT_FADE_INSET_PX,
 ): number {
-  const halfW = viewportWidth / 2;
-  const halfH = viewportHeight / 2;
-  const overshootX = Math.max(0, Math.abs(rect.center.x) - rect.halfWidth - halfW);
-  const overshootY = Math.max(0, Math.abs(rect.center.y) - rect.halfHeight - halfH);
-  const overshoot = Math.max(overshootX, overshootY);
+  const progressX = axisProgress(rect.center.x, rect.halfWidth, viewportWidth / 2, fadeInsetPx);
+  const progressY = axisProgress(rect.center.y, rect.halfHeight, viewportHeight / 2, fadeInsetPx);
+  return Math.min(progressX, progressY);
+}
 
-  if (fadeMarginPx <= 0) {
-    return overshoot > 0 ? 0 : 1;
-  }
-  return clamp01(1 - overshoot / fadeMarginPx);
+function axisProgress(
+  center: number,
+  halfSize: number,
+  halfViewport: number,
+  inset: number,
+): number {
+  // Distance from the card's outer edge to the viewport edge; negative once it pokes out.
+  const insideDepth = halfViewport - Math.abs(center) - halfSize;
+  const extent = halfSize * 2;
+  return clamp01((insideDepth + extent) / (extent + Math.max(inset, 0)));
 }
 
 /**
