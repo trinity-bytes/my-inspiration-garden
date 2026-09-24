@@ -2,17 +2,17 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
-import type { CardInstance } from "../item-layout";
-import { LruCache } from "../lru-cache";
+import { cardAssignmentKey, type CardInstance } from "../item-layout";
 import { clampSpriteCssSize } from "../max-sprite-size";
 import { createPlaceholderTexture } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
+import { TextureRegistry } from "../texture-registry";
 import { thumbnailUrlForItem } from "../thumbnail-source";
 import type { Vec2 } from "../types";
 
 export interface CardLayerOptions {
   maxPoolSize: number;
-  /** Max distinct textures kept resident; evicted textures are disposed (see `lru-cache.ts`). */
+  /** Max distinct textures kept resident; evicted textures are disposed (see `texture-registry.ts`). */
   textureCacheSize: number;
   apiBaseUrl: string;
   renderOrder: number;
@@ -33,7 +33,10 @@ interface PoolEntry {
   mesh: THREE.Mesh;
   material: THREE.ShaderMaterial;
   uniforms: CardUniforms;
+  /** `cardAssignmentKey` of the instance this entry currently renders — reload triggers when this changes, not just the cell key (see `item-layout.ts`). */
   assignedKey: string | null;
+  /** The texture cache key this entry currently holds a pin on (see `texture-registry.ts`), or `null` before its first assignment. Tracked separately from `assignedKey` because on a thumbnail load failure the entry re-pins to the placeholder key while keeping the same `assignedKey`. */
+  pinnedTextureKey: string | null;
   loadToken: number;
 }
 
@@ -51,16 +54,17 @@ export class CardLayer {
   readonly group: THREE.Group;
   private readonly options: CardLayerOptions;
   private readonly pool: PoolEntry[] = [];
-  private readonly textures: LruCache<THREE.Texture>;
+  private readonly textures: TextureRegistry<THREE.Texture>;
   private readonly loader = new THREE.TextureLoader();
 
   constructor(options: CardLayerOptions) {
     this.options = options;
     this.group = new THREE.Group();
     this.group.renderOrder = options.renderOrder;
-    this.textures = new LruCache<THREE.Texture>(options.textureCacheSize, (texture) =>
-      texture.dispose(),
-    );
+    this.textures = new TextureRegistry<THREE.Texture>({
+      maxSize: options.textureCacheSize,
+      dispose: (texture) => texture.dispose(),
+    });
   }
 
   private ensurePoolSize(size: number): void {
@@ -88,54 +92,90 @@ export class CardLayer {
       mesh.visible = false;
       mesh.renderOrder = this.options.renderOrder;
       this.group.add(mesh);
-      this.pool.push({ mesh, material, uniforms, assignedKey: null, loadToken: 0 });
+      this.pool.push({
+        mesh,
+        material,
+        uniforms,
+        assignedKey: null,
+        pinnedTextureKey: null,
+        loadToken: 0,
+      });
     }
   }
 
-  /** Loads (or reuses from cache) the texture for `item`, applying it to `entry` only if it is still assigned to the same instance by the time an async load resolves (stale-load guard via `loadToken`). */
+  /** Pins `entry` to `key` in the texture registry (protecting it from eviction while assigned), unpinning whatever key it held before. A no-op if already pinned to `key`. */
+  private pinEntryTexture(entry: PoolEntry, key: string): void {
+    if (entry.pinnedTextureKey === key) {
+      return;
+    }
+    if (entry.pinnedTextureKey) {
+      this.textures.unpin(entry.pinnedTextureKey);
+    }
+    entry.pinnedTextureKey = key;
+    this.textures.pin(key);
+  }
+
+  /**
+   * Loads (or reuses from cache) the texture for `item`, applying it to
+   * `entry` only if it is still assigned to the same instance by the time
+   * an async load resolves (stale-load guard via `loadToken`). Goes through
+   * `TextureRegistry.load` (dedupes concurrent loads for the same key — the
+   * layout repeats items across cells, so several entries can miss the
+   * cache for the same key in the same frame) and pins the key `entry`
+   * currently wants (so it's never evicted/disposed while this entry still
+   * renders it — see `texture-registry.ts`).
+   */
   private assignTexture(entry: PoolEntry, item: Item, widthPx: number, heightPx: number): void {
     const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
     const cacheKey = thumbnailUrl ?? `placeholder:${item.id}`;
-
-    const cached = this.textures.get(cacheKey);
-    if (cached) {
-      entry.uniforms.u_map.value = cached;
-      return;
-    }
-
     const token = entry.loadToken;
 
-    if (!thumbnailUrl) {
-      const texture = createPlaceholderTexture(item, widthPx, heightPx);
-      this.textures.set(cacheKey, texture);
-      if (entry.loadToken === token) {
-        entry.uniforms.u_map.value = texture;
-      }
-      return;
-    }
+    this.pinEntryTexture(entry, cacheKey);
 
-    this.loader.load(
-      thumbnailUrl,
+    this.textures.load(
+      cacheKey,
+      (resolve, reject) => {
+        if (!thumbnailUrl) {
+          resolve(createPlaceholderTexture(item, widthPx, heightPx));
+          return;
+        }
+        this.loader.load(
+          thumbnailUrl,
+          (texture) => {
+            // Respect the T8a device-px clamp convention: don't upscale
+            // beyond the loaded image's own resolution (see
+            // `max-sprite-size.ts`).
+            texture.colorSpace = THREE.NoColorSpace;
+            resolve(texture);
+          },
+          undefined,
+          reject,
+        );
+      },
       (texture) => {
-        // Respect the T8a device-px clamp convention: don't upscale beyond
-        // the loaded image's own resolution (see `max-sprite-size.ts`).
-        texture.colorSpace = THREE.NoColorSpace;
-        this.textures.set(cacheKey, texture);
         if (entry.loadToken === token) {
           entry.uniforms.u_map.value = texture;
         }
       },
-      undefined,
       () => {
         // Thumbnail failed to load (broken URL, network) — fall back to the
-        // generic placeholder rather than leaving the card blank.
+        // generic placeholder rather than leaving the card blank. Re-pin to
+        // the fallback key so the registry never disposes it while this
+        // entry still references it, and route through `load` too (never
+        // `set` a value already known to be cached — see
+        // `texture-registry.ts`'s identity no-op rule).
         const fallbackKey = `placeholder:${item.id}`;
-        const texture =
-          this.textures.get(fallbackKey) ?? createPlaceholderTexture(item, widthPx, heightPx);
-        this.textures.set(fallbackKey, texture);
-        if (entry.loadToken === token) {
-          entry.uniforms.u_map.value = texture;
-        }
+        this.pinEntryTexture(entry, fallbackKey);
+        this.textures.load(
+          fallbackKey,
+          (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
+          (texture) => {
+            if (entry.loadToken === token) {
+              entry.uniforms.u_map.value = texture;
+            }
+          },
+          () => {},
+        );
       },
     );
   }
@@ -167,8 +207,9 @@ export class CardLayer {
         continue;
       }
 
-      if (entry.assignedKey !== instance.key) {
-        entry.assignedKey = instance.key;
+      const assignmentKey = cardAssignmentKey(instance);
+      if (entry.assignedKey !== assignmentKey) {
+        entry.assignedKey = assignmentKey;
         entry.loadToken++;
         this.assignTexture(
           entry,

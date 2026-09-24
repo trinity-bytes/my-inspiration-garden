@@ -5,6 +5,7 @@ import {
   CARD_CELL_SIZE,
   CARD_WIDTH_MAX_FRACTION,
   cardAspectForItem,
+  cardAssignmentKey,
   cardSizeForItem,
   cardWorldRect,
   itemIndexForCell,
@@ -170,5 +171,25 @@ describe("visibleCardInstances", () => {
     const farKeys = new Set(far.map((instance) => instance.key));
     const overlap = [...nearKeys].filter((key) => farKeys.has(key));
     expect(overlap.length).toBe(0);
+  });
+});
+
+describe("cardAssignmentKey", () => {
+  it("is stable for the same cell and item", () => {
+    const instance = { key: "3,4", item: makeItem("a") };
+    expect(cardAssignmentKey(instance)).toBe(cardAssignmentKey(instance));
+  });
+
+  it("differs when the cell key differs (same item)", () => {
+    const item = makeItem("a");
+    expect(cardAssignmentKey({ key: "3,4", item })).not.toBe(
+      cardAssignmentKey({ key: "3,5", item }),
+    );
+  });
+
+  it("differs when the item differs, even for the SAME cell key (setItems reassigning a cell to a new item)", () => {
+    const a = cardAssignmentKey({ key: "3,4", item: makeItem("a") });
+    const b = cardAssignmentKey({ key: "3,4", item: makeItem("b") });
+    expect(a).not.toBe(b);
   });
 });

@@ -169,6 +169,18 @@ export function cardWorldRect(
   };
 }
 
+/**
+ * A pool entry's assignment identity (`layers/cards.ts`): a cell's
+ * `CardInstance.key` alone is NOT enough to know when a pool entry's
+ * texture must reload — the same cell key can resolve to a different item
+ * after `setItems` replaces the items array (same cell, different item,
+ * since `itemIndexForCell` depends on `itemCount`). Combining the cell key
+ * with the item id makes that case produce a different assignment key too.
+ */
+export function cardAssignmentKey(instance: Pick<CardInstance, "key" | "item">): string {
+  return `${instance.key}::${instance.item.id}`;
+}
+
 /** The full `CardInstance` for one cell, or `null` if there are no items. Pure — extracted so both `visibleCardInstances` and a caching hot-path caller (`engine.ts`) share one implementation. */
 export function cardInstanceForCell(
   cellX: number,
