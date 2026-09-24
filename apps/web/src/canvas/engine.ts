@@ -59,6 +59,11 @@ const DPR_CAP = 2;
 const SKY_PARALLAX = 0.05;
 const HAZE_PARALLAX = 0.12;
 
+// Exported so cloud-visibility.test.ts can assert the cloud layers' parallax
+// stays "barely faster" than the sky it drifts across (T8b-3 owner
+// feedback), against the real constant instead of a hardcoded copy.
+export { SKY_PARALLAX };
+
 // Aerial perspective (owner feedback, T8a): two cloud depths (far/mid)
 // built from cloudDepthStyle so speed, opacity, atmospheric tint, size and
 // draw order all come from the SAME depth value — a nearer, faster layer
@@ -77,13 +82,22 @@ const HAZE_PARALLAX = 0.12;
 // a little more atmospheric perspective. CLOUD_DEPTH_MID is lowered
 // 0.5->0.4 so mid samples closer to far on the same retuned curve (keeps
 // mid cohesive with far rather than reading as a separate near layer,
-// while still staying nearer/more-solid than far). cellSize/density below
-// are retuned alongside the size bump so the bigger sprites still land on
-// screen without crowding (see cloud-visibility.test.ts's 2-4 combined
-// on-screen target at 1440x900).
+// while still staying nearer/more-solid than far).
+//
+// T8b-3 owner feedback (second retune — "the motion still doesn't feel
+// right", goal = realism): bigger again (base 720->1008, 1.4x — see
+// max-sprite-size.ts's `maxUpscaleFactor` and layers/clouds.ts's
+// `CLOUD_MAX_UPSCALE_FACTOR` for how the DPR=2 clamp is kept from eating
+// this bump) and CLOUD_DEPTH_MID lowered again 0.4->0.3 (pulls mid's
+// opacity/atmosphereMix even closer to far's, matching cloud-depth.ts's
+// stronger-atmosphere retune, while PARALLAX_FAR/NEAR there independently
+// hit the new "barely faster than sky" parallax targets at this same
+// depth). cellSize/density below are retuned alongside the size bump so
+// the bigger sprites still land on screen without crowding (see
+// cloud-visibility.test.ts's 2-4 combined on-screen target at 1440x900).
 const CLOUD_DEPTH_FAR = 0;
-const CLOUD_DEPTH_MID = 0.4;
-const CLOUD_BASE_SPRITE_SIZE_PX = 720;
+const CLOUD_DEPTH_MID = 0.3;
+const CLOUD_BASE_SPRITE_SIZE_PX = 1008;
 
 // Cards draw above every cloud layer (decision recorded in
 // odd/tasks/garden-mvp.md: "cards above clouds"). Cloud renderOrder tops
@@ -143,8 +157,14 @@ function cloudLayerConfig(
 // verified against a grid search over cloud-field.ts's real placement math
 // to land back in the 2-4 on-screen range at 1440x900 (see
 // cloud-visibility.test.ts).
-export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 600, 0.22);
-export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 500, 0.18);
+//
+// T8b-3 retune: cellSize raised again (600->700, 500->600) and density
+// trimmed again (0.22->0.18, 0.18->0.16) for the same reason, re-verified
+// with the same grid-search approach against the now-bigger (1008px base,
+// 1.5x-upscale-capable) sprites — still lands at 2-4 on screen (far=2,
+// mid=1, total=3 at the exact constants below).
+export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 700, 0.18);
+export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 600, 0.16);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax

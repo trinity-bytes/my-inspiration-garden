@@ -22,19 +22,26 @@ export interface CloudDepthStyle {
 }
 
 // T8b-2 owner feedback: retune the two remaining layers (far, mid) TOGETHER
-// after the near layer's removal — slower (parallax ~0.6x the pre-retune
-// far/mid values: far 0.3->0.18, mid at the old depth=0.5 0.5->0.3) and a
-// little more atmospheric (atmosphereMix +0.1, opacity down to match) at
-// depth=0 (far). OPACITY_NEAR/ATMOSPHERE_MIX_NEAR stay at their fully-solid
-// boundary (no layer is placed at depth=1 anymore, but the generic mapping
-// keeps that invariant) — mid's own retuned values come from also lowering
-// CLOUD_DEPTH_MID (engine.ts, 0.5->0.4) so it samples closer to far on this
-// same far/near curve, instead of re-deriving a second set of endpoints.
-const PARALLAX_FAR = 0.18;
-const PARALLAX_NEAR = 0.48;
-const OPACITY_FAR = 0.55;
+// after the near layer's removal — slower, a little more atmospheric.
+//
+// T8b-3 owner feedback (second retune — "the motion still doesn't feel
+// right", goal = realism): far/mid retuned AGAIN.
+//   - Speed: real clouds barely outpace the sky they drift across, so
+//     parallax is now judged against SKY_PARALLAX=0.05 (engine.ts) rather
+//     than an arbitrary fraction of the old values — far 0.18->0.08, near
+//     endpoint 0.48->0.25 (giving mid, at depth=0.3, ~0.13; see engine.ts's
+//     CLOUD_DEPTH_MID below).
+//   - Atmosphere: stronger — far opacity 0.55->0.45, atmosphereMix 0.5->0.65.
+// OPACITY_NEAR/ATMOSPHERE_MIX_NEAR stay at their fully-solid boundary (no
+// layer is placed at depth=1 anymore, but the generic mapping keeps that
+// invariant) — mid's own retuned values come from CLOUD_DEPTH_MID
+// (engine.ts, 0.4->0.3 this round) sampling closer to far on this same
+// far/near curve, instead of re-deriving a second set of endpoints.
+const PARALLAX_FAR = 0.08;
+const PARALLAX_NEAR = 0.25;
+const OPACITY_FAR = 0.45;
 const OPACITY_NEAR = 1;
-const ATMOSPHERE_MIX_FAR = 0.5;
+const ATMOSPHERE_MIX_FAR = 0.65;
 const ATMOSPHERE_MIX_NEAR = 0;
 const SIZE_SCALE_FAR = 0.85;
 const SIZE_SCALE_NEAR = 1.2;

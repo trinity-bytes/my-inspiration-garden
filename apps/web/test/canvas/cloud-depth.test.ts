@@ -31,28 +31,30 @@ describe("cloudDepthStyle", () => {
     expect(nearest.atmosphereMix).toBe(0);
   });
 
-  // T8b-2 owner feedback (retune far+mid together after the near layer's
-  // removal): "a little" more atmospheric perspective — opacity down and
-  // atmosphereMix up vs the pre-retune far values (opacity 0.65,
-  // atmosphereMix 0.4) — so the farthest layer blends further into the sky.
-  it("the farthest layer (depth=0) reads as hazier than before the T8b-2 retune: opacity ~0.5-0.6, atmosphereMix ~0.45-0.55", () => {
+  // T8b-3 owner feedback (second retune, goal = realism): stronger
+  // atmospheric perspective than the T8b-2 retune (which had opacity
+  // ~0.5-0.6, atmosphereMix ~0.45-0.55) — far now reads noticeably hazier,
+  // opacity ~0.45, atmosphereMix ~0.65.
+  it("the farthest layer (depth=0) reads strongly hazy (T8b-3 realism retune): opacity ~0.4-0.5, atmosphereMix ~0.6-0.7", () => {
     const farthest = cloudDepthStyle(0);
-    expect(farthest.opacity).toBeGreaterThanOrEqual(0.5);
-    expect(farthest.opacity).toBeLessThanOrEqual(0.6);
-    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.45);
-    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.55);
+    expect(farthest.opacity).toBeGreaterThanOrEqual(0.4);
+    expect(farthest.opacity).toBeLessThanOrEqual(0.5);
+    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.6);
+    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.7);
   });
 
-  // T8b-2 owner feedback: "slower" — both remaining layers (far depth=0,
-  // mid depth=0.4, see engine.ts's CLOUD_DEPTH_MID) parallax reduced to
-  // ~0.6x their pre-retune values (far was 0.3, mid was 0.5 at the old
-  // depth=0.5) — the far/near depth-style endpoints below are what those
-  // two layers are actually sampled from.
-  it("keeps the parallax range at the retuned, slower far/near endpoints (~0.18 .. ~0.48)", () => {
+  // T8b-3 owner feedback: "the motion still doesn't feel right" — clouds
+  // should read as barely faster than the sky (SKY_PARALLAX=0.05,
+  // engine.ts) rather than distinctly faster. far/near depth-style
+  // endpoints retuned so far (depth=0, ~0.08) and mid (depth=0.3, see
+  // engine.ts's CLOUD_DEPTH_MID, ~0.13) both sit just above the sky/haze
+  // parallax band — see cloud-visibility.test.ts for the sky/far/mid
+  // ratio assertions against the live engine.ts constants.
+  it("keeps the parallax range at the retuned, barely-faster-than-sky far/near endpoints (~0.08 .. ~0.25)", () => {
     const far = cloudDepthStyle(0);
     const near = cloudDepthStyle(1);
-    expect(far.parallax).toBeCloseTo(0.18, 1);
-    expect(near.parallax).toBeCloseTo(0.48, 1);
+    expect(far.parallax).toBeCloseTo(0.08, 1);
+    expect(near.parallax).toBeCloseTo(0.25, 1);
   });
 
   it("clamps depth to [0, 1] for out-of-range inputs", () => {

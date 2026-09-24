@@ -10,6 +10,17 @@ import { spriteQuadCssSize } from "../max-sprite-size";
 import { CLOUD_FRAGMENT_GLSL, CLOUD_VERTEX_GLSL } from "../shaders/cloud";
 import type { Vec2 } from "../types";
 
+/**
+ * T8b-3 owner feedback (realism retune): cloud sprites may be drawn up to
+ * 1.5x their texture's native resolution at high DPR — soft, blurred
+ * atmospheric shapes tolerate mild upscaling far better than crisp cards
+ * do, and without this the DPR=2 clamp would otherwise cap the bigger
+ * T8b-3 base sprite size well short of its intended on-screen size (see
+ * max-sprite-size.ts's `maxUpscaleFactor`). Cards (layers/cards.ts) keep
+ * the strict default (1, no upscale) — this constant is cloud-only.
+ */
+const CLOUD_MAX_UPSCALE_FACTOR = 1.5;
+
 export interface CloudLayerRuntimeConfig extends CloudLayerConfig {
   /** Parallax factor relative to the world offset (near = larger/faster). From cloud-depth.ts. */
   parallax: number;
@@ -154,6 +165,7 @@ export class CloudLayer {
           texture.width,
           texture.height,
           dpr,
+          CLOUD_MAX_UPSCALE_FACTOR,
         );
 
         // Y is negated: cell placement is in this engine's world convention
