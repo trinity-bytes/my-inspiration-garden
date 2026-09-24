@@ -3,9 +3,11 @@ import type { Vec2 } from "./types";
 /**
  * Subtle spherical-feel barrel distortion applied as a full-screen
  * post-process (see `post/barrel.ts`). `k` is small on purpose — content
- * should barely bend.
+ * should barely bend. The pass is uniform across every layer; faster
+ * (nearer) layers only *look* more bent because they sweep through the
+ * curved edge faster. 0.045 = 0.75 × the original 0.06 (owner feedback).
  */
-export const DEFAULT_BARREL_K = 0.06;
+export const DEFAULT_BARREL_K = 0.045;
 
 /** Forward barrel distortion in normalized device-ish space (centered at 0). */
 export function barrelForward(p: Vec2, k: number): Vec2 {

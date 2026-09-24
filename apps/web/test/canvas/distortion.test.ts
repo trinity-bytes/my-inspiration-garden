@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { barrelForward, barrelInverse, DEFAULT_BARREL_K } from "../../src/canvas/distortion";
 
+describe("DEFAULT_BARREL_K", () => {
+  it("is 0.75 of the original 0.06 so card edges bend less while panning", () => {
+    expect(DEFAULT_BARREL_K).toBeCloseTo(0.045, 10);
+  });
+});
+
 describe("barrelForward", () => {
   it("leaves the center unchanged", () => {
     expect(barrelForward({ x: 0, y: 0 }, DEFAULT_BARREL_K)).toEqual({ x: 0, y: 0 });
