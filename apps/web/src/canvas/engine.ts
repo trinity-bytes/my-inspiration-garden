@@ -401,6 +401,11 @@ export class CanvasEngine {
     this.navigation?.setReducedMotion(reduced);
   }
 
+  /** Pauses (or resumes) canvas navigation (T9: the item detail modal). */
+  setPaused(paused: boolean): void {
+    this.navigation?.setPaused(paused);
+  }
+
   /** Minimal read-only state T8b needs: world offset, viewport size, distortion params. */
   getWorldState(): WorldState {
     const viewport = this.getViewportSize();

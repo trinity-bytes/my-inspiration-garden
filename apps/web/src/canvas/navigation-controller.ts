@@ -54,6 +54,8 @@ export class NavigationController {
 
   private mounted = false;
   private disposed = false;
+  /** True while the item detail modal (T9) is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
+  private paused = false;
 
   private worldOffset: Vec2 = { x: 0, y: 0 };
   private velocity: Vec2 = { x: 0, y: 0 };
@@ -132,6 +134,17 @@ export class NavigationController {
     }
   }
 
+  /** Pauses (or resumes) all ambient/direct navigation input — drift and keyboard panning stop immediately, with any in-flight velocity zeroed (T9: the item detail modal pauses canvas navigation while open). */
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (paused) {
+      this.velocity = { x: 0, y: 0 };
+      if (this.motionState !== "dragging") {
+        this.motionState = "idle";
+      }
+    }
+  }
+
   getWorldOffset(): Vec2 {
     return { ...this.worldOffset };
   }
@@ -203,6 +216,10 @@ export class NavigationController {
   }
 
   private computeIdleTargetVelocity(): Vec2 {
+    if (this.paused) {
+      return { x: 0, y: 0 };
+    }
+
     const keyboard = keyboardVelocity(this.activeKeyDirections, this.keyboardSpeed);
 
     const driftAllowed =

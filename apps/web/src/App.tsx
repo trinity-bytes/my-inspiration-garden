@@ -2,6 +2,9 @@ import { useCallback, useState } from "react";
 import { CanvasHost } from "./components/CanvasHost/CanvasHost";
 import { LoadingScreen } from "./components/LoadingScreen/LoadingScreen";
 import { Navbar } from "./components/Navbar/Navbar";
+import { ItemDetailModal } from "./detail/ItemDetailModal";
+import { useCategoryNames } from "./detail/useCategoryNames";
+import { useItemDetail } from "./detail/useItemDetail";
 import { useGardenItems } from "./items/useGardenItems";
 import { useOwnerSession } from "./session/useOwnerSession";
 
@@ -11,12 +14,11 @@ export function App() {
   const handleCanvasReady = useCallback(() => setCanvasReady(true), []);
 
   const { status: itemsStatus, items } = useGardenItems();
-  // T9 renders the detail view for `selectedItemId`; T8b only wires the
-  // hook up to the canvas's click/Enter handling (see `CanvasHost`'s
-  // `onItemOpen`). Exposed as a data attribute so the wiring itself is
-  // observable/testable before T9 exists.
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const handleItemOpen = useCallback((itemId: string) => setSelectedItemId(itemId), []);
+  const { selectedItem, selectedItemId, openItem, closeItem } = useItemDetail(
+    items,
+    itemsStatus !== "loading",
+  );
+  const categoryNames = useCategoryNames();
 
   return (
     <div
@@ -28,10 +30,14 @@ export function App() {
         onReady={handleCanvasReady}
         items={items}
         itemsStatus={itemsStatus}
-        onItemOpen={handleItemOpen}
+        onItemOpen={openItem}
+        paused={Boolean(selectedItem)}
       />
       <Navbar isOwner={ownerSession.status === "owner"} />
       <LoadingScreen ready={canvasReady} message="Growing the garden…" />
+      {selectedItem && (
+        <ItemDetailModal item={selectedItem} onClose={closeItem} categoryNames={categoryNames} />
+      )}
     </div>
   );
 }

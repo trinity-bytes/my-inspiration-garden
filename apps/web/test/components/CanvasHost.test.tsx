@@ -54,4 +54,10 @@ describe("CanvasHost", () => {
       screen.getByRole("list", { name: "Garden items currently in view" }),
     ).toBeInTheDocument();
   });
+
+  it("accepts a paused prop (T9 detail modal) and re-renders cleanly when it toggles", () => {
+    const { rerender } = render(<CanvasHost paused={false} />);
+    expect(() => rerender(<CanvasHost paused={true} />)).not.toThrow();
+    expect(() => rerender(<CanvasHost paused={false} />)).not.toThrow();
+  });
 });

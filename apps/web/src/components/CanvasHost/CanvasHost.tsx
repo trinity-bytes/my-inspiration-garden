@@ -13,6 +13,8 @@ export interface CanvasHostProps {
   itemsStatus?: GardenItemsStatus;
   /** Fired when a card is opened (clicked, or activated via the parallel DOM/ARIA layer). */
   onItemOpen?: (itemId: string) => void;
+  /** Pauses canvas navigation (drift + keyboard pan) — set while the item detail modal (T9) is open. */
+  paused?: boolean;
 }
 
 function prefersReducedMotion(): boolean {
@@ -52,6 +54,7 @@ export function CanvasHost({
   items = [],
   itemsStatus = "loading",
   onItemOpen,
+  paused = false,
 }: CanvasHostProps) {
   const targetRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
@@ -114,6 +117,10 @@ export function CanvasHost({
   useEffect(() => {
     engineRef.current?.setItems(items);
   }, [items]);
+
+  useEffect(() => {
+    engineRef.current?.setPaused(paused);
+  }, [paused]);
 
   const handleCardFocus = useCallback((key: string) => {
     engineRef.current?.centerOnCardKey(key);

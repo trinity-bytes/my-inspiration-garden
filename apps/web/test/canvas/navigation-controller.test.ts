@@ -382,6 +382,87 @@ describe("NavigationController", () => {
     controller.dispose();
   });
 
+  // T9 scope B: canvas navigation (drift/keyboard) must pause while the
+  // item detail modal is open.
+  describe("setPaused (T9 detail modal)", () => {
+    it("suppresses cursor drift while paused", () => {
+      const controller = new NavigationController({
+        container,
+        getViewportSize: () => ({ width: 1000, height: 1000 }),
+        maxSpeed: 300,
+      });
+      controller.mount();
+      controller.setPaused(true);
+
+      dispatchPointerMove(window, 900, 500);
+      for (let i = 0; i < 30; i++) {
+        controller.update(1 / 60);
+      }
+      expect(controller.getWorldOffset().x).toBeCloseTo(0, 5);
+
+      controller.dispose();
+    });
+
+    it("suppresses keyboard panning while paused", () => {
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      const controller = new NavigationController({
+        container,
+        getViewportSize: () => ({ width: 1000, height: 1000 }),
+        keyboardSpeed: 120,
+      });
+      controller.mount();
+      controller.setPaused(true);
+      container.focus();
+
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      for (let i = 0; i < 30; i++) {
+        controller.update(1 / 60);
+      }
+
+      expect(controller.getWorldOffset().x).toBe(0);
+
+      controller.dispose();
+      input.remove();
+    });
+
+    it("zeroes any in-flight velocity immediately when paused", () => {
+      const controller = new NavigationController({
+        container,
+        getViewportSize: () => ({ width: 1000, height: 1000 }),
+        maxSpeed: 300,
+      });
+      controller.mount();
+      dispatchPointerMove(window, 900, 500);
+      controller.update(1 / 60);
+      expect(controller.getVelocity().x).not.toBe(0);
+
+      controller.setPaused(true);
+      expect(controller.getVelocity()).toEqual({ x: 0, y: 0 });
+
+      controller.dispose();
+    });
+
+    it("resumes normal drift once unpaused", () => {
+      const controller = new NavigationController({
+        container,
+        getViewportSize: () => ({ width: 1000, height: 1000 }),
+        maxSpeed: 300,
+      });
+      controller.mount();
+      controller.setPaused(true);
+      controller.setPaused(false);
+
+      dispatchPointerMove(window, 900, 500);
+      for (let i = 0; i < 30; i++) {
+        controller.update(1 / 60);
+      }
+      expect(controller.getWorldOffset().x).not.toBe(0);
+
+      controller.dispose();
+    });
+  });
+
   it("clamps large dt gaps so a tab switch does not teleport", () => {
     const controller = new NavigationController({
       container,
