@@ -35,3 +35,17 @@ export function screenToWorld(screen: Vec2, worldOffset: Vec2, parallax: number)
     y: screen.y - worldOffset.y * parallax,
   };
 }
+
+/**
+ * The world offset that puts `worldPoint` exactly at the screen center for a
+ * layer with the given `parallax` (`screenToWorld({x:0,y:0}, offset,
+ * parallax) === worldPoint`). Used by T8b to pan-to-center a card (parallax
+ * 1, the card layer tracks navigation 1:1) when it gains keyboard focus via
+ * the parallel DOM/ARIA layer.
+ */
+export function centerOffsetFor(worldPoint: Vec2, parallax: number): Vec2 {
+  // `|| 0` normalizes a `-0` result (e.g. worldPoint.x === 0) to `0`, so the
+  // origin centers on itself as exactly `{ x: 0, y: 0 }`, not `{ x: -0, y:
+  // -0 }` (both are numerically zero, but `toEqual` distinguishes them).
+  return { x: -worldPoint.x / parallax || 0, y: -worldPoint.y / parallax || 0 };
+}

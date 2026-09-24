@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screenToWorld, worldToScreen } from "../../src/canvas/coords";
+import { centerOffsetFor, screenToWorld, worldToScreen } from "../../src/canvas/coords";
 
 describe("worldToScreen / screenToWorld", () => {
   it("round-trips: screenToWorld(worldToScreen(p)) === p, for any offset and parallax", () => {
@@ -64,5 +64,26 @@ describe("worldToScreen / screenToWorld", () => {
     const p = { x: 5, y: -5 };
     expect(worldToScreen(p, { x: 0, y: 0 }, 1)).toEqual(p);
     expect(screenToWorld(p, { x: 0, y: 0 }, 1)).toEqual(p);
+  });
+});
+
+describe("centerOffsetFor", () => {
+  it("produces the offset that puts worldPoint at the screen center (parallax 1)", () => {
+    const worldPoint = { x: 250, y: -120 };
+    const offset = centerOffsetFor(worldPoint, 1);
+    expect(screenToWorld({ x: 0, y: 0 }, offset, 1)).toEqual(worldPoint);
+  });
+
+  it("scales with parallax for a non-1:1 layer", () => {
+    const worldPoint = { x: 100, y: 100 };
+    const parallax = 0.5;
+    const offset = centerOffsetFor(worldPoint, parallax);
+    const recovered = screenToWorld({ x: 0, y: 0 }, offset, parallax);
+    expect(recovered.x).toBeCloseTo(worldPoint.x, 8);
+    expect(recovered.y).toBeCloseTo(worldPoint.y, 8);
+  });
+
+  it("the origin centers on itself with a zero offset", () => {
+    expect(centerOffsetFor({ x: 0, y: 0 }, 1)).toEqual({ x: 0, y: 0 });
   });
 });
