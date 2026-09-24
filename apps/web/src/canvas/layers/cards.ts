@@ -2,7 +2,7 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
-import { cardAssignmentKey, type CardInstance } from "../item-layout";
+import { type CardInstance, cardAssignmentKey } from "../item-layout";
 import { clampSpriteCssSize } from "../max-sprite-size";
 import { createPlaceholderTexture } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";

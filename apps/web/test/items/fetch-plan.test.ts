@@ -39,9 +39,7 @@ describe("shouldFetchNextPage", () => {
   });
 
   it("stops when the cursor repeats (server returned the same cursor it was given — would loop forever)", () => {
-    expect(
-      shouldFetchNextPage(page({ requestCursor: "same", nextCursor: "same" })),
-    ).toBe(false);
+    expect(shouldFetchNextPage(page({ requestCursor: "same", nextCursor: "same" }))).toBe(false);
   });
 
   it("stops when a page added no new unique items (progress stalled even though the cursor moved)", () => {

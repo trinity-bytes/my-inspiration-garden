@@ -21,8 +21,8 @@ import { NavigationController } from "./navigation-controller";
 import {
   IDLE_POINTER_GESTURE,
   isPointerGesturePressed,
-  pointerGestureDown,
   type PointerGestureState,
+  pointerGestureDown,
   pointerGestureReset,
   pointerGestureUp,
 } from "./pointer-gesture";
