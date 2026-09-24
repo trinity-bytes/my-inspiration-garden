@@ -29,12 +29,26 @@ export function useGardenItems(): UseGardenItemsResult {
     async function run(): Promise<void> {
       let collected: Item[] = [];
       let cursor: string | undefined;
+      let pagesSoFar = 0;
+      let keepGoing = true;
       try {
         do {
+          const requestCursor = cursor ?? null;
           const page = await listItems({ cursor, limit: ITEMS_FETCH_PAGE_LIMIT });
-          collected = mergeItemsPage(collected, page.items);
-          cursor = page.nextCursor ?? undefined;
-        } while (shouldFetchNextPage(collected.length, cursor ?? null));
+          const merged = mergeItemsPage(collected, page.items);
+          const addedCount = merged.length - collected.length;
+          collected = merged;
+          pagesSoFar++;
+          const nextCursor = page.nextCursor ?? null;
+          keepGoing = shouldFetchNextPage({
+            itemsSoFar: collected.length,
+            nextCursor,
+            requestCursor,
+            pagesSoFar,
+            addedCount,
+          });
+          cursor = nextCursor ?? undefined;
+        } while (keepGoing);
 
         if (!cancelled) {
           setItems(collected);

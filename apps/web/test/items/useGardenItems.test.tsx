@@ -62,6 +62,32 @@ describe("useGardenItems", () => {
     expect(listItems).toHaveBeenCalledTimes(2);
   });
 
+  it("stops paginating when the API returns the same cursor it was given (stuck cursor, would otherwise loop forever)", async () => {
+    vi.mocked(listItems)
+      .mockResolvedValueOnce({ items: [makeItem("a")], nextCursor: "stuck" })
+      .mockResolvedValueOnce({ items: [makeItem("b")], nextCursor: "stuck" })
+      // Would be called again forever if the guard didn't stop after the
+      // second page (requestCursor "stuck" === nextCursor "stuck").
+      .mockResolvedValueOnce({ items: [makeItem("c")], nextCursor: "stuck" });
+
+    const { result } = renderHook(() => useGardenItems());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.items.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(listItems).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops paginating once a page adds no new unique items, even with a fresh cursor", async () => {
+    vi.mocked(listItems)
+      .mockResolvedValueOnce({ items: [makeItem("a")], nextCursor: "page-2" })
+      // Every item in this page was already collected — no progress.
+      .mockResolvedValueOnce({ items: [makeItem("a")], nextCursor: "page-3" });
+
+    const { result } = renderHook(() => useGardenItems());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.items.map((item) => item.id)).toEqual(["a"]);
+    expect(listItems).toHaveBeenCalledTimes(2);
+  });
+
   it("does not update state after unmount", async () => {
     let resolvePage!: (value: { items: ReturnType<typeof makeItem>[]; nextCursor: null }) => void;
     vi.mocked(listItems).mockReturnValue(
