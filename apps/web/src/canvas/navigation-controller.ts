@@ -28,9 +28,9 @@ export interface NavigationControllerOptions {
 }
 
 // Exported so the constants are easy to find and re-tune later (owner
-// feedback 2026-09-23: the previous 220/260 felt slow).
-export const DEFAULT_MAX_SPEED = 380;
-export const DEFAULT_KEYBOARD_SPEED = 420;
+// feedback: 220/260 felt slow → 380/420; 2026-09-24 doubled for 2x max speed).
+export const DEFAULT_MAX_SPEED = 760;
+export const DEFAULT_KEYBOARD_SPEED = 840;
 const DEFAULT_SMOOTHING_K = 6;
 const DEFAULT_DRAG_DECAY_HALF_LIFE = 0.35;
 const RELEASE_STOP_EPSILON = 0.05;

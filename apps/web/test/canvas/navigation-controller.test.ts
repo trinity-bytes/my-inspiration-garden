@@ -1,5 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { NavigationController } from "../../src/canvas/navigation-controller";
+import {
+  DEFAULT_KEYBOARD_SPEED,
+  DEFAULT_MAX_SPEED,
+  NavigationController,
+} from "../../src/canvas/navigation-controller";
+
+describe("navigation speed defaults", () => {
+  it("doubles the original drift and keyboard speeds (owner feedback: 2x max speed)", () => {
+    expect(DEFAULT_MAX_SPEED).toBe(760);
+    expect(DEFAULT_KEYBOARD_SPEED).toBe(840);
+  });
+});
 
 function makeContainer(): HTMLDivElement {
   const el = document.createElement("div");
