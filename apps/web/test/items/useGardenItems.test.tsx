@@ -1,13 +1,41 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useGardenItems } from "../../src/items/useGardenItems";
 import { makeItem } from "../fixtures/items";
+
+/**
+ * `useGardenItems`'s `cancelled` guard exists to stop it from calling
+ * `setItems`/`setStatus` after unmount. Asserting on `result.current`
+ * after a real `unmount()` can't tell a working guard from a removed one:
+ * React itself silently drops any state update on an unmounted tree
+ * regardless of the guard (verified directly — deleting the `if
+ * (!cancelled)` checks from the source still left `result.current.status`
+ * at `"loading"`, unchanged). Spying on the `useState` setters instead
+ * catches it: the guard runs before the setter is ever CALLED, in our own
+ * code, before React gets a chance to decide whether the update lands — so
+ * with the guard removed, the wrapped setter records a call after unmount
+ * even though `result.current` itself never changes.
+ */
+const stateSetters: ReturnType<typeof vi.fn>[] = [];
+
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+  return {
+    ...actual,
+    useState: (initial: unknown) => {
+      const [value, setValue] = actual.useState(initial);
+      const spied = vi.fn(setValue);
+      stateSetters.push(spied);
+      return [value, spied] as const;
+    },
+  };
+});
 
 vi.mock("../../src/api/endpoints", () => ({
   listItems: vi.fn(),
 }));
 
 import { listItems } from "../../src/api/endpoints";
+import { useGardenItems } from "../../src/items/useGardenItems";
 
 describe("useGardenItems", () => {
   // `mockResolvedValueOnce` queues on top of whatever implementation a
@@ -17,6 +45,7 @@ describe("useGardenItems", () => {
   // test's resolved/rejected value.
   beforeEach(() => {
     vi.mocked(listItems).mockReset();
+    stateSetters.length = 0;
   });
 
   afterEach(() => {
@@ -88,7 +117,7 @@ describe("useGardenItems", () => {
     expect(listItems).toHaveBeenCalledTimes(2);
   });
 
-  it("does not update state after unmount", async () => {
+  it("does not call a state setter after unmount (deferred fetch resolves after unmount)", async () => {
     let resolvePage!: (value: { items: ReturnType<typeof makeItem>[]; nextCursor: null }) => void;
     vi.mocked(listItems).mockReturnValue(
       new Promise((resolve) => {
@@ -96,11 +125,22 @@ describe("useGardenItems", () => {
       }),
     );
 
-    const { result, unmount } = renderHook(() => useGardenItems());
+    const { unmount } = renderHook(() => useGardenItems());
+    // Captures this render's setItems/setStatus specifically, so a later
+    // test's setters (stateSetters is shared, reset in beforeEach) can
+    // never be mistaken for this one's.
+    const settersFromThisRender = [...stateSetters];
+    expect(settersFromThisRender.length).toBeGreaterThan(0);
+
     unmount();
-    resolvePage({ items: [], nextCursor: null });
+    resolvePage({ items: [makeItem("a")], nextCursor: null });
+    // Flush the microtask queue the resolved promise's `await` continues on.
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
 
-    expect(result.current.status).toBe("loading");
+    for (const setter of settersFromThisRender) {
+      expect(setter).not.toHaveBeenCalled();
+    }
   });
 });
