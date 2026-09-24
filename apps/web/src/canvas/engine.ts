@@ -1,7 +1,6 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
-import { isClick } from "./click-vs-drag";
 import { cloudDepthStyle, cloudOpacityRange } from "./cloud-depth";
 import { DEFAULT_BARREL_K } from "./distortion";
 import { selectDomMirrorCards } from "./dom-mirror";
@@ -19,6 +18,14 @@ import { HazeLayer } from "./layers/haze";
 import { SkyLayer } from "./layers/sky";
 import { LruCache } from "./lru-cache";
 import { NavigationController } from "./navigation-controller";
+import {
+  IDLE_POINTER_GESTURE,
+  isPointerGesturePressed,
+  pointerGestureDown,
+  type PointerGestureState,
+  pointerGestureReset,
+  pointerGestureUp,
+} from "./pointer-gesture";
 import { BarrelPass } from "./post/barrel";
 import { detectAvifSupport, selectTextureFormat, textureUrl } from "./texture-format";
 import type { Vec2 } from "./types";
@@ -163,8 +170,8 @@ export class CanvasEngine {
   );
   private lastDomMirrorSignature = "";
   private hoveredCardKey: string | null = null;
-  /** Container-relative pointer position at the last `pointerdown`, `null` when no button is held (see `click-vs-drag.ts`). */
-  private pointerDownPos: Vec2 | null = null;
+  /** Click-vs-drag / hover-suppression state machine (see `pointer-gesture.ts`). */
+  private pointerGesture: PointerGestureState = IDLE_POINTER_GESTURE;
 
   private navigation: NavigationController | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -262,6 +269,7 @@ export class CanvasEngine {
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerCancel);
     canvas.addEventListener("pointerleave", this.handlePointerLeave);
+    canvas.addEventListener("lostpointercapture", this.handleLostPointerCapture);
 
     this.navigation = new NavigationController({
       container,
@@ -329,6 +337,7 @@ export class CanvasEngine {
       this.canvas.removeEventListener("pointerup", this.handlePointerUp);
       this.canvas.removeEventListener("pointercancel", this.handlePointerCancel);
       this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
+      this.canvas.removeEventListener("lostpointercapture", this.handleLostPointerCapture);
       this.canvas.parentElement?.removeChild(this.canvas);
     }
     this.canvas = null;
@@ -509,30 +518,43 @@ export class CanvasEngine {
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    this.pointerDownPos = this.pointerFromEvent(event);
+    this.pointerGesture = pointerGestureDown(this.pointerFromEvent(event));
+    // Pointer Capture keeps pointerup/pointercancel/lostpointercapture
+    // targeting this canvas even if the button is released outside it (a
+    // fast drag off-screen, for example) — without it, a release-outside
+    // never fires pointerup here, leaving the gesture stuck "pressed" and
+    // hover feedback permanently suppressed until the next full
+    // down/up cycle. Feature-detected: jsdom (this project's test
+    // environment) doesn't implement it, and some pointer types can
+    // legitimately reject capture.
+    if (typeof this.canvas?.setPointerCapture === "function") {
+      try {
+        this.canvas.setPointerCapture(event.pointerId);
+      } catch {
+        // Falls back to ordinary event targeting — still correct, just
+        // less robust against release-outside-canvas.
+      }
+    }
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
     // A held button means the user is panning (NavigationController's own
     // drag handling) or about to click — hover feedback would just be
     // noisy mid-gesture.
-    if (this.pointerDownPos) {
+    if (isPointerGesturePressed(this.pointerGesture)) {
       return;
     }
     this.setHoveredCardKey(this.hitTestAt(this.pointerFromEvent(event)));
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    const start = this.pointerDownPos;
-    this.pointerDownPos = null;
-    if (!start) {
+    const pos = this.pointerFromEvent(event);
+    const { state, isClick: wasClick } = pointerGestureUp(this.pointerGesture, pos);
+    this.pointerGesture = state;
+    if (!wasClick) {
       return;
     }
-    const end = this.pointerFromEvent(event);
-    if (!isClick(start, end)) {
-      return;
-    }
-    const hitKey = this.hitTestAt(end);
+    const hitKey = this.hitTestAt(pos);
     if (!hitKey) {
       return;
     }
@@ -543,11 +565,16 @@ export class CanvasEngine {
   };
 
   private readonly handlePointerCancel = (): void => {
-    this.pointerDownPos = null;
+    this.pointerGesture = pointerGestureReset();
   };
 
   private readonly handlePointerLeave = (): void => {
     this.setHoveredCardKey(null);
+  };
+
+  /** Fires if capture is released without a prior pointerup/pointercancel (some browsers force-release it, e.g. on multi-touch conflicts) — a safety net so the gesture never stays stuck "pressed". */
+  private readonly handleLostPointerCapture = (): void => {
+    this.pointerGesture = pointerGestureReset();
   };
 
   private fireReady(): void {
