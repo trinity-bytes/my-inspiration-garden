@@ -58,4 +58,14 @@ describe("App", () => {
 
     await waitFor(() => expect(screen.getByRole("link", { name: "Sign out" })).toBeInTheDocument());
   });
+
+  it("shows a subtle canvas message when the items fetch fails (the every-request 403 above)", async () => {
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Couldn't load the garden's items right now.")).toBeInTheDocument(),
+    );
+    // The sky/canvas host still renders alongside the message.
+    expect(screen.getByTestId("canvas-host")).toBeInTheDocument();
+  });
 });

@@ -24,3 +24,20 @@
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: calc(-1 * var(--focus-ring-width));
 }
+
+/* Empty/fetch-error state (T8b): the sky still renders behind this, per
+   `odd/tasks/garden-mvp.md`'s "canvas still renders the sky" requirement. */
+.canvas-host__message {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-7);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-full);
+  background: var(--glass-surface-fallback);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  pointer-events: none;
+}

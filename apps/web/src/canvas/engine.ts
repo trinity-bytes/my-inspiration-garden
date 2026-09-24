@@ -1,10 +1,23 @@
+import type { Item } from "@garden/shared";
 import * as THREE from "three";
+import { resolveApiBaseUrl } from "../api/client";
+import { isClick } from "./click-vs-drag";
 import { cloudDepthStyle, cloudOpacityRange } from "./cloud-depth";
 import { DEFAULT_BARREL_K } from "./distortion";
+import { selectDomMirrorCards } from "./dom-mirror";
+import { hitTestCard } from "./hit-test";
+import {
+  type CardInstance,
+  DEFAULT_CARD_MARGIN_CELLS,
+  DEFAULT_MAX_CARD_POOL_SIZE,
+  visibleCardInstances,
+} from "./item-layout";
+import { CardLayer } from "./layers/cards";
 import type { CloudLayerRuntimeConfig } from "./layers/clouds";
 import { CloudLayer } from "./layers/clouds";
 import { HazeLayer } from "./layers/haze";
 import { SkyLayer } from "./layers/sky";
+import { LruCache } from "./lru-cache";
 import { NavigationController } from "./navigation-controller";
 import { BarrelPass } from "./post/barrel";
 import { detectAvifSupport, selectTextureFormat, textureUrl } from "./texture-format";
@@ -16,6 +29,12 @@ export interface CanvasEngineOptions {
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
   onError?: (error: unknown) => void;
   reducedMotion?: boolean;
+  /** Items rendered as cards (see `item-layout.ts`); can also be set/updated later via `setItems`. */
+  items?: Item[];
+  /** Fired when a card is clicked (not after a drag — see `click-vs-drag.ts`) or opened via the parallel DOM/ARIA layer's Enter key. */
+  onItemOpen?: (itemId: string) => void;
+  /** Fired whenever the set of cards the parallel DOM/ARIA layer should mirror changes (see `dom-mirror.ts`). */
+  onVisibleCardsChange?: (cards: CardInstance[]) => void;
 }
 
 export interface WorldState {
@@ -43,6 +62,21 @@ const CLOUD_DEPTH_FAR = 0;
 const CLOUD_DEPTH_MID = 0.5;
 const CLOUD_DEPTH_NEAR = 1;
 const CLOUD_BASE_SPRITE_SIZE_PX = 480;
+
+// Cards draw above every cloud layer (decision recorded in
+// odd/tasks/garden-mvp.md: "cards above clouds ... near layer still behind
+// cards"). Cloud renderOrder tops out at 100 (cloudDepthStyle's
+// RENDER_ORDER_SCALE), so 200 leaves headroom.
+const CARD_RENDER_ORDER = 200;
+const CARD_TEXTURE_CACHE_SIZE = 120;
+// A CardInstance's content is a pure, deterministic function of its cell
+// (see item-layout.ts) and never changes while `items` doesn't, so caching
+// it keeps the per-frame hot path from reallocating an instance (+ its
+// nested worldRect) for every visible cell every frame — only cells newly
+// entering the render margin allocate. Sized comfortably above the card
+// pool cap so cells stay cached through small pans, not just exactly the
+// currently-visible set.
+const CARD_INSTANCE_CACHE_SIZE = DEFAULT_MAX_CARD_POOL_SIZE * 3;
 
 function cloudLayerConfig(
   layerId: number,
@@ -116,7 +150,21 @@ export class CanvasEngine {
   private cloudsFar: CloudLayer | null = null;
   private cloudsMid: CloudLayer | null = null;
   private cloudsNear: CloudLayer | null = null;
+  private cards: CardLayer | null = null;
   private boundTextures: THREE.Texture[] = [];
+
+  private items: Item[];
+  /** The full visible-card set computed last frame (hit-testing/hover use this; the DOM mirror uses a smaller, sorted subset — see `dom-mirror.ts`). Reused in place every frame (`visibleCardInstances`'s `out` param) rather than reassigned, so the array itself isn't reallocated either. */
+  private readonly lastCardInstances: CardInstance[] = [];
+  /** Memoizes `CardInstance`s by cell key across frames — see `CARD_INSTANCE_CACHE_SIZE`. */
+  private readonly cardInstanceCache = new LruCache<CardInstance>(
+    CARD_INSTANCE_CACHE_SIZE,
+    () => {},
+  );
+  private lastDomMirrorSignature = "";
+  private hoveredCardKey: string | null = null;
+  /** Container-relative pointer position at the last `pointerdown`, `null` when no button is held (see `click-vs-drag.ts`). */
+  private pointerDownPos: Vec2 | null = null;
 
   private navigation: NavigationController | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -134,6 +182,21 @@ export class CanvasEngine {
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
     this.reducedMotion = options.reducedMotion ?? false;
+    this.items = options.items ?? [];
+  }
+
+  /** Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for the items array it was computed from. */
+  setItems(items: Item[]): void {
+    this.items = items;
+    this.cardInstanceCache.clear();
+  }
+
+  /** Pans instantly so the card identified by `key` (see `CardInstance.key` / `dom-mirror.ts`) is centered on screen. A no-op if that card is not among the currently-known instances. */
+  centerOnCardKey(key: string): void {
+    const instance = this.lastCardInstances.find((candidate) => candidate.key === key);
+    if (instance) {
+      this.navigation?.centerOn({ x: instance.worldRect.x, y: instance.worldRect.y });
+    }
   }
 
   mount(container: HTMLElement): void {
@@ -184,6 +247,22 @@ export class CanvasEngine {
     this.postScene = new THREE.Scene();
     this.postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
+    // Cards don't wait on the sky/cloud texture load (loadAssetsAndBuildScene,
+    // below): they load their own textures independently (layers/cards.ts).
+    this.cards = new CardLayer({
+      maxPoolSize: DEFAULT_MAX_CARD_POOL_SIZE,
+      textureCacheSize: CARD_TEXTURE_CACHE_SIZE,
+      apiBaseUrl: resolveApiBaseUrl(),
+      renderOrder: CARD_RENDER_ORDER,
+    });
+    this.scene.add(this.cards.group);
+
+    canvas.addEventListener("pointerdown", this.handlePointerDown);
+    canvas.addEventListener("pointermove", this.handlePointerMove);
+    canvas.addEventListener("pointerup", this.handlePointerUp);
+    canvas.addEventListener("pointercancel", this.handlePointerCancel);
+    canvas.addEventListener("pointerleave", this.handlePointerLeave);
+
     this.navigation = new NavigationController({
       container,
       getViewportSize: () => this.getViewportSize(),
@@ -225,12 +304,14 @@ export class CanvasEngine {
     this.cloudsFar?.dispose();
     this.cloudsMid?.dispose();
     this.cloudsNear?.dispose();
+    this.cards?.dispose();
     this.barrelPass?.dispose();
     this.sky = null;
     this.haze = null;
     this.cloudsFar = null;
     this.cloudsMid = null;
     this.cloudsNear = null;
+    this.cards = null;
     this.barrelPass = null;
 
     for (const texture of this.boundTextures) {
@@ -243,6 +324,11 @@ export class CanvasEngine {
 
     if (this.canvas) {
       this.canvas.removeEventListener("webglcontextlost", this.handleContextLost);
+      this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
+      this.canvas.removeEventListener("pointermove", this.handlePointerMove);
+      this.canvas.removeEventListener("pointerup", this.handlePointerUp);
+      this.canvas.removeEventListener("pointercancel", this.handlePointerCancel);
+      this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
       this.canvas.parentElement?.removeChild(this.canvas);
     }
     this.canvas = null;
@@ -389,6 +475,81 @@ export class CanvasEngine {
     this.options.onError?.(new Error("WebGL context lost"));
   };
 
+  /** Container-relative pointer position (CSS px, origin top-left) — the convention `hit-test.ts` expects. */
+  private pointerFromEvent(event: PointerEvent): Vec2 {
+    const rect = this.canvas?.getBoundingClientRect();
+    if (!rect) {
+      return { x: 0, y: 0 };
+    }
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  /** Cards, keyed by their layout cell (`CardInstance.key`), for `hit-test.ts` — matches what `layers/cards.ts` renders this frame. */
+  private hitTestableCards(): { id: string; worldRect: CardInstance["worldRect"] }[] {
+    return this.lastCardInstances.map((instance) => ({
+      id: instance.key,
+      worldRect: instance.worldRect,
+    }));
+  }
+
+  private hitTestAt(pointer: Vec2): string | null {
+    const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
+    const viewport = this.getViewportSize();
+    return hitTestCard(pointer, viewport, world, this.distortionK, this.hitTestableCards());
+  }
+
+  private setHoveredCardKey(key: string | null): void {
+    if (key === this.hoveredCardKey) {
+      return;
+    }
+    this.hoveredCardKey = key;
+    if (this.canvas) {
+      this.canvas.style.cursor = key ? "pointer" : "";
+    }
+  }
+
+  private readonly handlePointerDown = (event: PointerEvent): void => {
+    this.pointerDownPos = this.pointerFromEvent(event);
+  };
+
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    // A held button means the user is panning (NavigationController's own
+    // drag handling) or about to click — hover feedback would just be
+    // noisy mid-gesture.
+    if (this.pointerDownPos) {
+      return;
+    }
+    this.setHoveredCardKey(this.hitTestAt(this.pointerFromEvent(event)));
+  };
+
+  private readonly handlePointerUp = (event: PointerEvent): void => {
+    const start = this.pointerDownPos;
+    this.pointerDownPos = null;
+    if (!start) {
+      return;
+    }
+    const end = this.pointerFromEvent(event);
+    if (!isClick(start, end)) {
+      return;
+    }
+    const hitKey = this.hitTestAt(end);
+    if (!hitKey) {
+      return;
+    }
+    const instance = this.lastCardInstances.find((candidate) => candidate.key === hitKey);
+    if (instance) {
+      this.options.onItemOpen?.(instance.item.id);
+    }
+  };
+
+  private readonly handlePointerCancel = (): void => {
+    this.pointerDownPos = null;
+  };
+
+  private readonly handlePointerLeave = (): void => {
+    this.setHoveredCardKey(null);
+  };
+
   private fireReady(): void {
     if (this.readyFired) {
       return;
@@ -423,6 +584,54 @@ export class CanvasEngine {
       viewport.height,
       this.dpr,
     );
+  }
+
+  /**
+   * Cards use parallax 1 (they pan 1:1 with navigation, unlike the ambient
+   * sky/cloud layers) — the same `group.position = world * parallax` +
+   * fixed-local-position technique as `updateCloudLayer`, with parallax
+   * fixed at 1. Recomputes the visible-card set every frame from the
+   * current `this.items` (`item-layout.ts`'s `visibleCardInstances`, pure
+   * and cheap — no per-frame allocation beyond the returned array itself,
+   * matching the cloud layers' own per-frame recompute) and notifies
+   * `onVisibleCardsChange` only when the DOM-mirrored subset actually
+   * changes (`dom-mirror.ts`), so React doesn't re-render every frame.
+   */
+  private updateCards(world: Vec2, viewport: { width: number; height: number }): void {
+    if (!this.cards) {
+      return;
+    }
+
+    const cardCenterWorld: Vec2 = { x: -world.x, y: -world.y };
+    visibleCardInstances(
+      this.items,
+      cardCenterWorld,
+      viewport.width,
+      viewport.height,
+      DEFAULT_CARD_MARGIN_CELLS,
+      DEFAULT_MAX_CARD_POOL_SIZE,
+      this.cardInstanceCache,
+      this.lastCardInstances,
+    );
+
+    this.cards.group.position.x = world.x;
+    this.cards.group.position.y = -world.y;
+    this.cards.update(
+      this.lastCardInstances,
+      world,
+      viewport.width,
+      viewport.height,
+      this.dpr,
+      this.reducedMotion,
+      this.hoveredCardKey,
+    );
+
+    const domCards = selectDomMirrorCards(this.lastCardInstances);
+    const signature = domCards.map((card) => card.key).join("|");
+    if (signature !== this.lastDomMirrorSignature) {
+      this.lastDomMirrorSignature = signature;
+      this.options.onVisibleCardsChange?.(domCards);
+    }
   }
 
   private readonly tick = (now: number): void => {
@@ -466,6 +675,8 @@ export class CanvasEngine {
     this.updateCloudLayer(this.cloudsFar, FAR_CLOUD_CONFIG.parallax, world, viewport);
     this.updateCloudLayer(this.cloudsMid, MID_CLOUD_CONFIG.parallax, world, viewport);
     this.updateCloudLayer(this.cloudsNear, NEAR_CLOUD_CONFIG.parallax, world, viewport);
+
+    this.updateCards(world, viewport);
 
     this.renderer.setRenderTarget(this.renderTarget);
     this.renderer.render(this.scene, this.worldCamera);

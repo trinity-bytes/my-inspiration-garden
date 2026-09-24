@@ -27,4 +27,31 @@ describe("CanvasHost", () => {
     const { unmount } = render(<CanvasHost />);
     expect(() => unmount()).not.toThrow();
   });
+
+  it("shows a subtle empty-state message when there are no items, and the canvas still renders", () => {
+    render(<CanvasHost itemsStatus="empty" />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "The garden is empty for now — nothing to show yet.",
+    );
+    expect(screen.getByTestId("canvas-host")).toBeInTheDocument();
+  });
+
+  it("shows a subtle error message when the items fetch failed", () => {
+    render(<CanvasHost itemsStatus="error" />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Couldn't load the garden's items right now.",
+    );
+  });
+
+  it("shows no message once items are ready", () => {
+    render(<CanvasHost itemsStatus="ready" />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("exposes an (initially empty, jsdom has no WebGL to compute visible cards) parallel DOM/ARIA card list", () => {
+    render(<CanvasHost items={[]} />);
+    expect(
+      screen.getByRole("list", { name: "Garden items currently in view" }),
+    ).toBeInTheDocument();
+  });
 });

@@ -1,3 +1,4 @@
+import { centerOffsetFor } from "./coords";
 import { deadZoneRadius } from "./deadzone";
 import { type DragSample, decayVelocity, releaseVelocity } from "./drag";
 import { clampDt } from "./dt-clamp";
@@ -133,6 +134,21 @@ export class NavigationController {
 
   getWorldOffset(): Vec2 {
     return { ...this.worldOffset };
+  }
+
+  /**
+   * Instantly pans so `worldPoint` (a 1:1, parallax-1 layer's world
+   * coordinate — the card layer, see `item-layout.ts`) sits at the screen
+   * center, and stops any in-flight drift/release motion. Used by the
+   * parallel DOM/ARIA layer (`components/CanvasHost/CanvasHost.tsx`) when a
+   * card gains keyboard focus. Instant rather than eased: a smooth animated
+   * pan needs its own time-based tween state, which is a reasonable future
+   * enhancement but out of scope here (see the T8b report's known gaps).
+   */
+  centerOn(worldPoint: Vec2): void {
+    this.worldOffset = centerOffsetFor(worldPoint, 1);
+    this.velocity = { x: 0, y: 0 };
+    this.motionState = "idle";
   }
 
   getVelocity(): Vec2 {
