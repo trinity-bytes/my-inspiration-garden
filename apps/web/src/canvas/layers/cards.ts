@@ -2,6 +2,7 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
+import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
 import { clampSpriteCssSize } from "../max-sprite-size";
 import { createPlaceholderTexture } from "../placeholder-texture";
@@ -153,24 +154,32 @@ export class CardLayer {
         );
       },
       (texture) => {
-        if (entry.loadToken === token) {
+        if (!isStaleLoadCallback(entry.loadToken, token)) {
           entry.uniforms.u_map.value = texture;
         }
       },
       () => {
         // Thumbnail failed to load (broken URL, network) — fall back to the
-        // generic placeholder rather than leaving the card blank. Re-pin to
-        // the fallback key so the registry never disposes it while this
-        // entry still references it, and route through `load` too (never
-        // `set` a value already known to be cached — see
-        // `texture-registry.ts`'s identity no-op rule).
+        // generic placeholder rather than leaving the card blank. Bail out
+        // entirely if the entry has since moved on to a different instance
+        // (`isStaleLoadCallback`): the entry's pin was already updated by
+        // that newer assignment, and re-pinning here for the OLD item would
+        // unpin the texture the entry currently renders and pin a
+        // placeholder for an item it no longer represents (see
+        // `card-texture-token.ts`). Re-pin to the fallback key so the
+        // registry never disposes it while this entry still references it,
+        // and route through `load` too (never `set` a value already known
+        // to be cached — see `texture-registry.ts`'s identity no-op rule).
+        if (isStaleLoadCallback(entry.loadToken, token)) {
+          return;
+        }
         const fallbackKey = `placeholder:${item.id}`;
         this.pinEntryTexture(entry, fallbackKey);
         this.textures.load(
           fallbackKey,
           (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
           (texture) => {
-            if (entry.loadToken === token) {
+            if (!isStaleLoadCallback(entry.loadToken, token)) {
               entry.uniforms.u_map.value = texture;
             }
           },
