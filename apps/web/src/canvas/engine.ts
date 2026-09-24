@@ -69,12 +69,21 @@ const HAZE_PARALLAX = 0.12;
 //
 // T8b owner feedback: the near (fastest, most opaque) cloud layer was
 // REMOVED — cards now supply the depth cue, and a solid near cloud layer
-// competed with them visually. Far/mid are unchanged (the owner likes how
-// far blends into the sky via the atmospheric effect) — only retune if
-// asked.
+// competed with them visually.
+//
+// T8b-2 owner feedback: retune far+mid TOGETHER — bigger sprites (base
+// size 480->720, 1.5x, see cloud-depth.ts's PARALLAX/OPACITY/ATMOSPHERE_MIX
+// _FAR/NEAR for the parallax/opacity/atmosphereMix side), slower parallax,
+// a little more atmospheric perspective. CLOUD_DEPTH_MID is lowered
+// 0.5->0.4 so mid samples closer to far on the same retuned curve (keeps
+// mid cohesive with far rather than reading as a separate near layer,
+// while still staying nearer/more-solid than far). cellSize/density below
+// are retuned alongside the size bump so the bigger sprites still land on
+// screen without crowding (see cloud-visibility.test.ts's 2-4 combined
+// on-screen target at 1440x900).
 const CLOUD_DEPTH_FAR = 0;
-const CLOUD_DEPTH_MID = 0.5;
-const CLOUD_BASE_SPRITE_SIZE_PX = 480;
+const CLOUD_DEPTH_MID = 0.4;
+const CLOUD_BASE_SPRITE_SIZE_PX = 720;
 
 // Cards draw above every cloud layer (decision recorded in
 // odd/tasks/garden-mvp.md: "cards above clouds"). Cloud renderOrder tops
@@ -128,8 +137,14 @@ function cloudLayerConfig(
 // land on screen, and the density-selected cells' random offsets landed
 // off-screen far more often than on. Densities are unchanged; cellSize
 // reduced so most cells are meaningfully smaller than the viewport.
-export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 550, 0.24);
-export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 450, 0.2);
+//
+// T8b-2 retune: cellSize raised (550->600, 450->500) and density trimmed
+// slightly (0.24->0.22, 0.2->0.18) to offset the bigger sprites above —
+// verified against a grid search over cloud-field.ts's real placement math
+// to land back in the 2-4 on-screen range at 1440x900 (see
+// cloud-visibility.test.ts).
+export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 600, 0.22);
+export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 500, 0.18);
 
 /**
  * Owns the full WebGL scene: sky, procedural haze, two cloud parallax

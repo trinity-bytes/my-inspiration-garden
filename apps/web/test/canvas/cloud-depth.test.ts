@@ -31,19 +31,28 @@ describe("cloudDepthStyle", () => {
     expect(nearest.atmosphereMix).toBe(0);
   });
 
-  it("the farthest layer (depth=0) reads as hazy but still perceptible: opacity ~0.6-0.7, atmosphereMix ~0.35-0.45", () => {
+  // T8b-2 owner feedback (retune far+mid together after the near layer's
+  // removal): "a little" more atmospheric perspective — opacity down and
+  // atmosphereMix up vs the pre-retune far values (opacity 0.65,
+  // atmosphereMix 0.4) — so the farthest layer blends further into the sky.
+  it("the farthest layer (depth=0) reads as hazier than before the T8b-2 retune: opacity ~0.5-0.6, atmosphereMix ~0.45-0.55", () => {
     const farthest = cloudDepthStyle(0);
-    expect(farthest.opacity).toBeGreaterThanOrEqual(0.6);
-    expect(farthest.opacity).toBeLessThanOrEqual(0.7);
-    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.35);
-    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.45);
+    expect(farthest.opacity).toBeGreaterThanOrEqual(0.5);
+    expect(farthest.opacity).toBeLessThanOrEqual(0.6);
+    expect(farthest.atmosphereMix).toBeGreaterThanOrEqual(0.45);
+    expect(farthest.atmosphereMix).toBeLessThanOrEqual(0.55);
   });
 
-  it("keeps the parallax range consistent with the existing far/near values (~0.3 .. ~0.7)", () => {
+  // T8b-2 owner feedback: "slower" — both remaining layers (far depth=0,
+  // mid depth=0.4, see engine.ts's CLOUD_DEPTH_MID) parallax reduced to
+  // ~0.6x their pre-retune values (far was 0.3, mid was 0.5 at the old
+  // depth=0.5) — the far/near depth-style endpoints below are what those
+  // two layers are actually sampled from.
+  it("keeps the parallax range at the retuned, slower far/near endpoints (~0.18 .. ~0.48)", () => {
     const far = cloudDepthStyle(0);
     const near = cloudDepthStyle(1);
-    expect(far.parallax).toBeCloseTo(0.3, 1);
-    expect(near.parallax).toBeCloseTo(0.7, 1);
+    expect(far.parallax).toBeCloseTo(0.18, 1);
+    expect(near.parallax).toBeCloseTo(0.48, 1);
   });
 
   it("clamps depth to [0, 1] for out-of-range inputs", () => {
