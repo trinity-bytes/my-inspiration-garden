@@ -38,6 +38,8 @@ const ACCENT_HEX = "#f29a6b"; // --garden-accent
 export const PADDING_FRACTION = 0.08;
 export const TEXT_TITLE_FONT_FRACTION = 0.07;
 export const TEXT_TITLE_GAP_FRACTION = 0.11;
+export const TEXT_TITLE_LINE_HEIGHT_FRACTION = 0.088;
+export const TEXT_TITLE_MAX_LINES = 2;
 export const TEXT_BODY_FONT_FRACTION = 0.05;
 export const TEXT_BODY_LINE_HEIGHT_FRACTION = 0.065;
 export const LINK_TITLE_FONT_FRACTION = 0.075;
@@ -244,9 +246,15 @@ function paintTextCard(item: TextItem, widthPx: number, heightPx: number): HTMLC
   if (content.title) {
     ctx.fillStyle = FOREGROUND_HEX;
     ctx.font = geistFont(600, canvas.width * TEXT_TITLE_FONT_FRACTION);
-    const { lines } = wrapText((text) => ctx.measureText(text).width, content.title, maxWidth, 1);
-    drawLines(ctx, lines, padding, cursorY, 0);
-    cursorY += canvas.width * TEXT_TITLE_GAP_FRACTION;
+    const titleLineHeight = canvas.width * TEXT_TITLE_LINE_HEIGHT_FRACTION;
+    const { lines } = wrapText(
+      (text) => ctx.measureText(text).width,
+      content.title,
+      maxWidth,
+      TEXT_TITLE_MAX_LINES,
+    );
+    drawLines(ctx, lines, padding, cursorY, titleLineHeight);
+    cursorY += (lines.length - 1) * titleLineHeight + canvas.width * TEXT_TITLE_GAP_FRACTION;
   }
 
   ctx.fillStyle = FOREGROUND_HEX;

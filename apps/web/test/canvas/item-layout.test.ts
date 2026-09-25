@@ -107,6 +107,22 @@ describe("cardAspectForItem content-fit (text kind, columnWidth provided)", () =
   });
 });
 
+describe("text card title wraps to two lines", () => {
+  const columnWidth = 240;
+  it("gives a title that needs two lines a taller card than a one-line title with the same body", () => {
+    const body = {
+      body: "Same body for both cards, long enough to wrap over several lines so neither card is clamped to the aspect limit.",
+    };
+    const oneLine = makeItem("tt1", "text", body, { title: "Short" });
+    const twoLines = makeItem("tt2", "text", body, {
+      title: "Composition and negative space in quiet layouts",
+    });
+    expect(cardAspectForItem(twoLines, columnWidth)).toBeLessThan(
+      cardAspectForItem(oneLine, columnWidth),
+    );
+  });
+});
+
 describe("cardAspectForItem content-fit (link kind without a preview image)", () => {
   const columnWidth = 240;
 

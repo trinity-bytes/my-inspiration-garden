@@ -9,6 +9,8 @@ import {
   TEXT_BODY_LINE_HEIGHT_FRACTION,
   TEXT_TITLE_FONT_FRACTION,
   TEXT_TITLE_GAP_FRACTION,
+  TEXT_TITLE_LINE_HEIGHT_FRACTION,
+  TEXT_TITLE_MAX_LINES,
 } from "./card-painters";
 import { COLUMN_GUTTER_PX } from "./column-layout";
 import { clamp } from "./deadzone";
@@ -135,7 +137,16 @@ function textCardContentFitHeight(
   const maxWidth = columnWidth - padding * 2;
   let cursorY = padding + columnWidth * TEXT_TITLE_FONT_FRACTION;
   if (title) {
-    cursorY += columnWidth * TEXT_TITLE_GAP_FRACTION;
+    const titleFontSize = columnWidth * TEXT_TITLE_FONT_FRACTION;
+    const titleLineCount = wrapText(
+      (text) => approxMeasure(text, titleFontSize, 600),
+      title,
+      maxWidth,
+      TEXT_TITLE_MAX_LINES,
+    ).lines.length;
+    cursorY +=
+      (titleLineCount - 1) * columnWidth * TEXT_TITLE_LINE_HEIGHT_FRACTION +
+      columnWidth * TEXT_TITLE_GAP_FRACTION;
   }
   const bodyLineHeight = columnWidth * TEXT_BODY_LINE_HEIGHT_FRACTION;
   const bodyFontSize = columnWidth * TEXT_BODY_FONT_FRACTION;
