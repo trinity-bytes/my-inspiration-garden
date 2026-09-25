@@ -1,6 +1,7 @@
 import type { Item } from "@garden/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { contrastTextColor } from "../color-contrast";
+import { useLoadedFontFamily } from "./useLoadedFontFamily";
 import "./ItemDetailModal.css";
 
 export interface ItemDetailModalProps {
@@ -94,6 +95,33 @@ function PaletteSwatches({ colors }: { colors: { hex: string; name?: string }[] 
   );
 }
 
+function FontSpecimen({ item }: { item: Extract<Item, { kind: "font" }> }) {
+  const { fontFamily } = useLoadedFontFamily(
+    item.data.family,
+    item.data.sourceUrl,
+    "Geist Variable",
+  );
+  const style = { fontFamily: `"${fontFamily}", "Geist Variable", system-ui, sans-serif` };
+
+  return (
+    <div className="item-detail__font-specimen">
+      <p className="item-detail__font-family">{item.data.family}</p>
+      {[0.9, 1.6, 2.6].map((scale) => (
+        <p
+          key={scale}
+          className="item-detail__font-sample"
+          style={{ ...style, fontSize: `${scale * 1.5}rem` }}
+        >
+          Aa
+        </p>
+      ))}
+      <p className="item-detail__font-pangram" style={style}>
+        {item.data.previewText?.trim() || "The quick brown fox jumps over the lazy dog"}
+      </p>
+    </div>
+  );
+}
+
 function ItemDetailBody({ item }: { item: Item }) {
   switch (item.kind) {
     case "image":
@@ -167,29 +195,7 @@ function ItemDetailBody({ item }: { item: Item }) {
     case "palette":
       return <PaletteSwatches colors={item.data.colors} />;
     case "font":
-      return (
-        <div className="item-detail__font-specimen">
-          <p className="item-detail__font-family">{item.data.family}</p>
-          {[0.9, 1.6, 2.6].map((scale) => (
-            <p
-              key={scale}
-              className="item-detail__font-sample"
-              style={{
-                fontSize: `${scale * 1.5}rem`,
-                fontFamily: `"${item.data.family}", "Geist Variable", system-ui, sans-serif`,
-              }}
-            >
-              Aa
-            </p>
-          ))}
-          <p
-            className="item-detail__font-pangram"
-            style={{ fontFamily: `"${item.data.family}", "Geist Variable", system-ui, sans-serif` }}
-          >
-            {item.data.previewText?.trim() || "The quick brown fox jumps over the lazy dog"}
-          </p>
-        </div>
-      );
+      return <FontSpecimen item={item} />;
   }
 }
 
