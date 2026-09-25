@@ -13,6 +13,13 @@
 -- Origin: the local D1 image items seeded during T8b's visual QA used the
 -- canvas's own alpha-sprite cloud textures (transparent) and, for one
 -- text item, a body-truncated (not word-wrapped) title — both now fixed.
+--
+-- `updated_at` uses a literal ISO-8601 string, NOT SQLite's
+-- `CURRENT_TIMESTAMP` (verified by a first run: it produces
+-- "YYYY-MM-DD HH:MM:SS" — space-separated, no `T`/`Z` — which fails the
+-- shared package's `isoDateTimeSchema` and made the whole `GET /api/items`
+-- response fail client-side Zod validation, i.e. the entire canvas showed
+-- "Couldn't load the garden's items right now." until this was fixed).
 
 -- --- image: repoint transparent cloud-sprite items at real, already- ---
 -- --- uploaded opaque photos (landscape/sky derivatives, T8b's local  ---
@@ -23,19 +30,19 @@
 UPDATE items SET
   title = 'Ridge at golden hour',
   data = '{"r2Key":"media/2026/09/93041ab7-bdc7-42a8-b324-f5520ecb9e08.webp","width":1280,"height":720,"mime":"image/webp","alt":"Warm-lit mountain ridgeline at dusk"}',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'ebdbcf2b-602c-4a26-8519-0cc7552fb211';
 
 UPDATE items SET
   title = 'Hazy horizon study',
   data = '{"r2Key":"media/2026/09/737da92b-2323-437f-b93a-758c49a9ae97.webp","width":3548,"height":1774,"mime":"image/webp","alt":"Soft gradient sky in dusk tones"}',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'f10fc334-9827-43c9-bc9c-c64d317d1488';
 
 UPDATE items SET
   title = 'Wide valley vista',
   data = '{"r2Key":"media/2026/09/3667ebe5-5edd-4f32-a6cc-ee941d581871.webp","width":2560,"height":1439,"mime":"image/webp","alt":"Broad landscape vista at golden hour"}',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'b88fadd7-655c-4bb7-88d7-08b3c2d4cfcb';
 
 -- Redundant once the above three are repointed (a literal duplicate r2Key
@@ -55,34 +62,52 @@ DELETE FROM items WHERE id IN (
 -- --- preview, covering "links with and without preview" either way.  ---
 UPDATE items SET
   data = json_set(data, '$.previewImage', '/api/media/media/2026/09/93041ab7-bdc7-42a8-b324-f5520ecb9e08.webp'),
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '27211369-0325-484d-8a71-ae14b94736f1'; -- Dribbble shot
 
 UPDATE items SET
   data = json_set(data, '$.previewImage', '/api/media/media/2026/09/737da92b-2323-437f-b93a-758c49a9ae97.webp'),
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '646ef312-cde1-4f66-ac48-3c620fcc5236'; -- Pinterest pin
 
--- --- text: fix the one bad seed title (this was the actual origin of ---
--- --- the "titles are hard-clipped" T9 bug report — the SEEDED title  ---
--- --- itself was a body prefix truncated mid-word, not a rendering    ---
--- --- bug; wrap-text.ts now handles real long titles/bodies correctly ---
--- --- regardless). Body is left as-is (still a good long-body case).  ---
+-- --- text: fix the bad seed titles — this was the actual origin of the  ---
+-- --- "titles are hard-clipped" T9 bug report: EVERY text item's seeded  ---
+-- --- title (not just the one first noticed) was a body prefix          ---
+-- --- truncated mid-word ("Longer text item to chec", "Remember: the    ---
+-- --- accent col", "A short note about compo", "Idea — spherical        ---
+-- --- distort"), not a rendering bug; wrap-text.ts now handles real     ---
+-- --- long titles/bodies correctly regardless. Bodies are left as-is    ---
+-- --- (still good varied-length cases, including one long one).        ---
 UPDATE items SET
   title = 'Notes on text card wrapping',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '42aac0d6-64cc-47ae-9a81-ea817de61a38';
+
+UPDATE items SET
+  title = 'Spherical distortion should stay subtle',
+  updated_at = '2026-09-24T12:00:00.000Z'
+WHERE id = '7c68f892-251a-414a-b8e4-c0b2fe5ed72b';
+
+UPDATE items SET
+  title = 'Reminder: apricot, never hot pink',
+  updated_at = '2026-09-24T12:00:00.000Z'
+WHERE id = 'f8319452-adba-4d8c-b7ec-3a81c76662d3';
+
+UPDATE items SET
+  title = 'Composition and negative space',
+  updated_at = '2026-09-24T12:00:00.000Z'
+WHERE id = '38eaaa45-5873-4277-9546-125d07fbd9bc';
 
 -- --- palette: bring every palette into the requested 4-6 color range ---
 -- --- (two were seeded with only 3).                                  ---
 UPDATE items SET
   data = '{"colors":[{"hex":"#F29A6B"},{"hex":"#E0784E"},{"hex":"#FCE3D3"},{"hex":"#FFB088"},{"hex":"#2A2140"}]}',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'e6744dc6-be07-48b2-954e-f8ff050da00d'; -- Apricot accent (3 -> 5)
 
 UPDATE items SET
   data = '{"colors":[{"hex":"#2A2140"},{"hex":"#F6F3FA"},{"hex":"#8F7BB5"},{"hex":"#5E4C82"},{"hex":"#D5CBE8"}]}',
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '9b9b6309-0a99-4fa1-b099-4c31cea37692'; -- Ink & sky (3 -> 5)
 
 -- --- font: give one item a real, loadable sourceUrl (a stable jsDelivr ---
@@ -95,7 +120,7 @@ WHERE id = '9b9b6309-0a99-4fa1-b099-4c31cea37692'; -- Ink & sky (3 -> 5)
 -- --- card code path (loads live, no URL at all) is covered.            ---
 UPDATE items SET
   data = json_set(data, '$.sourceUrl', 'https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.woff2'),
-  updated_at = CURRENT_TIMESTAMP
+  updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'fd1e8802-7b1f-4afb-bb83-de1323b9f2e0'; -- Inter
 
 -- --- video: only 2 existed (both embedUrl-only, no thumbnail — neither ---
