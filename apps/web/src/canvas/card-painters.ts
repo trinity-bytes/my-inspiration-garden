@@ -28,7 +28,21 @@ import { wrapText } from "./wrap-text";
 const BACKGROUND_HEX = "#e9e3f3"; // --garden-lavender-100
 const FOREGROUND_HEX = "#2a2140"; // --garden-ink
 const ACCENT_HEX = "#f29a6b"; // --garden-accent
-const PADDING_FRACTION = 0.08;
+/**
+ * Exported (not just a local const) so `item-layout.ts`'s pure content-fit
+ * sizing (T9b, owner feedback: short text cards were too tall) can derive a
+ * card's height using the SAME padding/font-scale fractions this painter
+ * actually draws with — a single source of truth, so the computed layout
+ * size and the painted content never drift apart.
+ */
+export const PADDING_FRACTION = 0.08;
+export const TEXT_TITLE_FONT_FRACTION = 0.07;
+export const TEXT_TITLE_GAP_FRACTION = 0.11;
+export const TEXT_BODY_FONT_FRACTION = 0.05;
+export const TEXT_BODY_LINE_HEIGHT_FRACTION = 0.065;
+export const LINK_TITLE_FONT_FRACTION = 0.075;
+export const LINK_TITLE_LINE_HEIGHT_FRACTION = 0.09;
+export const LINK_TITLE_GAP_FRACTION = 0.05;
 const IMAGE_LOAD_TIMEOUT_MS = 4000;
 const FONT_LOAD_TIMEOUT_MS = 2000;
 
@@ -146,7 +160,7 @@ async function paintLinkCard(
   }
 
   ctx.textBaseline = "alphabetic";
-  ctx.font = geistFont(600, canvas.width * 0.075);
+  ctx.font = geistFont(600, canvas.width * LINK_TITLE_FONT_FRACTION);
   const maxTextWidth = canvas.width - padding * 2;
   const { lines: titleLines } = wrapText(
     (text) => ctx.measureText(text).width,
@@ -154,9 +168,10 @@ async function paintLinkCard(
     maxTextWidth,
     2,
   );
-  const titleLineHeight = Math.round(canvas.width * 0.09);
+  const titleLineHeight = Math.round(canvas.width * LINK_TITLE_LINE_HEIGHT_FRACTION);
   const domainY = canvas.height - padding;
-  const titleTop = domainY - canvas.width * 0.05 - titleLines.length * titleLineHeight;
+  const titleTop =
+    domainY - canvas.width * LINK_TITLE_GAP_FRACTION - titleLines.length * titleLineHeight;
   drawLines(ctx, titleLines, padding, titleTop, titleLineHeight);
 
   ctx.font = geistFont(500, canvas.width * 0.045);
@@ -225,19 +240,19 @@ function paintTextCard(item: TextItem, widthPx: number, heightPx: number): HTMLC
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.textBaseline = "alphabetic";
 
-  let cursorY = padding + canvas.width * 0.07;
+  let cursorY = padding + canvas.width * TEXT_TITLE_FONT_FRACTION;
   if (content.title) {
     ctx.fillStyle = FOREGROUND_HEX;
-    ctx.font = geistFont(600, canvas.width * 0.07);
+    ctx.font = geistFont(600, canvas.width * TEXT_TITLE_FONT_FRACTION);
     const { lines } = wrapText((text) => ctx.measureText(text).width, content.title, maxWidth, 1);
     drawLines(ctx, lines, padding, cursorY, 0);
-    cursorY += canvas.width * 0.11;
+    cursorY += canvas.width * TEXT_TITLE_GAP_FRACTION;
   }
 
   ctx.fillStyle = FOREGROUND_HEX;
   ctx.globalAlpha = 0.85;
-  ctx.font = geistFont(400, canvas.width * 0.05);
-  const bodyLineHeight = Math.round(canvas.width * 0.065);
+  ctx.font = geistFont(400, canvas.width * TEXT_BODY_FONT_FRACTION);
+  const bodyLineHeight = Math.round(canvas.width * TEXT_BODY_LINE_HEIGHT_FRACTION);
   const remainingHeight = canvas.height - padding - cursorY;
   const maxLines = Math.max(1, Math.floor(remainingHeight / bodyLineHeight));
   const { lines } = wrapText(

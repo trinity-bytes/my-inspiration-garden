@@ -7,12 +7,8 @@ import {
 } from "../../src/canvas/column-layout";
 
 describe("COLUMN_GUTTER_PX", () => {
-  it("matches the previous per-cell grid's own effective horizontal gap (owner: horizontal spacing was fine)", () => {
-    // Previous grid: CARD_CELL_SIZE=340, card width = cellSize * fraction,
-    // fraction uniform in [0.55, 0.86] (mean 0.705). A card centered in its
-    // cell (no jitter) left cellSize - typicalWidth of total gap to its
-    // neighbor: 340 - 340*0.705 = 340*0.295 = 100.3 -> rounded to 100.
-    expect(COLUMN_GUTTER_PX).toBe(100);
+  it("is reduced to 56 (owner feedback T9b: cards were too far apart both horizontally and vertically)", () => {
+    expect(COLUMN_GUTTER_PX).toBe(56);
   });
 });
 

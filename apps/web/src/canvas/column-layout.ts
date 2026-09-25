@@ -16,15 +16,15 @@ import { clamp } from "./deadzone";
  * was fine, vertical was irregular — using the SAME constant for both axes
  * removes the irregularity instead of retuning either one).
  *
- * Derived from the previous per-cell grid's own effective horizontal gap, so
- * the "fine" horizontal spacing carries over unchanged: a cell was 340
- * world px wide and a card's width was `cellSize * fraction`, `fraction`
- * uniform in [0.55, 0.86] (mean 0.705, i.e. a "typical" card width of
- * ~240px). A card centered in its cell (no jitter) left
- * `cellSize - typicalWidth` of total gap to its neighbor:
- * 340 - 340*0.705 = 340*0.295 ≈ 100px.
+ * Originally derived from the previous per-cell grid's own effective
+ * horizontal gap (340*0.295 ≈ 100px — see prior revisions of this comment).
+ * Reduced to 56 (T9b, owner feedback): both the horizontal gap between
+ * columns and the vertical gap between stacked cards felt too spacious once
+ * real per-kind card content (T9) was in place — one constant still drives
+ * both axes, so tightening it removes the excess space uniformly instead of
+ * retuning either axis independently.
  */
-export const COLUMN_GUTTER_PX = 100;
+export const COLUMN_GUTTER_PX = 56;
 
 /** Column width is clamped into this range regardless of viewport size, so extreme viewports never produce a degenerate (near-zero or absurdly wide) column. */
 export const MIN_COLUMN_WIDTH_PX = 140;

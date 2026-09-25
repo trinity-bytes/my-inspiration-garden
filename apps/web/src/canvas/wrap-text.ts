@@ -59,6 +59,30 @@ function withEllipsis(line: string, measure: (text: string) => number, maxWidth:
  * ellipsis-truncated at a word (then, if still needed, character) boundary
  * and `truncated` is `true`.
  */
+/**
+ * Average glyph width as a fraction of font size, per weight bucket. Not
+ * calibrated per font family (impossible without a real canvas) — just
+ * separates "regular" from "heavier" text enough to make wrapped-line-count
+ * estimates plausible for layout sizing.
+ */
+function approxCharWidthFraction(weight: number): number {
+  return weight >= 600 ? 0.58 : 0.52;
+}
+
+/**
+ * A pure, canvas-free approximation of `ctx.measureText(text).width` for a
+ * given font size/weight: `text.length * fontSizePx * <per-weight
+ * fraction>`. Exists so layout code (which must stay synchronous and
+ * deterministic — unlike a real 2D canvas, unavailable outside a paint
+ * call) can still derive text-dependent sizing, such as a text card's
+ * content-fit height (`item-layout.ts`), by reusing `wrapText` with this as
+ * its `measure` function instead of a real canvas context. Not
+ * pixel-accurate; only needs to be a reasonable, monotonic approximation.
+ */
+export function approxMeasure(text: string, fontSizePx: number, weight = 400): number {
+  return text.length * fontSizePx * approxCharWidthFraction(weight);
+}
+
 export function wrapText(
   measure: (text: string) => number,
   text: string,

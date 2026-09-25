@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wrapText } from "../../src/canvas/wrap-text";
+import { approxMeasure, wrapText } from "../../src/canvas/wrap-text";
 
 /** A deterministic fake measurer: each character is exactly 10 units wide (a space too), so expected widths are trivial to compute by hand. */
 function fixedWidthMeasure(charWidth = 10): (text: string) => number {
@@ -75,5 +75,39 @@ describe("wrapText", () => {
     const result = wrapText(fixedWidthMeasure(), "supercalifragilisticexpialidocious", 50, 3);
     expect(result.lines).toEqual(["supercalifragilisticexpialidocious"]);
     expect(result.truncated).toBe(false);
+  });
+});
+
+/**
+ * `approxMeasure` is a pure, canvas-free stand-in for `ctx.measureText`, so
+ * layout code (which must stay synchronous/deterministic, unlike a real 2D
+ * canvas) can derive text-dependent card sizing without an actual canvas.
+ * It only needs to be a *reasonable* approximation, not pixel-exact.
+ */
+describe("approxMeasure", () => {
+  it("is deterministic for the same inputs", () => {
+    expect(approxMeasure("hello world", 16, 400)).toBe(approxMeasure("hello world", 16, 400));
+  });
+
+  it("grows with text length", () => {
+    const short = approxMeasure("hi", 16, 400);
+    const long = approxMeasure("hello world this is longer", 16, 400);
+    expect(long).toBeGreaterThan(short);
+  });
+
+  it("returns 0 for empty text", () => {
+    expect(approxMeasure("", 16, 400)).toBe(0);
+  });
+
+  it("scales with font size", () => {
+    const small = approxMeasure("hello", 10, 400);
+    const large = approxMeasure("hello", 20, 400);
+    expect(large).toBeGreaterThan(small);
+  });
+
+  it("gives a heavier weight at least as much width as a lighter one", () => {
+    const regular = approxMeasure("hello world", 16, 400);
+    const bold = approxMeasure("hello world", 16, 700);
+    expect(bold).toBeGreaterThanOrEqual(regular);
   });
 });

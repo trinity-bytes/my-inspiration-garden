@@ -53,6 +53,101 @@ describe("cardHeightForItem", () => {
   });
 });
 
+/**
+ * Owner feedback (T9b): short text cards were too tall, with lots of empty
+ * space below the wrapped content. The text card's aspect must now be
+ * derived from its actual wrapped title/body line count (via `wrap-text.ts`
+ * + `approxMeasure`), not a fixed per-kind default — while staying pure and
+ * deterministic (layout can't depend on an async/real canvas measurement).
+ */
+describe("cardAspectForItem content-fit (text kind, columnWidth provided)", () => {
+  const columnWidth = 240;
+
+  it("gives very short text content a taller aspect (shorter card) than the old fixed default (0.8)", () => {
+    const item = makeItem("t1", "text", { body: "hi" }, { title: "Hi" });
+    const aspect = cardAspectForItem(item, columnWidth);
+    expect(aspect).toBeGreaterThan(0.8);
+  });
+
+  it("gives longer text content a shorter aspect (taller card) than very short content", () => {
+    const shortItem = makeItem("t2", "text", { body: "short" }, { title: "Short" });
+    const longItem = makeItem(
+      "t3",
+      "text",
+      {
+        body: "This is a much longer body of text that will wrap across several lines when it is measured against the column width, unlike the very short one above.",
+      },
+      { title: "A longer title than the short one" },
+    );
+    const shortAspect = cardAspectForItem(shortItem, columnWidth);
+    const longAspect = cardAspectForItem(longItem, columnWidth);
+    expect(longAspect).toBeLessThan(shortAspect);
+  });
+
+  it("stays within [CARD_ASPECT_MIN, CARD_ASPECT_MAX] for very long content", () => {
+    const item = makeItem(
+      "t4",
+      "text",
+      { body: "word ".repeat(400).trim() },
+      { title: "word ".repeat(20).trim() },
+    );
+    const aspect = cardAspectForItem(item, columnWidth);
+    expect(aspect).toBeGreaterThanOrEqual(CARD_ASPECT_MIN);
+    expect(aspect).toBeLessThanOrEqual(CARD_ASPECT_MAX);
+  });
+
+  it("is deterministic for the same item and columnWidth", () => {
+    const item = makeItem("t5", "text", { body: "hello world" }, { title: "Title" });
+    expect(cardAspectForItem(item, columnWidth)).toBe(cardAspectForItem(item, columnWidth));
+  });
+
+  it("falls back to the fixed default aspect when no columnWidth is provided (back-compat)", () => {
+    const item = makeItem("t6", "text", { body: "hi" }, { title: "Hi" });
+    expect(cardAspectForItem(item)).toBeCloseTo(0.8, 5);
+  });
+});
+
+describe("cardAspectForItem content-fit (link kind without a preview image)", () => {
+  const columnWidth = 240;
+
+  it("gives a short-titled link without a preview a taller aspect than the fixed default (1.4)", () => {
+    const item = makeItem("l1", "link", {}, { title: "Hi" });
+    const aspect = cardAspectForItem(item, columnWidth);
+    expect(aspect).toBeGreaterThan(1.4);
+  });
+
+  it("stays within [CARD_ASPECT_MIN, CARD_ASPECT_MAX]", () => {
+    const item = makeItem(
+      "l2",
+      "link",
+      {},
+      { title: "A very long link title that will wrap across two lines at this column width" },
+    );
+    const aspect = cardAspectForItem(item, columnWidth);
+    expect(aspect).toBeGreaterThanOrEqual(CARD_ASPECT_MIN);
+    expect(aspect).toBeLessThanOrEqual(CARD_ASPECT_MAX);
+  });
+
+  it("leaves a link WITH a preview image at the fixed default aspect, ignoring columnWidth", () => {
+    const item = makeItem(
+      "l3",
+      "link",
+      { previewImage: "https://example.com/p.png" },
+      { title: "Hi" },
+    );
+    expect(cardAspectForItem(item, columnWidth)).toBeCloseTo(1.4, 5);
+  });
+});
+
+describe("cardAspectForItem content-fit does not affect other kinds", () => {
+  it("video, palette, and font keep their fixed default aspect regardless of columnWidth", () => {
+    for (const kind of ["video", "palette", "font"] as const) {
+      const item = makeItem(`k-${kind}`, kind);
+      expect(cardAspectForItem(item, 240)).toBe(cardAspectForItem(item));
+    }
+  });
+});
+
 /** 24 items spanning every kind, matching the real seed data scale used for owner visual QA. */
 function seedItems(count = 24): ReturnType<typeof makeItem>[] {
   const kinds = ["image", "link", "text", "video", "palette", "font"] as const;
@@ -403,7 +498,12 @@ describe("visibleCardInstances", () => {
   // case: no single item should dominate. `STEP_CHANNEL`/`PHASE_CHANNEL`
   // were tuned against this exact scenario to minimize the max repeat
   // count.
-  it("distribution: in a 1440x900 window with 24 items, no item appears more than twice", () => {
+  it("distribution: in a 1440x900 window with 24 items, no item appears more than 3 times", () => {
+    // T9b: COLUMN_GUTTER_PX dropped 100 -> 56 (owner feedback: cards were
+    // too far apart), which packs more slots into the same viewport, so the
+    // realistic per-item repeat bound loosens from 2 to 3 (matching the
+    // it.each "realistic library size" bound below) at this fixed item
+    // count/viewport combination.
     const items24 = seedItems(24);
     const { columnWidth: desktopColumnWidth } = columnLayoutFor(1440);
     const instances = visibleCardInstances(
@@ -420,10 +520,10 @@ describe("visibleCardInstances", () => {
       counts.set(instance.item.id, (counts.get(instance.item.id) ?? 0) + 1);
     }
     for (const count of counts.values()) {
-      expect(count).toBeLessThanOrEqual(2);
+      expect(count).toBeLessThanOrEqual(3);
     }
     // Still meaningfully better than a 1:1 slot-to-item ratio would suggest.
-    expect(counts.size).toBeGreaterThanOrEqual(instances.length - 3);
+    expect(counts.size).toBeGreaterThanOrEqual(instances.length - 8);
   });
 
   // Slot count in a 1440x900 window stays roughly constant (~21-25) as item

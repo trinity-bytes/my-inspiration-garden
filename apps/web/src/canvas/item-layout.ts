@@ -1,7 +1,19 @@
 import type { Item, ItemKind } from "@garden/shared";
+import { linkCardContent, textCardContent } from "./card-content";
+import {
+  LINK_TITLE_FONT_FRACTION,
+  LINK_TITLE_GAP_FRACTION,
+  LINK_TITLE_LINE_HEIGHT_FRACTION,
+  PADDING_FRACTION,
+  TEXT_BODY_FONT_FRACTION,
+  TEXT_BODY_LINE_HEIGHT_FRACTION,
+  TEXT_TITLE_FONT_FRACTION,
+  TEXT_TITLE_GAP_FRACTION,
+} from "./card-painters";
 import { COLUMN_GUTTER_PX } from "./column-layout";
 import { clamp } from "./deadzone";
 import type { Vec2 } from "./types";
+import { approxMeasure, wrapText } from "./wrap-text";
 
 /**
  * Ordered, responsive masonry layout of items (owner feedback, T8b:
@@ -96,21 +108,95 @@ const KIND_DEFAULT_ASPECT: Record<ItemKind, number> = {
 };
 
 /**
+ * A generous cap on the body lines a text card's content-fit height will
+ * account for — not a real display limit (the painter still wraps/ellipsizes
+ * normally), just a bound so pathologically long bodies can't blow the fit
+ * calculation up before the [CARD_ASPECT_MIN, CARD_ASPECT_MAX] clamp below
+ * gets a chance to apply.
+ */
+const TEXT_CARD_MAX_FIT_BODY_LINES = 30;
+
+/**
+ * The world-px height a text card's content (title + body) actually needs
+ * at `columnWidth`, using the SAME padding/font-scale fractions
+ * `card-painters.ts`'s `paintTextCard` draws with (imported from there, one
+ * source of truth) so the painted card stays consistent with the size this
+ * layout reserves for it — no clipped text, no extra empty space (T9b,
+ * owner feedback: short text cards were too tall). Pure/deterministic:
+ * measured via `wrapText` + `approxMeasure` (a canvas-free approximation of
+ * `ctx.measureText`), since layout can't depend on an async/real canvas.
+ */
+function textCardContentFitHeight(
+  columnWidth: number,
+  title: string | null,
+  excerpt: string,
+): number {
+  const padding = columnWidth * PADDING_FRACTION;
+  const maxWidth = columnWidth - padding * 2;
+  let cursorY = padding + columnWidth * TEXT_TITLE_FONT_FRACTION;
+  if (title) {
+    cursorY += columnWidth * TEXT_TITLE_GAP_FRACTION;
+  }
+  const bodyLineHeight = columnWidth * TEXT_BODY_LINE_HEIGHT_FRACTION;
+  const bodyFontSize = columnWidth * TEXT_BODY_FONT_FRACTION;
+  const bodyLineCount = excerpt.trim()
+    ? wrapText(
+        (text) => approxMeasure(text, bodyFontSize, 400),
+        excerpt,
+        maxWidth,
+        TEXT_CARD_MAX_FIT_BODY_LINES,
+      ).lines.length
+    : 0;
+  return cursorY + bodyLineCount * bodyLineHeight + padding;
+}
+
+/**
+ * The world-px height a link card's typographic fallback (no preview
+ * image — see `paintLinkCard`) actually needs for its (up to 2-line)
+ * title, using the same fractions the painter draws with. Same rationale
+ * as `textCardContentFitHeight` above.
+ */
+function linkCardContentFitHeight(columnWidth: number, title: string): number {
+  const padding = columnWidth * PADDING_FRACTION;
+  const maxWidth = columnWidth - padding * 2;
+  const titleFontSize = columnWidth * LINK_TITLE_FONT_FRACTION;
+  const titleLineHeight = columnWidth * LINK_TITLE_LINE_HEIGHT_FRACTION;
+  const { lines } = wrapText((text) => approxMeasure(text, titleFontSize, 600), title, maxWidth, 2);
+  return padding + lines.length * titleLineHeight + columnWidth * LINK_TITLE_GAP_FRACTION + padding;
+}
+
+/**
  * The card's aspect ratio (width / height), clamped to [CARD_ASPECT_MIN,
  * CARD_ASPECT_MAX]. Per-kind rich rendering is T9; this layout only needs a
- * stable aspect — real image dimensions when known, a sane per-kind default
- * otherwise.
+ * stable aspect — real image dimensions when known, content-fit sizing for
+ * text (and a link without a preview image, T9b owner feedback: short text
+ * cards were too tall with empty space) when `columnWidth` is supplied, a
+ * sane per-kind default otherwise. `columnWidth` is optional so existing
+ * callers that only need a default (or an image's own aspect) keep working
+ * unchanged.
  */
-export function cardAspectForItem(item: Item): number {
+export function cardAspectForItem(item: Item, columnWidth?: number): number {
   if (item.kind === "image" && item.data.width > 0 && item.data.height > 0) {
     return clamp(item.data.width / item.data.height, CARD_ASPECT_MIN, CARD_ASPECT_MAX);
+  }
+  if (columnWidth && columnWidth > 0) {
+    if (item.kind === "text") {
+      const content = textCardContent(item);
+      const height = textCardContentFitHeight(columnWidth, content.title, content.excerpt);
+      return clamp(columnWidth / height, CARD_ASPECT_MIN, CARD_ASPECT_MAX);
+    }
+    if (item.kind === "link" && !item.data.previewImage) {
+      const content = linkCardContent(item);
+      const height = linkCardContentFitHeight(columnWidth, content.title);
+      return clamp(columnWidth / height, CARD_ASPECT_MIN, CARD_ASPECT_MAX);
+    }
   }
   return clamp(KIND_DEFAULT_ASPECT[item.kind], CARD_ASPECT_MIN, CARD_ASPECT_MAX);
 }
 
-/** A card's world-px height for a given column width: card width is always exactly `columnWidth` (owner feedback: no jitter, no random size scaling), so height is fully determined by the item's aspect ratio. */
+/** A card's world-px height for a given column width: card width is always exactly `columnWidth` (owner feedback: no jitter, no random size scaling), so height is fully determined by the item's aspect ratio (content-fit for text/typographic-link, see `cardAspectForItem`). */
 export function cardHeightForItem(item: Item, columnWidth: number): number {
-  return columnWidth / cardAspectForItem(item);
+  return columnWidth / cardAspectForItem(item, columnWidth);
 }
 
 const STEP_CHANNEL = 180_077;
