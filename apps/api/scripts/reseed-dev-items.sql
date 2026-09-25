@@ -7,8 +7,15 @@
 -- touches the shared local D1 file both a running dev server and this
 -- command read/write from the same `apps/api` working directory. The
 -- items_fts5 triggers on `items` keep the search index in sync
--- automatically; item_colors (color filtering, T10 scope) is NOT
--- refreshed by this script — a documented gap, out of scope here.
+-- automatically; item_colors IS refreshed below (T10) for `palette`
+-- items, matching the API's own derivation (`deriveItemColors` in
+-- `apps/api/src/db/repositories/items-repository.ts`): one row per color,
+-- `weight = 1 / colors.length`. `image` items are NOT covered here — none
+-- of this seed's image items carry a `data.palette` (the API only derives
+-- colors for an image item when its upload/import pipeline populated
+-- one), so there is nothing to compute from for the current dataset; add
+-- image `item_colors` rows the same way if a future seed gives an image
+-- item a `data.palette` array.
 --
 -- Origin: the local D1 image items seeded during T8b's visual QA used the
 -- canvas's own alpha-sprite cloud textures (transparent) and, for one
@@ -109,6 +116,20 @@ UPDATE items SET
   data = '{"colors":[{"hex":"#2A2140"},{"hex":"#F6F3FA"},{"hex":"#8F7BB5"},{"hex":"#5E4C82"},{"hex":"#D5CBE8"}]}',
   updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '9b9b6309-0a99-4fa1-b099-4c31cea37692'; -- Ink & sky (3 -> 5)
+
+-- --- item_colors: rebuild from every palette item's `data.colors` (T10) ---
+-- --- so the color filter (`GET /api/items?color=`) has data locally --- --
+-- --- instead of only working once an item is created through the live ---
+-- --- API. Delete-then-reinsert so a re-run of this script is idempotent. --
+DELETE FROM item_colors WHERE item_id IN (SELECT id FROM items WHERE kind = 'palette');
+
+INSERT INTO item_colors (item_id, hex, weight)
+SELECT
+  items.id,
+  json_extract(color.value, '$.hex'),
+  1.0 / (SELECT COUNT(*) FROM json_each(items.data, '$.colors'))
+FROM items, json_each(items.data, '$.colors') AS color
+WHERE items.kind = 'palette' AND items.deleted_at IS NULL;
 
 -- --- font: give one item a real, loadable sourceUrl (a stable jsDelivr ---
 -- --- CDN static font file) so the FontFace-loads-successfully path is  ---
