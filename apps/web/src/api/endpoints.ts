@@ -52,6 +52,15 @@ export function getCategoryTree(): Promise<CategoryTreeResult> {
   return apiFetch("/api/categories", { schema: categoryTreeResultSchema });
 }
 
+const tagWithCountSchema = z.object({ id: z.string(), name: z.string(), count: z.number() });
+const tagsResultSchema = z.object({ tags: z.array(tagWithCountSchema) });
+export type TagsResult = z.infer<typeof tagsResultSchema>;
+
+/** `GET /api/tags` — every tag with its item count, for the filter panel's tag list. Public read. */
+export function getTags(): Promise<TagsResult> {
+  return apiFetch("/api/tags", { schema: tagsResultSchema });
+}
+
 const sessionResultSchema = z.object({ role: z.enum(["owner", "visitor"]) });
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 

@@ -1,6 +1,7 @@
 import type { Item } from "@garden/shared";
 import { useEffect, useState } from "react";
 import { listItems } from "../api/endpoints";
+import { defaultFilterState, type FilterState, filtersToListParams } from "../filters/filter-state";
 import { ITEMS_FETCH_PAGE_LIMIT, mergeItemsPage, shouldFetchNextPage } from "./fetch-plan";
 
 export type GardenItemsStatus = "loading" | "ready" | "empty" | "error";
@@ -17,12 +18,20 @@ export interface UseGardenItemsResult {
  * to `"error"`; a successful fetch with zero items resolves to `"empty"` —
  * both are surfaced by `CanvasHost` as a subtle DOM message while the sky
  * still renders (T8b "Empty state and fetch error"). Never updates state
- * after unmount.
+ * after unmount. `filters` (T10's filter panel state) restarts the fetch
+ * from scratch whenever it changes — filtering always re-pages from the
+ * first cursor rather than trying to patch the already-collected items.
  */
-export function useGardenItems(): UseGardenItemsResult {
+export function useGardenItems(filters: FilterState = defaultFilterState()): UseGardenItemsResult {
   const [items, setItems] = useState<Item[]>([]);
   const [status, setStatus] = useState<GardenItemsStatus>("loading");
+  const listParams = filtersToListParams(filters);
+  const filterKey = JSON.stringify(listParams);
 
+  // `filterKey` is the stable, deep-equality proxy for `listParams` (a
+  // fresh object every render); depending on `listParams` directly would
+  // refetch every render even when the filters didn't actually change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey is the intentional dependency, see above.
   useEffect(() => {
     let cancelled = false;
 
@@ -34,7 +43,11 @@ export function useGardenItems(): UseGardenItemsResult {
       try {
         do {
           const requestCursor = cursor ?? null;
-          const page = await listItems({ cursor, limit: ITEMS_FETCH_PAGE_LIMIT });
+          const page = await listItems({
+            ...listParams,
+            cursor,
+            limit: ITEMS_FETCH_PAGE_LIMIT,
+          });
           const merged = mergeItemsPage(collected, page.items);
           const addedCount = merged.length - collected.length;
           collected = merged;
@@ -65,7 +78,7 @@ export function useGardenItems(): UseGardenItemsResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [filterKey]);
 
   return { status, items };
 }

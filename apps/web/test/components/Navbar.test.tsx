@@ -1,8 +1,29 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Navbar } from "../../src/components/Navbar/Navbar";
+import { defaultFilterState } from "../../src/filters/filter-state";
 
 describe("Navbar", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    // `mockImplementation`, not `mockResolvedValue`: `Navbar` fetches its
+    // filter options via two concurrent calls (`getCategoryTree`,
+    // `getTags`), and a `Response` body can only be read once — a single
+    // shared instance would make the second reader's `.json()` throw.
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { code: "forbidden", message: "no" } }), {
+          status: 403,
+        }),
+    );
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
   it("renders the brand wordmark", () => {
     render(<Navbar />);
     expect(screen.getByRole("heading", { name: "Inspiration Garden" })).toBeInTheDocument();
@@ -42,5 +63,36 @@ describe("Navbar", () => {
     render(<Navbar isOwner />);
     const signOut = screen.getByRole("link", { name: "Sign out" });
     expect(signOut).toHaveAttribute("href", "/cdn-cgi/access/logout");
+  });
+
+  it("does not render the filter panel while closed", () => {
+    render(<Navbar />);
+    expect(screen.queryByRole("region", { name: "Filters" })).not.toBeInTheDocument();
+  });
+
+  it("opens the filter panel when the Filters button is clicked", () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
+  });
+
+  it("reports search input changes through onFiltersChange with the rest of the filters preserved", () => {
+    const onFiltersChange = vi.fn();
+    render(
+      <Navbar
+        filters={{ ...defaultFilterState(), kinds: ["image"] }}
+        onFiltersChange={onFiltersChange}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Search the garden"), {
+      target: { value: "sunset" },
+    });
+
+    expect(onFiltersChange).toHaveBeenCalledWith({
+      ...defaultFilterState(),
+      kinds: ["image"],
+      q: "sunset",
+    });
   });
 });

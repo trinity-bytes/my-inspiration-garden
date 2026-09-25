@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getCategoryTree, getItem, getSession, listItems } from "../../src/api/endpoints";
+import { getCategoryTree, getItem, getSession, getTags, listItems } from "../../src/api/endpoints";
 import { ApiError } from "../../src/api/errors";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -112,6 +112,31 @@ describe("getCategoryTree", () => {
     expect(result).toEqual({ categories: [category] });
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain("/api/categories");
+  });
+});
+
+describe("getTags", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("requests /api/tags and validates the tag list with counts", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const tag = { id: "01HZY3Q3G0K8R4S8T2V6W0X4Y8", name: "ui", count: 3 };
+    fetchMock.mockResolvedValue(jsonResponse({ tags: [tag] }));
+
+    const result = await getTags();
+
+    expect(result).toEqual({ tags: [tag] });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("/api/tags");
   });
 });
 

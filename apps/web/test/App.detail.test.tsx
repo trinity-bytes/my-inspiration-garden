@@ -6,11 +6,12 @@ vi.mock("../src/api/endpoints", () => ({
   listItems: vi.fn(),
   getItem: vi.fn(),
   getCategoryTree: vi.fn(),
+  getTags: vi.fn(),
   getSession: vi.fn(),
 }));
 
 import { App } from "../src/App";
-import { getCategoryTree, getItem, getSession, listItems } from "../src/api/endpoints";
+import { getCategoryTree, getItem, getSession, getTags, listItems } from "../src/api/endpoints";
 
 const items = [
   makeItem("a", "text", { body: "hello" }, { title: "Item A" }),
@@ -22,6 +23,7 @@ describe("App: item detail modal + deep link (T9 scope B)", () => {
     vi.mocked(listItems).mockResolvedValue({ items, nextCursor: null });
     vi.mocked(getSession).mockResolvedValue({ role: "visitor" });
     vi.mocked(getCategoryTree).mockResolvedValue({ categories: [] });
+    vi.mocked(getTags).mockResolvedValue({ tags: [] });
     vi.mocked(getItem).mockReset();
     window.history.replaceState({}, "", "/");
   });

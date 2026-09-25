@@ -9,10 +9,16 @@ describe("App", () => {
     // Prevents useOwnerSession's probe request from hitting the real
     // network during this composition test; its own behavior is covered by
     // test/session/owner-session.test.ts and useOwnerSession.test.tsx.
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ error: { code: "forbidden", message: "no" } }), {
-        status: 403,
-      }),
+    // `mockImplementation` (not `mockResolvedValue`) so every call gets its
+    // own `Response` instance: `Navbar`'s T10 filter-option loads
+    // (`getCategoryTree`/`getTags`) now fetch alongside `useOwnerSession`'s
+    // probe, and a `Response` body can only be read (`.json()`) once — a
+    // single shared instance would make the second reader's parse throw.
+    globalThis.fetch = vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { code: "forbidden", message: "no" } }), {
+          status: 403,
+        }),
     );
   });
 
@@ -52,7 +58,9 @@ describe("App", () => {
   it("shows a sign-out link once the owner session resolves", async () => {
     globalThis.fetch = vi
       .fn()
-      .mockResolvedValue(new Response(JSON.stringify({ role: "owner" }), { status: 200 }));
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ role: "owner" }), { status: 200 }),
+      );
 
     render(<App />);
 

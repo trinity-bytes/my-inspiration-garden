@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { defaultFilterState } from "../../src/filters/filter-state";
 import { makeItem } from "../fixtures/items";
 
 /**
@@ -142,5 +143,34 @@ describe("useGardenItems", () => {
     for (const setter of settersFromThisRender) {
       expect(setter).not.toHaveBeenCalled();
     }
+  });
+
+  it("passes the given filters through to listItems alongside pagination params", async () => {
+    vi.mocked(listItems).mockResolvedValue({ items: [], nextCursor: null });
+
+    renderHook(() =>
+      useGardenItems({ ...defaultFilterState(), kinds: ["image"], tags: ["ui"], q: "sunset" }),
+    );
+
+    await waitFor(() => expect(listItems).toHaveBeenCalled());
+    expect(listItems).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: ["image"], tag: ["ui"], q: "sunset" }),
+    );
+  });
+
+  it("refetches from scratch when the filters change", async () => {
+    vi.mocked(listItems).mockResolvedValue({ items: [makeItem("a")], nextCursor: null });
+
+    const { result, rerender } = renderHook(({ filters }) => useGardenItems(filters), {
+      initialProps: { filters: defaultFilterState() },
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(listItems).toHaveBeenCalledTimes(1);
+
+    vi.mocked(listItems).mockResolvedValue({ items: [makeItem("b")], nextCursor: null });
+    rerender({ filters: { ...defaultFilterState(), kinds: ["text"] } });
+
+    await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(["b"]));
+    expect(listItems).toHaveBeenCalledTimes(2);
   });
 });
