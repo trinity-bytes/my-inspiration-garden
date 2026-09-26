@@ -65,13 +65,15 @@ export const itemRevisions = sqliteTable(
 /**
  * Hierarchical category tree, unlimited depth via self-referencing `parent_id`.
  *
- * FK delete behavior: `ON DELETE SET NULL`. Deleting a category promotes its
- * direct children to root (`parent_id = NULL`) instead of either cascading
- * (which could silently wipe out an entire, possibly large, subtree the
- * owner did not intend to delete) or restricting (which would force the
- * owner/API to manually re-parent every child before the delete succeeds).
- * SET NULL keeps the operation safe and single-step; re-parenting into a new
- * home is a normal follow-up edit, not a required precondition.
+ * FK delete behavior: `ON DELETE SET NULL`, a safety net for a raw delete
+ * that bypasses the repository. `CategoriesRepository.delete` (T11b B6) is
+ * the intended path: it re-parents direct children to the deleted
+ * category's own parent (its `parent_id`, possibly `null`) before removing
+ * the row, so those children keep their place one level up the tree
+ * instead of being promoted all the way to root. Cascading the whole
+ * subtree was rejected (could silently wipe out a large subtree the owner
+ * did not intend to delete), and restricting was rejected too (would force
+ * manually re-parenting every child before the delete could succeed).
  */
 export const categories = sqliteTable(
   "categories",
