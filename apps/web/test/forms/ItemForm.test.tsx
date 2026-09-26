@@ -236,6 +236,173 @@ describe("ItemForm — video kind", () => {
 
     await waitFor(() => expect(uploadVideoFile).toHaveBeenCalledWith(file));
   });
+
+  it("detects provider/embed URL from a pasted YouTube URL and fills empty title + thumbnail via unfurl", async () => {
+    const unfurl = vi.fn().mockResolvedValue({
+      url: "https://www.youtube.com/watch?v=abc123",
+      platform: "youtube",
+      title: "A great video",
+      previewImage: "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+    });
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://www.youtube.com/watch?v=abc123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+
+    await waitFor(() =>
+      expect(unfurl).toHaveBeenCalledWith("https://www.youtube.com/watch?v=abc123"),
+    );
+    expect(await screen.findByLabelText("Title")).toHaveValue("A great video");
+    expect(screen.getByLabelText("Embed URL")).toHaveValue("https://www.youtube.com/embed/abc123");
+    expect(screen.getByLabelText("Thumbnail URL")).toHaveValue(
+      "https://i.ytimg.com/vi/abc123/hqdefault.jpg",
+    );
+  });
+
+  it("does not overwrite an already-filled title when detecting a video", async () => {
+    const unfurl = vi.fn().mockResolvedValue({
+      url: "https://vimeo.com/76979871",
+      platform: "vimeo",
+      title: "Vimeo title",
+    });
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "My own title" } });
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://vimeo.com/76979871" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+
+    await waitFor(() => expect(unfurl).toHaveBeenCalled());
+    expect(screen.getByLabelText("Title")).toHaveValue("My own title");
+    expect(screen.getByLabelText("Embed URL")).toHaveValue(
+      "https://player.vimeo.com/video/76979871",
+    );
+  });
+
+  it("shows an error and does not call unfurl for a url that isn't a recognized video url", async () => {
+    const unfurl = vi.fn();
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://example.com/not-a-video" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+
+    expect(unfurl).not.toHaveBeenCalled();
+    expect(await screen.findByText(/doesn.t look like a youtube or vimeo/i)).toBeInTheDocument();
+  });
+
+  it("keeps the derived embed URL even when the unfurl fetch fails (non-fatal)", async () => {
+    const unfurl = vi.fn().mockRejectedValue(new Error("network error"));
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://youtu.be/abc123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+
+    await waitFor(() => expect(unfurl).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByLabelText("Embed URL")).toHaveValue(
+        "https://www.youtube.com/embed/abc123",
+      ),
+    );
+    expect(screen.queryByText(/doesn.t look like/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a loading state while detecting", async () => {
+    let resolveUnfurl: (value: unknown) => void = () => {};
+    const unfurl = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveUnfurl = resolve;
+      }),
+    );
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://youtu.be/abc123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+
+    expect(await screen.findByText(/detecting/i)).toBeInTheDocument();
+    resolveUnfurl({ url: "https://youtu.be/abc123", platform: "youtube" });
+    await waitFor(() => expect(screen.queryByText(/detecting/i)).not.toBeInTheDocument());
+  });
+
+  it("keeps the video URL and embed fields editable after detection", async () => {
+    const unfurl = vi
+      .fn()
+      .mockResolvedValue({ url: "https://youtu.be/abc123", platform: "youtube" });
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("video")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Video URL"), {
+      target: { value: "https://youtu.be/abc123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Detect video" }));
+    await waitFor(() => expect(unfurl).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText("Embed URL"), {
+      target: { value: "https://www.youtube.com/embed/other" },
+    });
+    expect(screen.getByLabelText("Embed URL")).toHaveValue("https://www.youtube.com/embed/other");
+  });
 });
 
 describe("ItemForm — palette kind", () => {

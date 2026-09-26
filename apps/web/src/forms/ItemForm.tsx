@@ -17,6 +17,7 @@ import {
 import "./ItemForm.css";
 import { type ImageUploadResult, uploadImageFile } from "./media-upload";
 import { TagInput } from "./TagInput";
+import { deriveVideoEmbed } from "./video-url";
 
 const KIND_OPTIONS: { value: ItemKind; label: string }[] = [
   { value: "image", label: "Image" },
@@ -96,6 +97,31 @@ export function ItemForm({
       setUnfurlStatus("idle");
     } catch {
       setUnfurlStatus("error");
+    }
+  }
+
+  async function handleFetchVideoPreview(): Promise<void> {
+    const url = state.url.trim();
+    if (!url) return;
+    const derived = deriveVideoEmbed(url);
+    if (!derived) {
+      setUnfurlStatus("error");
+      return;
+    }
+    updateKindData("video", { provider: derived.provider, embedUrl: derived.embedUrl });
+    setUnfurlStatus("loading");
+    try {
+      const metadata = await unfurl(url);
+      setState((current) => ({
+        ...current,
+        title: current.title.trim().length > 0 ? current.title : (metadata.title ?? current.title),
+        video: { ...current.video, thumbnail: metadata.previewImage ?? current.video.thumbnail },
+      }));
+      setUnfurlStatus("idle");
+    } catch {
+      // Non-fatal: the embed URL/provider are already derived and saved;
+      // only the title/thumbnail enrichment from unfurl failed.
+      setUnfurlStatus("idle");
     }
   }
 
@@ -270,6 +296,32 @@ export function ItemForm({
 
       {state.kind === "video" && (
         <>
+          {(state.video.provider === "youtube" || state.video.provider === "vimeo") && (
+            <label className="item-form__field" htmlFor={`${formId}-video-url`}>
+              Video URL
+              <div className="item-form__url-row">
+                <input
+                  id={`${formId}-video-url`}
+                  type="url"
+                  value={state.url}
+                  onChange={(event) => update({ url: event.target.value })}
+                />
+                <button
+                  type="button"
+                  onClick={handleFetchVideoPreview}
+                  disabled={unfurlStatus === "loading" || state.url.trim().length === 0}
+                >
+                  Detect video
+                </button>
+              </div>
+              {unfurlStatus === "loading" && <span className="item-form__hint">Detecting…</span>}
+              {unfurlStatus === "error" && (
+                <span className="item-form__hint">
+                  Doesn't look like a YouTube or Vimeo video URL.
+                </span>
+              )}
+            </label>
+          )}
           <label className="item-form__field" htmlFor={`${formId}-video-provider`}>
             Provider
             <select
