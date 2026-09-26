@@ -1,5 +1,5 @@
 import type { Item } from "@garden/shared";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { listItems } from "../api/endpoints";
 import { defaultFilterState, type FilterState, filtersToListParams } from "../filters/filter-state";
 import { ITEMS_FETCH_PAGE_LIMIT, mergeItemsPage, shouldFetchNextPage } from "./fetch-plan";
@@ -9,6 +9,8 @@ export type GardenItemsStatus = "loading" | "ready" | "empty" | "error";
 export interface UseGardenItemsResult {
   status: GardenItemsStatus;
   items: Item[];
+  /** Re-runs the fetch from scratch without changing `filters` (T11: reflect a write — add/edit/delete/restore — on the canvas). */
+  refetch: () => void;
 }
 
 /**
@@ -25,13 +27,16 @@ export interface UseGardenItemsResult {
 export function useGardenItems(filters: FilterState = defaultFilterState()): UseGardenItemsResult {
   const [items, setItems] = useState<Item[]>([]);
   const [status, setStatus] = useState<GardenItemsStatus>("loading");
+  const [refreshIndex, setRefreshIndex] = useState(0);
+  const refetch = useCallback(() => setRefreshIndex((current) => current + 1), []);
   const listParams = filtersToListParams(filters);
   const filterKey = JSON.stringify(listParams);
 
   // `filterKey` is the stable, deep-equality proxy for `listParams` (a
   // fresh object every render); depending on `listParams` directly would
   // refetch every render even when the filters didn't actually change.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey is the intentional dependency, see above.
+  // `refreshIndex` is the on-demand refetch trigger (T11's `refetch`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filterKey/refreshIndex are the intentional dependencies, see above.
   useEffect(() => {
     let cancelled = false;
 
@@ -78,7 +83,7 @@ export function useGardenItems(filters: FilterState = defaultFilterState()): Use
     return () => {
       cancelled = true;
     };
-  }, [filterKey]);
+  }, [filterKey, refreshIndex]);
 
-  return { status, items };
+  return { status, items, refetch };
 }

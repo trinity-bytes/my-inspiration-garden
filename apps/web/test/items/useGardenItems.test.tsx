@@ -173,4 +173,21 @@ describe("useGardenItems", () => {
     await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(["b"]));
     expect(listItems).toHaveBeenCalledTimes(2);
   });
+
+  it("re-fetches on demand via refetch (T11: reflect a write without changing filters)", async () => {
+    vi.mocked(listItems).mockResolvedValue({ items: [makeItem("a")], nextCursor: null });
+
+    const { result } = renderHook(() => useGardenItems());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(listItems).toHaveBeenCalledTimes(1);
+
+    vi.mocked(listItems).mockResolvedValue({
+      items: [makeItem("a"), makeItem("b")],
+      nextCursor: null,
+    });
+    result.current.refetch();
+
+    await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(["a", "b"]));
+    expect(listItems).toHaveBeenCalledTimes(2);
+  });
 });
