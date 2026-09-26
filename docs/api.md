@@ -126,6 +126,42 @@ not automated here):
   `/cdn-cgi/access/logout` automatically for any hostname with an Access
   application; the web app's "Sign out" link just points there.
 
+## For agents
+
+The garden is designed to be read and written by AI agents through the same
+REST API the web app uses — no separate MCP server exists yet (planned for a
+later phase), but the API and tokens described here are already usable.
+
+1. **Create a token.** Sign in as the owner in the web app and open **API
+   tokens** from the navbar (next to **Categories**). Create a token with a
+   name and a scope — `read` for browsing only, or `read + write` to also
+   create/update/delete items, categories, and tags (`write` always implies
+   `read`). The plaintext token is shown exactly once, right after creation —
+   copy it immediately; it cannot be retrieved again (only revoked and
+   replaced with a new one).
+2. **Read the machine-readable spec.** `GET /api/openapi.json` serves an
+   OpenAPI 3.1 document covering every `/api/*` route (items, categories,
+   tags, tokens, session, media, unfurl), generated from this project's own
+   Zod schemas — feed it directly to an OpenAPI-aware client/codegen tool
+   instead of hand-transcribing this page.
+3. **Call the API** with `Authorization: Bearer <token>`:
+
+   ```sh
+   # List the 5 most recent items
+   curl "https://garden.example.com/api/items?limit=5" \
+     -H "Authorization: Bearer ig_your_token_here"
+
+   # Create a text item (needs a write-scope token)
+   curl -X POST "https://garden.example.com/api/items" \
+     -H "Authorization: Bearer ig_your_token_here" \
+     -H "Content-Type: application/json" \
+     -d '{"kind":"text","data":{"body":"Noted via agent"}}'
+   ```
+
+   A bearer token is exempt from the CSRF guard above (it's never an ambient
+   credential), so `Origin`/`X-Garden-Client` are not required on token
+   requests — only for owner-session writes from a browser.
+
 ## Local dev reseed
 
 `apps/api/scripts/reseed-dev-items.sql` refreshes the local-only seed data (opaque photos instead of the canvas's transparent cloud sprites, 3-5 realistic items per kind) — run with `pnpm exec wrangler d1 execute inspiration-garden --local --file=scripts/reseed-dev-items.sql` from `apps/api`; never pass `--remote`.
