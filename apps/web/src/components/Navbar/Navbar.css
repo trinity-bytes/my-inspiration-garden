@@ -81,7 +81,8 @@
 }
 
 .navbar__add-button,
-.navbar__trash-button {
+.navbar__trash-button,
+.navbar__categories-button {
   flex: 0 0 auto;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
@@ -94,8 +95,10 @@
 
 .navbar__add-button:hover,
 .navbar__trash-button:hover,
+.navbar__categories-button:hover,
 .navbar__add-button:focus-visible,
-.navbar__trash-button:focus-visible {
+.navbar__trash-button:focus-visible,
+.navbar__categories-button:focus-visible {
   background: var(--color-accent-soft);
 }
 

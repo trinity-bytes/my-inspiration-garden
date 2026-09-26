@@ -107,21 +107,33 @@ describe("Navbar", () => {
     });
   });
 
-  it("does not show Add/Trash buttons for a visitor (T11, owner-only)", () => {
+  it("does not show Add/Trash/Categories buttons for a visitor (T11/T11b, owner-only)", () => {
     render(<Navbar />);
     expect(screen.queryByRole("button", { name: "Add item" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Trash" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Categories" })).not.toBeInTheDocument();
   });
 
-  it("shows Add/Trash buttons for the owner and wires their callbacks (T11)", () => {
+  it("shows Add/Trash/Categories buttons for the owner and wires their callbacks (T11/T11b)", () => {
     const onAddClick = vi.fn();
     const onTrashClick = vi.fn();
-    render(<Navbar isOwner onAddClick={onAddClick} onTrashClick={onTrashClick} />);
+    const onCategoriesClick = vi.fn();
+    render(
+      <Navbar
+        isOwner
+        onAddClick={onAddClick}
+        onTrashClick={onTrashClick}
+        onCategoriesClick={onCategoriesClick}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Add item" }));
     expect(onAddClick).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Trash" }));
     expect(onTrashClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Categories" }));
+    expect(onCategoriesClick).toHaveBeenCalledTimes(1);
   });
 });

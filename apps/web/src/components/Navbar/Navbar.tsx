@@ -24,6 +24,8 @@ export interface NavbarProps {
   onAddClick?: () => void;
   /** T11: opens the owner-only trash modal. Only rendered when `isOwner` and this is provided. */
   onTrashClick?: () => void;
+  /** T11b B6: opens the owner-only category manager modal. Only rendered when `isOwner` and this is provided. */
+  onCategoriesClick?: () => void;
 }
 
 /**
@@ -39,6 +41,7 @@ export function Navbar({
   onFilterPanelOpenChange,
   onAddClick,
   onTrashClick,
+  onCategoriesClick,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersDisclosure = useDisclosure();
@@ -69,6 +72,11 @@ export function Navbar({
       {isOwner && onTrashClick && (
         <button type="button" className="navbar__trash-button" onClick={onTrashClick}>
           Trash
+        </button>
+      )}
+      {isOwner && onCategoriesClick && (
+        <button type="button" className="navbar__categories-button" onClick={onCategoriesClick}>
+          Categories
         </button>
       )}
       {isOwner && (

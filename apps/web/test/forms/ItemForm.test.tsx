@@ -513,3 +513,26 @@ describe("ItemForm — font kind", () => {
     });
   });
 });
+
+describe("ItemForm — category picker hierarchy (T11b B6 item 5)", () => {
+  it("nests a child category's checkbox under its parent (already indented via the shared CategoryTree/FilterPanel.css, not flat)", () => {
+    const nested = [
+      { id: "c1", name: "Illustration", slug: "illustration", parentId: null, position: 0 },
+      { id: "c2", name: "Pixel art", slug: "pixel-art", parentId: "c1", position: 0 },
+    ];
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("text")}
+        categories={nested}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    const parentItem = screen.getByRole("checkbox", { name: "Illustration" }).closest("li");
+    const childItem = screen.getByRole("checkbox", { name: "Pixel art" }).closest("li");
+    expect(parentItem).not.toBeNull();
+    expect(childItem?.closest("ul")?.parentElement).toBe(parentItem);
+  });
+});

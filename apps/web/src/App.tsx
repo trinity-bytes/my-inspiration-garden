@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { deleteItem } from "./api/endpoints";
+import { CategoryManagerModal } from "./categories/CategoryManagerModal";
 import { CanvasHost } from "./components/CanvasHost/CanvasHost";
 import { LoadingScreen } from "./components/LoadingScreen/LoadingScreen";
 import { Navbar } from "./components/Navbar/Navbar";
@@ -39,6 +40,8 @@ export function App() {
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  // T11b B6: owner-only category manager, opened from the navbar.
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
 
   const handleCloseDetail = useCallback(() => {
     setIsEditOpen(false);
@@ -89,6 +92,7 @@ export function App() {
         onFilterPanelOpenChange={setIsFilterPanelOpen}
         onAddClick={isOwner ? () => setIsQuickAddOpen(true) : undefined}
         onTrashClick={isOwner ? () => setIsTrashOpen(true) : undefined}
+        onCategoriesClick={isOwner ? () => setIsCategoriesOpen(true) : undefined}
       />
       <LoadingScreen ready={canvasReady} message="Growing the garden…" />
       {selectedItem && (
@@ -111,6 +115,9 @@ export function App() {
       )}
       {isOwner && isTrashOpen && (
         <TrashModal onClose={() => setIsTrashOpen(false)} onRestored={refetch} />
+      )}
+      {isOwner && isCategoriesOpen && (
+        <CategoryManagerModal categories={categories} onClose={() => setIsCategoriesOpen(false)} />
       )}
       {isOwner && selectedItem && isEditOpen && (
         <EditItemModal

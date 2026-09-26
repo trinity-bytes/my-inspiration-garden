@@ -17,10 +17,14 @@ vi.mock("../src/api/endpoints", () => ({
   unfurlLink: vi.fn(),
   uploadMedia: vi.fn(),
   importMedia: vi.fn(),
+  createCategory: vi.fn(),
+  updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
 }));
 
 import { App } from "../src/App";
 import {
+  createCategory,
   createItem,
   deleteItem,
   getCategoryTree,
@@ -88,6 +92,43 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     await waitFor(() => expect(restoreItem).toHaveBeenCalledWith("t1"));
     await waitFor(() => expect(within(dialog).getByText(/trash is empty/i)).toBeInTheDocument());
     await waitFor(() => expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("opens the category manager from the navbar, creates a category, and refreshes the picker without reload (T11b B6)", async () => {
+    const newCategory = {
+      id: "c1",
+      name: "Palettes",
+      slug: "palettes",
+      parentId: null,
+      position: 0,
+    };
+    vi.mocked(getCategoryTree).mockResolvedValue({ categories: [] });
+    vi.mocked(createCategory).mockResolvedValue(newCategory);
+    render(<App />);
+
+    const categoriesButton = await screen.findByRole("button", { name: "Categories" });
+    fireEvent.click(categoriesButton);
+
+    const dialog = await screen.findByRole("dialog", { name: "Categories" });
+    // Every `useCategories`/`useFilterOptions`/`useCategoryNames` instance
+    // refetches on `invalidateCategories()`, not just the one feeding this
+    // modal's prop — replace the persistent mock (not `...Once`) so whichever
+    // of them calls first still gets the post-create list.
+    vi.mocked(getCategoryTree).mockResolvedValue({ categories: [newCategory] });
+    fireEvent.change(within(dialog).getByLabelText("New top-level category"), {
+      target: { value: "Palettes" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add top-level category" }));
+
+    await waitFor(() =>
+      expect(createCategory).toHaveBeenCalledWith({ name: "Palettes", parentId: null }),
+    );
+    // The shared invalidation signal (categories-store) re-triggers
+    // `useCategories`'s fetch in `App`, so the picker updates without a
+    // page reload once the (mocked) refetch resolves.
+    await waitFor(() =>
+      expect(within(dialog).getByText("Palettes", { selector: ".category-manager__name" })),
+    );
   });
 
   it("edits the deep-linked item from its detail modal and refetches, closing both modals", async () => {
