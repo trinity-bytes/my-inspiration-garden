@@ -1,0 +1,121 @@
+.item-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--color-text);
+}
+
+.item-form__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+  font-size: 0.9rem;
+}
+
+.item-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-label);
+}
+
+.item-form__field input,
+.item-form__field select,
+.item-form__field textarea {
+  font: inherit;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.item-form__field textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.item-form__field input:focus-visible,
+.item-form__field select:focus-visible,
+.item-form__field textarea:focus-visible,
+.item-form button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.item-form__url-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.item-form__url-row input {
+  flex: 1;
+}
+
+.item-form__hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-body);
+}
+
+.item-form__preview {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.item-form__palette {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item-form__palette legend {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.item-form__palette-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.item-form__palette-row label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+}
+
+.item-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.item-form__actions button,
+.item-form button[type="button"] {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: var(--font-weight-label);
+  cursor: pointer;
+}
+
+.item-form__actions button[type="submit"] {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border-color: transparent;
+}
