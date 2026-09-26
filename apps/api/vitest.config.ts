@@ -12,7 +12,9 @@ export default defineConfig(async () => {
     plugins: [
       cloudflareTest({
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations },
+          // Wrangler loads the gitignored `.dev.vars` into tests too; pin the
+          // local owner bypass off so auth tests behave the same either way.
+          bindings: { TEST_MIGRATIONS: migrations, DEV_OWNER_BYPASS: "false" },
         },
         wrangler: { configPath: "./wrangler.jsonc" },
       }),
