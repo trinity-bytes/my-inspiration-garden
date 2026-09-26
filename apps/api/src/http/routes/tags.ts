@@ -6,7 +6,7 @@ import { AppError } from "../../lib/errors";
 import { requireAuth } from "../middleware/require";
 import type { AppEnv } from "../types";
 
-const renameTagInputSchema = z.object({ name: z.string().trim().min(1) });
+export const renameTagInputSchema = z.object({ name: z.string().trim().min(1) });
 
 export function registerTagRoutes(app: Hono<AppEnv>): void {
   app.get("/api/tags", async (c) => {

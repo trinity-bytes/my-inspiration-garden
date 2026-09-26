@@ -7,6 +7,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerCategoryRoutes } from "./routes/categories";
 import { registerItemRoutes } from "./routes/items";
 import { registerMediaRoutes } from "./routes/media";
+import { registerOpenApiRoutes } from "./routes/openapi";
 import { registerSessionRoutes } from "./routes/session";
 import { registerTagRoutes } from "./routes/tags";
 import { registerTokenRoutes } from "./routes/tokens";
@@ -31,6 +32,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
   registerTokenRoutes(app);
   registerMediaRoutes(app, deps);
   registerUnfurlRoutes(app, deps);
+  registerOpenApiRoutes(app);
 
   app.onError((err, c) => {
     if (err instanceof AppError) {
