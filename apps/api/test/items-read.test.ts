@@ -177,6 +177,32 @@ describe("GET /api/items filters", () => {
     const writeBody = await writeTokenIncludeDeleted.json<{ items: { id: string }[] }>();
     expect(writeBody.items.map((i) => i.id)).toContain("trashed-item");
   });
+
+  it("deletedOnly returns exclusively soft-deleted items and requires owner/write auth (T11 trash list gap)", async () => {
+    await insertItem("trash-visible-item", {});
+    await insertItem("trash-trashed-item", { deletedAt: now });
+
+    const anon = await SELF.fetch("https://example.com/api/items?deletedOnly=true");
+    expect(anon.status).toBe(403);
+
+    const readTokenHash = await hashHex("ig_read_token_deletedonly");
+    await insertApiToken("read-token-deletedonly", { tokenHash: readTokenHash, scope: "read" });
+    const readTokenRes = await SELF.fetch("https://example.com/api/items?deletedOnly=true", {
+      headers: { Authorization: "Bearer ig_read_token_deletedonly" },
+    });
+    expect(readTokenRes.status).toBe(403);
+
+    const writeTokenHash = await hashHex("ig_write_token_deletedonly");
+    await insertApiToken("write-token-deletedonly", { tokenHash: writeTokenHash, scope: "write" });
+    const res = await SELF.fetch("https://example.com/api/items?deletedOnly=true", {
+      headers: { Authorization: "Bearer ig_write_token_deletedonly" },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ items: { id: string }[] }>();
+    const ids = body.items.map((i) => i.id);
+    expect(ids).toContain("trash-trashed-item");
+    expect(ids).not.toContain("trash-visible-item");
+  });
 });
 
 describe("GET /api/items pagination", () => {

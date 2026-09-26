@@ -1,5 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getCategoryTree, getItem, getSession, getTags, listItems } from "../../src/api/endpoints";
+import {
+  createItem,
+  deleteItem,
+  getCategoryTree,
+  getItem,
+  getSession,
+  getTags,
+  importMedia,
+  listItemRevisions,
+  listItems,
+  restoreItem,
+  restoreItemRevision,
+  unfurlLink,
+  updateItem,
+  uploadMedia,
+} from "../../src/api/endpoints";
 import { ApiError } from "../../src/api/errors";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -168,5 +183,238 @@ describe("getSession", () => {
     fetchMock.mockResolvedValue(jsonResponse({ role: "admin" }));
 
     await expect(getSession()).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe("listItems deletedOnly (T11 trash list)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("forwards deletedOnly as a query param", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextCursor: null }));
+
+    await listItems({ deletedOnly: true });
+
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("deletedOnly=true");
+  });
+});
+
+describe("createItem (T11 quick-add)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs /api/items and validates the created item", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse(sampleItem, 201));
+
+    const result = await createItem({
+      kind: "text",
+      categoryIds: [],
+      tags: [],
+      data: { body: "hello garden" },
+    });
+
+    expect(result).toEqual(sampleItem);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/items");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toMatchObject({ kind: "text" });
+  });
+});
+
+describe("updateItem (T11 edit)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("PATCHes /api/items/:id and validates the updated item", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse(sampleItem));
+
+    const result = await updateItem(sampleItem.id, { kind: "text", title: "New title" });
+
+    expect(result).toEqual(sampleItem);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/items/${sampleItem.id}`);
+    expect(init.method).toBe("PATCH");
+  });
+});
+
+describe("deleteItem / restoreItem (T11 trash)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("DELETEs /api/items/:id (soft delete)", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      jsonResponse({ ...sampleItem, deletedAt: "2026-09-26T00:00:00.000Z" }),
+    );
+
+    const result = await deleteItem(sampleItem.id);
+
+    expect(result.deletedAt).toBe("2026-09-26T00:00:00.000Z");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/items/${sampleItem.id}`);
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("POSTs /api/items/:id/restore", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse(sampleItem));
+
+    const result = await restoreItem(sampleItem.id);
+
+    expect(result).toEqual(sampleItem);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/items/${sampleItem.id}/restore`);
+    expect(init.method).toBe("POST");
+  });
+});
+
+describe("listItemRevisions / restoreItemRevision (T11 revision history)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("GETs /api/items/:id/revisions and validates the revision list", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const revision = {
+      id: "01HZY3Q3G0K8R4S8T2V6W0X4Y9",
+      itemId: sampleItem.id,
+      snapshot: sampleItem,
+      actor: "owner",
+      createdAt: "2026-09-26T00:00:00.000Z",
+    };
+    fetchMock.mockResolvedValue(jsonResponse({ revisions: [revision] }));
+
+    const result = await listItemRevisions(sampleItem.id);
+
+    expect(result).toEqual({ revisions: [revision] });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain(`/api/items/${sampleItem.id}/revisions`);
+  });
+
+  it("POSTs /api/items/:id/revisions/:revisionId/restore", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse(sampleItem));
+
+    const result = await restoreItemRevision(sampleItem.id, "rev-1");
+
+    expect(result).toEqual(sampleItem);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/items/${sampleItem.id}/revisions/rev-1/restore`);
+    expect(init.method).toBe("POST");
+  });
+});
+
+describe("unfurlLink (T11 quick-add link)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs /api/unfurl and validates the returned metadata", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const metadata = { url: "https://dribbble.com/shots/1", platform: "dribbble", title: "Shot" };
+    fetchMock.mockResolvedValue(jsonResponse(metadata));
+
+    const result = await unfurlLink("https://dribbble.com/shots/1");
+
+    expect(result).toEqual(metadata);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/unfurl");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ url: "https://dribbble.com/shots/1" });
+  });
+});
+
+describe("uploadMedia / importMedia (T11 quick-add image)", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs /api/media with a multipart file field and validates the stored-media result", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      jsonResponse({ r2Key: "media/2026/09/abc.png", mime: "image/png", size: 3 }, 201),
+    );
+
+    const file = new File(["abc"], "photo.png", { type: "image/png" });
+    const result = await uploadMedia(file);
+
+    expect(result).toEqual({ r2Key: "media/2026/09/abc.png", mime: "image/png", size: 3 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/media");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get("file")).toBe(file);
+  });
+
+  it("POSTs /api/media/import with a remote url and validates the stored-media result", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      jsonResponse({ r2Key: "media/2026/09/def.jpg", mime: "image/jpeg", size: 9 }, 201),
+    );
+
+    const result = await importMedia("https://example.com/photo.jpg");
+
+    expect(result).toEqual({ r2Key: "media/2026/09/def.jpg", mime: "image/jpeg", size: 9 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/media/import");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ url: "https://example.com/photo.jpg" });
   });
 });

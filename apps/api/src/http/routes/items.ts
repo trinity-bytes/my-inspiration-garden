@@ -35,6 +35,7 @@ export function registerItemRoutes(app: Hono<AppEnv>): void {
       cursor: c.req.query("cursor"),
       limit: c.req.query("limit"),
       includeDeleted: c.req.query("includeDeleted"),
+      deletedOnly: c.req.query("deletedOnly"),
     };
     const parsed = itemListQuerySchema.safeParse(raw);
     if (!parsed.success) {
@@ -42,8 +43,8 @@ export function registerItemRoutes(app: Hono<AppEnv>): void {
     }
     const query = parsed.data;
 
-    if (query.includeDeleted && !canSeeDeleted(c.get("actor"))) {
-      throw AppError.forbidden("includeDeleted requires owner or write-scope access");
+    if ((query.includeDeleted || query.deletedOnly) && !canSeeDeleted(c.get("actor"))) {
+      throw AppError.forbidden("includeDeleted/deletedOnly requires owner or write-scope access");
     }
 
     const repo = new ItemsRepository(createDb(c.env.DB));

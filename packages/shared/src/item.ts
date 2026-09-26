@@ -225,5 +225,7 @@ export const itemListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),
   includeDeleted: z.preprocess(toOptionalBoolean, z.boolean().optional()),
+  /** T11: lists exclusively soft-deleted items (the trash view). Gated the same as `includeDeleted`. */
+  deletedOnly: z.preprocess(toOptionalBoolean, z.boolean().optional()),
 });
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;

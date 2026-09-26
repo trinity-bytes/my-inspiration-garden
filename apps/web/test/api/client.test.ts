@@ -91,6 +91,27 @@ describe("apiFetch", () => {
     expect(headers.get("Content-Type")).toBeNull();
   });
 
+  it("sends a FormData body as-is, without JSON.stringify or a Content-Type header (T11 media upload)", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("file", new Blob(["x"]), "x.png");
+
+    await apiFetch("/api/media", { schema: echoSchema, method: "POST", body: formData });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(formData);
+    const headers = new Headers(init.headers);
+    expect(headers.get("Content-Type")).toBeNull();
+    expect(headers.get("X-Garden-Client")).toBe("web");
+  });
+
   it("maps a non-ok response to a typed http ApiError carrying the server code", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue(

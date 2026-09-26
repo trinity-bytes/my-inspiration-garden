@@ -7,7 +7,7 @@ import type {
   UpdateItemInput,
 } from "@garden/shared";
 import { normalizePalette } from "@garden/shared";
-import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { isColorMatch } from "../../lib/color";
 import { decodeCursor, encodeCursor } from "../../lib/cursor";
 import { AppError } from "../../lib/errors";
@@ -175,7 +175,11 @@ export class ItemsRepository {
 
   async list(query: ItemListQuery): Promise<ListItemsResult> {
     const conditions = [];
-    if (!query.includeDeleted) conditions.push(isNull(items.deletedAt));
+    if (query.deletedOnly) {
+      conditions.push(isNotNull(items.deletedAt));
+    } else if (!query.includeDeleted) {
+      conditions.push(isNull(items.deletedAt));
+    }
     if (query.kind.length > 0) conditions.push(inArray(items.kind, query.kind));
 
     if (query.tag.length > 0) {

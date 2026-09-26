@@ -218,6 +218,12 @@ describe("itemListQuerySchema", () => {
     expect(result.includeDeleted).toBe(true);
   });
 
+  it("coerces deletedOnly from a query-string boolean (T11 trash list gap)", () => {
+    expect(itemListQuerySchema.parse({}).deletedOnly).toBeUndefined();
+    expect(itemListQuerySchema.parse({ deletedOnly: "true" }).deletedOnly).toBe(true);
+    expect(itemListQuerySchema.parse({ deletedOnly: "false" }).deletedOnly).toBe(false);
+  });
+
   it("rejects a limit above 100 or below 1", () => {
     expect(itemListQuerySchema.safeParse({ limit: "0" }).success).toBe(false);
     expect(itemListQuerySchema.safeParse({ limit: "101" }).success).toBe(false);

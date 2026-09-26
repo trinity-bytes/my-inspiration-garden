@@ -74,9 +74,13 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
 export async function apiFetch<T>(path: string, options: ApiFetchOptions<T>): Promise<T> {
   const url = buildRequestUrl(resolveApiBaseUrl(), path, options.searchParams);
   const hasBody = options.body !== undefined;
+  // A `FormData` body (media upload, T11) is sent as-is: the browser sets its
+  // own multipart Content-Type (with boundary) — setting one here or
+  // JSON.stringify-ing the body would both break the request.
+  const isFormData = options.body instanceof FormData;
 
   const headers = new Headers({ "X-Garden-Client": "web" });
-  if (hasBody) headers.set("Content-Type", "application/json");
+  if (hasBody && !isFormData) headers.set("Content-Type", "application/json");
 
   let response: Response;
   try {
@@ -84,7 +88,11 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions<T>): Pr
       method: options.method ?? "GET",
       credentials: "same-origin",
       headers,
-      body: hasBody ? JSON.stringify(options.body) : undefined,
+      body: hasBody
+        ? isFormData
+          ? (options.body as FormData)
+          : JSON.stringify(options.body)
+        : undefined,
       signal: options.signal,
     });
   } catch {
