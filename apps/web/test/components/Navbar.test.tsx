@@ -106,4 +106,22 @@ describe("Navbar", () => {
       q: "sunset",
     });
   });
+
+  it("does not show Add/Trash buttons for a visitor (T11, owner-only)", () => {
+    render(<Navbar />);
+    expect(screen.queryByRole("button", { name: "Add item" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Trash" })).not.toBeInTheDocument();
+  });
+
+  it("shows Add/Trash buttons for the owner and wires their callbacks (T11)", () => {
+    const onAddClick = vi.fn();
+    const onTrashClick = vi.fn();
+    render(<Navbar isOwner onAddClick={onAddClick} onTrashClick={onTrashClick} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(onAddClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Trash" }));
+    expect(onTrashClick).toHaveBeenCalledTimes(1);
+  });
 });

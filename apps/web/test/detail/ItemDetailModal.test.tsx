@@ -217,6 +217,41 @@ describe("ItemDetailModal", () => {
   });
 });
 
+describe("ItemDetailModal owner actions (T11)", () => {
+  it("shows no owner action buttons for a visitor (isOwner omitted)", () => {
+    const item = makeItem("owner1", "text", { body: "hello" });
+    render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "History" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move to trash" })).not.toBeInTheDocument();
+  });
+
+  it("shows Edit/History/Move to trash for the owner and wires each callback", () => {
+    const item = makeItem("owner2", "text", { body: "hello" });
+    const onEdit = vi.fn();
+    const onOpenHistory = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={() => {}}
+        categoryNames={{}}
+        isOwner
+        onEdit={onEdit}
+        onOpenHistory={onOpenHistory}
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("ItemDetailModal reduced motion", () => {
   const originalMatchMedia = window.matchMedia;
 

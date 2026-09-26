@@ -9,6 +9,11 @@ export interface ItemDetailModalProps {
   onClose: () => void;
   /** `categoryIds` -> display name, resolved by the caller (T10 owns the full category tree UI — this modal only reads names it's given). A missing id falls back to showing the raw id (documented gap: the API's item detail response only carries `categoryIds`, not names). */
   categoryNames: Record<string, string>;
+  /** T11: shows the owner-only action row (Edit/History/Move to trash) when true. Defaults to false (visitor view, unchanged from T9). */
+  isOwner?: boolean;
+  onEdit?: () => void;
+  onOpenHistory?: () => void;
+  onDelete?: () => void;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -203,10 +208,20 @@ function ItemDetailBody({ item }: { item: Item }) {
  * Frosted-glass modal overlay showing an item's full detail (T9 scope B).
  * `role="dialog"` + `aria-modal`, labelled by the item's title; traps Tab
  * focus within itself, closes on Esc or a backdrop click, and returns
- * focus to whatever was focused before it opened. Owner-only editing is
- * T11 — this view is read-only for everyone.
+ * focus to whatever was focused before it opened. Owner-only editing (T11):
+ * when `isOwner` is true, an Edit/History/Move to trash action row appears;
+ * each button only renders once its callback prop is provided, so partial
+ * wiring degrades gracefully instead of throwing.
  */
-export function ItemDetailModal({ item, onClose, categoryNames }: ItemDetailModalProps) {
+export function ItemDetailModal({
+  item,
+  onClose,
+  categoryNames,
+  isOwner = false,
+  onEdit,
+  onOpenHistory,
+  onDelete,
+}: ItemDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const titleId = `item-detail-title-${item.id}`;
@@ -293,6 +308,26 @@ export function ItemDetailModal({ item, onClose, categoryNames }: ItemDetailModa
         <button type="button" className="item-detail__close" onClick={onClose} aria-label="Close">
           ×
         </button>
+
+        {isOwner && (onEdit || onOpenHistory || onDelete) && (
+          <div className="item-detail__owner-actions">
+            {onEdit && (
+              <button type="button" onClick={onEdit}>
+                Edit
+              </button>
+            )}
+            {onOpenHistory && (
+              <button type="button" onClick={onOpenHistory}>
+                History
+              </button>
+            )}
+            {onDelete && (
+              <button type="button" onClick={onDelete}>
+                Move to trash
+              </button>
+            )}
+          </div>
+        )}
 
         <span className="item-detail__kind-label">{KIND_LABELS[item.kind]}</span>
         <h2 id={titleId} className="item-detail__title">

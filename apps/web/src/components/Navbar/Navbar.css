@@ -80,6 +80,25 @@
   background: var(--color-accent-strong);
 }
 
+.navbar__add-button,
+.navbar__trash-button {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-weight: var(--font-weight-label);
+  cursor: pointer;
+}
+
+.navbar__add-button:hover,
+.navbar__trash-button:hover,
+.navbar__add-button:focus-visible,
+.navbar__trash-button:focus-visible {
+  background: var(--color-accent-soft);
+}
+
 .navbar__signout {
   flex: 0 0 auto;
   font-size: var(--font-size-xs);

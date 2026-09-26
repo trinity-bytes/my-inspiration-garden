@@ -67,6 +67,28 @@
   background: var(--color-accent-soft);
 }
 
+/* T11 owner-only action row */
+.item-detail__owner-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 var(--space-6) var(--space-3) 0;
+}
+
+.item-detail__owner-actions button {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.item-detail__owner-actions button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .item-detail__kind-label {
   display: inline-block;
   font-size: var(--font-size-xs);

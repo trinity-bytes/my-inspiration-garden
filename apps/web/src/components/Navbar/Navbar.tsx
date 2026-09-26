@@ -20,6 +20,10 @@ export interface NavbarProps {
    * canvas's cursor-drift navigation must pause while the panel is open — see `App`, which
    * feeds this into `CanvasHost`'s `paused` prop). */
   onFilterPanelOpenChange?: (isOpen: boolean) => void;
+  /** T11: opens the owner-only quick-add modal. Only rendered when `isOwner` and this is provided. */
+  onAddClick?: () => void;
+  /** T11: opens the owner-only trash modal. Only rendered when `isOwner` and this is provided. */
+  onTrashClick?: () => void;
 }
 
 /**
@@ -33,6 +37,8 @@ export function Navbar({
   filters = defaultFilterState(),
   onFiltersChange = () => {},
   onFilterPanelOpenChange,
+  onAddClick,
+  onTrashClick,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersDisclosure = useDisclosure();
@@ -55,6 +61,16 @@ export function Navbar({
         onChange={(q) => onFiltersChange({ ...filters, q })}
       />
       <FiltersButton isOpen={filtersDisclosure.isOpen} onToggle={filtersDisclosure.toggle} />
+      {isOwner && onAddClick && (
+        <button type="button" className="navbar__add-button" onClick={onAddClick}>
+          Add item
+        </button>
+      )}
+      {isOwner && onTrashClick && (
+        <button type="button" className="navbar__trash-button" onClick={onTrashClick}>
+          Trash
+        </button>
+      )}
       {isOwner && (
         <a className="navbar__signout" href="/cdn-cgi/access/logout">
           Sign out
