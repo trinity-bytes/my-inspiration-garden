@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ItemDetailModal } from "../../src/detail/ItemDetailModal";
@@ -226,7 +226,7 @@ describe("ItemDetailModal owner actions (T11)", () => {
     expect(screen.queryByRole("button", { name: "Move to trash" })).not.toBeInTheDocument();
   });
 
-  it("shows Edit/History/Move to trash for the owner and wires each callback", () => {
+  it("shows Edit/History/Move to trash for the owner and wires Edit/History directly", () => {
     const item = makeItem("owner2", "text", { body: "hello" });
     const onEdit = vi.fn();
     const onOpenHistory = vi.fn();
@@ -247,8 +247,85 @@ describe("ItemDetailModal owner actions (T11)", () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(onOpenHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it("Move to trash opens a confirm dialog instead of deleting immediately", () => {
+    const item = makeItem("owner3", "text", { body: "hello" });
+    const onDelete = vi.fn();
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={() => {}}
+        categoryNames={{}}
+        isOwner
+        onDelete={onDelete}
+      />,
+    );
+
     fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: /move to trash/i })).toBeInTheDocument();
+  });
+
+  it("confirming the dialog calls onDelete and closes the dialog", () => {
+    const item = makeItem("owner4", "text", { body: "hello" });
+    const onDelete = vi.fn();
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={() => {}}
+        categoryNames={{}}
+        isOwner
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
+    const confirmDialog = screen.getByRole("dialog", { name: /move to trash/i });
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "Move to trash" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog", { name: /move to trash/i })).not.toBeInTheDocument();
+  });
+
+  it("cancelling the dialog leaves the item untouched", () => {
+    const item = makeItem("owner5", "text", { body: "hello" });
+    const onDelete = vi.fn();
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={() => {}}
+        categoryNames={{}}
+        isOwner
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: /move to trash/i })).not.toBeInTheDocument();
+  });
+
+  it("Escape while the confirm dialog is open only cancels the confirm, not the whole detail view", () => {
+    const item = makeItem("owner6", "text", { body: "hello" });
+    const onClose = vi.fn();
+    const onDelete = vi.fn();
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={onClose}
+        categoryNames={{}}
+        isOwner
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Move to trash" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog", { name: /move to trash/i })).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Item owner6" })).toBeInTheDocument();
   });
 });
 

@@ -1,0 +1,18 @@
+.confirm-dialog {
+  width: min(420px, 100%);
+}
+
+.confirm-dialog__message {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.confirm-dialog__confirm--destructive {
+  background: var(--color-danger);
+  border-color: var(--color-danger-strong);
+  color: var(--garden-white);
+}
+
+.confirm-dialog__confirm--destructive:hover {
+  background: var(--color-danger-strong);
+}

@@ -1,6 +1,7 @@
 import type { Item } from "@garden/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { contrastTextColor } from "../color-contrast";
+import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
 import { useLoadedFontFamily } from "./useLoadedFontFamily";
 import "./ItemDetailModal.css";
 
@@ -226,6 +227,7 @@ export function ItemDetailModal({
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const titleId = `item-detail-title-${item.id}`;
   const reducedMotion = prefersReducedMotion();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
@@ -241,37 +243,44 @@ export function ItemDetailModal({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      // While the confirm-delete dialog is open, it owns Escape (see its own
+      // useDialogFocusTrap) — this modal must not also close underneath it.
+      if (event.key === "Escape" && !confirmingDelete) {
         onClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, confirmingDelete]);
 
-  const handleTabKey = useCallback((event: React.KeyboardEvent) => {
-    if (event.key !== "Tab") return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0] as HTMLElement;
-    const last = focusable[focusable.length - 1] as HTMLElement;
-    const active = document.activeElement;
-
-    if (event.shiftKey) {
-      if (active === first || !dialog.contains(active)) {
+  const handleTabKey = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      // The nested confirm dialog owns its own Tab trap while open.
+      if (confirmingDelete) return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
         event.preventDefault();
-        last.focus();
+        return;
       }
-    } else if (active === last || !dialog.contains(active)) {
-      event.preventDefault();
-      first.focus();
-    }
-  }, []);
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      const active = document.activeElement;
+
+      if (event.shiftKey) {
+        if (active === first || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    [confirmingDelete],
+  );
 
   const handleBackdropClick = useCallback(() => {
     onClose();
@@ -322,11 +331,25 @@ export function ItemDetailModal({
               </button>
             )}
             {onDelete && (
-              <button type="button" onClick={onDelete}>
+              <button type="button" onClick={() => setConfirmingDelete(true)}>
                 Move to trash
               </button>
             )}
           </div>
+        )}
+
+        {confirmingDelete && onDelete && (
+          <ConfirmDialog
+            title="Move to trash?"
+            message="This item will be moved to the trash. You can restore it later."
+            confirmLabel="Move to trash"
+            destructive
+            onConfirm={() => {
+              setConfirmingDelete(false);
+              onDelete();
+            }}
+            onCancel={() => setConfirmingDelete(false)}
+          />
         )}
 
         <span className="item-detail__kind-label">{KIND_LABELS[item.kind]}</span>

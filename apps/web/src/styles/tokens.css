@@ -32,6 +32,11 @@
   --color-accent-strong: var(--garden-accent-strong);
   --color-accent-soft: var(--garden-accent-soft);
 
+  /* Semantic: danger (destructive actions, e.g. move to trash) */
+  --color-danger: #c94f4f;
+  --color-danger-strong: #a83b3b;
+  --color-danger-soft: #f6dcdc;
+
   /* Semantic: focus */
   --color-focus-ring: var(--garden-accent-strong);
   --focus-ring-width: 2px;

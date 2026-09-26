@@ -159,6 +159,8 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
 
     const detailDialog = await screen.findByRole("dialog", { name: "Item A" });
     fireEvent.click(within(detailDialog).getByRole("button", { name: "Move to trash" }));
+    const confirmDialog = await screen.findByRole("dialog", { name: /move to trash/i });
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "Move to trash" }));
 
     const listItemsCallsBefore = vi.mocked(listItems).mock.calls.length;
     await waitFor(() => expect(deleteItem).toHaveBeenCalledWith("a"));
