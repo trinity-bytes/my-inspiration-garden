@@ -134,7 +134,7 @@ export function CanvasHost({
   const showErrorMessage = itemsStatus === "error";
 
   return (
-    <div className="canvas-host" data-testid="canvas-host">
+    <div className="canvas-host" data-testid="canvas-host" data-paused={paused}>
       <div
         ref={targetRef}
         className="canvas-host__webgl-target"

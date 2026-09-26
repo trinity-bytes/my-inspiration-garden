@@ -60,4 +60,12 @@ describe("CanvasHost", () => {
     expect(() => rerender(<CanvasHost paused={true} />)).not.toThrow();
     expect(() => rerender(<CanvasHost paused={false} />)).not.toThrow();
   });
+
+  it("reflects the paused prop as data-paused (test/tooling hook, e.g. for App's filter-panel wiring)", () => {
+    const { rerender } = render(<CanvasHost paused={false} />);
+    expect(screen.getByTestId("canvas-host")).toHaveAttribute("data-paused", "false");
+
+    rerender(<CanvasHost paused={true} />);
+    expect(screen.getByTestId("canvas-host")).toHaveAttribute("data-paused", "true");
+  });
 });

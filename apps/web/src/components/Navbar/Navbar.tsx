@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { FilterPanel } from "../../filters/FilterPanel";
 import { defaultFilterState, type FilterState } from "../../filters/filter-state";
 import { useFilterOptions } from "../../filters/useFilterOptions";
@@ -16,6 +16,10 @@ export interface NavbarProps {
   filters?: FilterState;
   /** Called with the next filter state on every search or filter-panel change. */
   onFiltersChange?: (next: FilterState) => void;
+  /** Called whenever the filter panel's own open/closed state changes (T10 owner QA: the
+   * canvas's cursor-drift navigation must pause while the panel is open — see `App`, which
+   * feeds this into `CanvasHost`'s `paused` prop). */
+  onFilterPanelOpenChange?: (isOpen: boolean) => void;
 }
 
 /**
@@ -28,6 +32,7 @@ export function Navbar({
   isOwner = false,
   filters = defaultFilterState(),
   onFiltersChange = () => {},
+  onFilterPanelOpenChange,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersDisclosure = useDisclosure();
@@ -36,6 +41,10 @@ export function Navbar({
   useKeyboardShortcut("k", () => {
     searchRef.current?.focus();
   });
+
+  useEffect(() => {
+    onFilterPanelOpenChange?.(filtersDisclosure.isOpen);
+  }, [filtersDisclosure.isOpen, onFilterPanelOpenChange]);
 
   return (
     <header className="navbar">

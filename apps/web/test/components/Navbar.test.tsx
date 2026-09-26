@@ -76,6 +76,17 @@ describe("Navbar", () => {
     expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
   });
 
+  it("reports filter-panel open/close through onFilterPanelOpenChange (T10 owner QA: canvas drift must pause while it's open)", () => {
+    const onFilterPanelOpenChange = vi.fn();
+    render(<Navbar onFilterPanelOpenChange={onFilterPanelOpenChange} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(onFilterPanelOpenChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(onFilterPanelOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("reports search input changes through onFiltersChange with the rest of the filters preserved", () => {
     const onFiltersChange = vi.fn();
     render(

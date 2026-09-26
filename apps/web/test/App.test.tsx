@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 
@@ -65,6 +65,18 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByRole("link", { name: "Sign out" })).toBeInTheDocument());
+  });
+
+  it("pauses canvas navigation while the filter panel is open, and resumes once it's closed (owner QA)", () => {
+    render(<App />);
+    const canvasHost = screen.getByTestId("canvas-host");
+    expect(canvasHost).toHaveAttribute("data-paused", "false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(canvasHost).toHaveAttribute("data-paused", "true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(canvasHost).toHaveAttribute("data-paused", "false");
   });
 
   it("shows a subtle canvas message when the items fetch fails (the every-request 403 above)", async () => {

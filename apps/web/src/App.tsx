@@ -14,6 +14,9 @@ export function App() {
   const [canvasReady, setCanvasReady] = useState(false);
   const handleCanvasReady = useCallback(() => setCanvasReady(true), []);
   const [filters, setFilters] = useState(defaultFilterState());
+  // T10 owner QA: the filter panel opening/closing must pause/resume canvas
+  // drift, same as the item detail modal below.
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   const { status: itemsStatus, items } = useGardenItems(filters);
   const { selectedItem, selectedItemId, openItem, closeItem } = useItemDetail(
@@ -33,12 +36,13 @@ export function App() {
         items={items}
         itemsStatus={itemsStatus}
         onItemOpen={openItem}
-        paused={Boolean(selectedItem)}
+        paused={Boolean(selectedItem) || isFilterPanelOpen}
       />
       <Navbar
         isOwner={ownerSession.status === "owner"}
         filters={filters}
         onFiltersChange={setFilters}
+        onFilterPanelOpenChange={setIsFilterPanelOpen}
       />
       <LoadingScreen ready={canvasReady} message="Growing the garden…" />
       {selectedItem && (
