@@ -123,7 +123,12 @@ async function upsertTagsByName(db: Db, names: string[]): Promise<{ id: string; 
  * `image` items index `data.palette` (client-extracted via
  * `packages/shared/src/palette.ts`); `palette` items index `data.colors`
  * directly so color filtering also finds standalone palette items. Every
- * other kind has no colors.
+ * other kind has no colors. Both kinds go through the same shared
+ * `normalizePalette` (T11b B5, owner decision 2026-09-26): an explicit
+ * per-color `weight` is normalized proportionally against the others (it
+ * need not sum to 1 or 100), and a color missing a weight falls back to an
+ * even share — which is also what keeps pre-B5 items (with no `weight`
+ * field at all) indexing exactly as before.
  */
 function deriveItemColors(kind: string, data: unknown): PaletteColor[] {
   if (kind === "image") {
@@ -134,9 +139,9 @@ function deriveItemColors(kind: string, data: unknown): PaletteColor[] {
     return [];
   }
   if (kind === "palette") {
-    const colors = (data as { colors?: { hex: string }[] }).colors;
+    const colors = (data as { colors?: { hex: string; weight?: number }[] }).colors;
     if (Array.isArray(colors) && colors.length > 0) {
-      return colors.map((c) => ({ hex: c.hex, weight: 1 / colors.length }));
+      return normalizePalette(colors);
     }
   }
   return [];

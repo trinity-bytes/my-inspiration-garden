@@ -434,6 +434,59 @@ describe("ItemForm — palette kind", () => {
     fireEvent.click(firstRemoveButton as HTMLElement);
     expect(screen.queryByLabelText("Color 1 hex")).toHaveValue("#5E4C82");
   });
+
+  it("shows a % weight input per color, submits it, and shows a running total (T11b B5)", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("palette")}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add color" }));
+    fireEvent.change(screen.getByLabelText("Color 1 hex"), { target: { value: "#F29A6B" } });
+    fireEvent.change(screen.getByLabelText("Color 1 weight (%)"), { target: { value: "60" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add color" }));
+    fireEvent.change(screen.getByLabelText("Color 2 hex"), { target: { value: "#5E4C82" } });
+    fireEvent.change(screen.getByLabelText("Color 2 weight (%)"), { target: { value: "40" } });
+
+    expect(screen.getByText(/total.*100%/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      kind: "palette",
+      data: {
+        colors: [
+          { hex: "#F29A6B", weight: 60 },
+          { hex: "#5E4C82", weight: 40 },
+        ],
+      },
+    });
+  });
+
+  it("shows a running total that reflects weights not summing to 100", () => {
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("palette")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add color" }));
+    fireEvent.change(screen.getByLabelText("Color 1 weight (%)"), { target: { value: "70" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add color" }));
+    fireEvent.change(screen.getByLabelText("Color 2 weight (%)"), { target: { value: "70" } });
+
+    expect(screen.getByText(/total.*140%/i)).toBeInTheDocument();
+  });
 });
 
 describe("ItemForm — font kind", () => {

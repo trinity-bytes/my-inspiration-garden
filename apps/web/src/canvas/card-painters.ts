@@ -281,10 +281,15 @@ function paintPaletteCard(item: PaletteItem, widthPx: number, heightPx: number):
   if (!ctx) return canvas;
 
   const content = paletteCardContent(item);
-  const bandWidth = canvas.width / content.colors.length;
-  content.colors.forEach((color, i) => {
+  // `content.colors` weights already sum to 1 (normalized in `paletteCardContent`),
+  // so each band's width is just its share of the canvas — no per-band
+  // renormalization needed here (T11b B5).
+  let x = 0;
+  content.colors.forEach((color) => {
+    const bandWidth = color.weight * canvas.width;
     ctx.fillStyle = color.hex;
-    ctx.fillRect(Math.round(i * bandWidth), 0, Math.ceil(bandWidth) + 1, canvas.height);
+    ctx.fillRect(Math.round(x), 0, Math.ceil(bandWidth) + 1, canvas.height);
+    x += bandWidth;
   });
 
   const padding = canvas.width * PADDING_FRACTION * 0.6;

@@ -1,4 +1,5 @@
 import type { Item } from "@garden/shared";
+import { normalizePalette } from "@garden/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { contrastTextColor } from "../color-contrast";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
@@ -52,9 +53,19 @@ const KIND_LABELS: Record<Item["kind"], string> = {
   font: "Font",
 };
 
-function PaletteSwatches({ colors }: { colors: { hex: string; name?: string }[] }) {
+function PaletteSwatches({
+  colors,
+}: {
+  colors: { hex: string; name?: string; weight?: number }[];
+}) {
   const [copiedHex, setCopiedHex] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Normalized once for the whole palette (T11b B5): weights always sum to
+  // 1, so each swatch's size and shown percentage stay proportional and
+  // consistent with the canvas card's bands (`paletteCardContent`) and the
+  // API's `item_colors` indexing (`deriveItemColors`) — all three go through
+  // this same shared `normalizePalette`.
+  const normalized = normalizePalette(colors);
 
   const handleCopy = useCallback((hex: string) => {
     const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
@@ -79,8 +90,8 @@ function PaletteSwatches({ colors }: { colors: { hex: string; name?: string }[] 
 
   return (
     <ul className="item-detail__palette-grid">
-      {colors.map((color) => (
-        <li key={color.hex}>
+      {normalized.map((color) => (
+        <li key={color.hex} style={{ flexBasis: `${(color.weight * 100).toFixed(2)}%` }}>
           <button
             type="button"
             className="item-detail__swatch"
@@ -89,6 +100,7 @@ function PaletteSwatches({ colors }: { colors: { hex: string; name?: string }[] 
           >
             <span className="item-detail__swatch-hex">{color.hex}</span>
             {color.name && <span className="item-detail__swatch-name">{color.name}</span>}
+            <span className="item-detail__swatch-weight">{Math.round(color.weight * 100)}%</span>
             {copiedHex === color.hex && (
               <span className="item-detail__swatch-copied" role="status">
                 Copied!

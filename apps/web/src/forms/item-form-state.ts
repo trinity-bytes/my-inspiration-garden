@@ -42,6 +42,8 @@ export interface VideoFormData {
 export interface PaletteColorInput {
   hex: string;
   name?: string;
+  /** Relative proportion of this color (T11b B5) — see `paletteColorSchema` in `packages/shared/src/item.ts`. */
+  weight?: number;
 }
 
 export interface PaletteFormData {
@@ -123,7 +125,9 @@ export function formStateFromItem(item: Item): ItemFormState {
       state.video = { ...item.data };
       break;
     case "palette":
-      state.palette = { colors: item.data.colors.map((c) => ({ hex: c.hex, name: c.name })) };
+      state.palette = {
+        colors: item.data.colors.map((c) => ({ hex: c.hex, name: c.name, weight: c.weight })),
+      };
       break;
     case "font":
       state.font = { ...item.data };

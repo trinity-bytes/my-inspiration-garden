@@ -141,6 +141,28 @@ describe("buildCreateItemInput", () => {
     }
   });
 
+  it("builds a valid palette item input carrying per-color weight (T11b B5)", () => {
+    const state = createEmptyFormState("palette");
+    state.palette.colors = [
+      { hex: "#F29A6B", weight: 60 },
+      { hex: "#5E4C82", weight: 40 },
+    ];
+
+    const result = buildCreateItemInput(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.input).toMatchObject({
+        kind: "palette",
+        data: {
+          colors: [
+            { hex: "#F29A6B", weight: 60 },
+            { hex: "#5E4C82", weight: 40 },
+          ],
+        },
+      });
+    }
+  });
+
   it("rejects a font item without a family name", () => {
     const state = createEmptyFormState("font");
     expect(buildCreateItemInput(state).ok).toBe(false);
@@ -212,5 +234,23 @@ describe("formStateFromItem / buildUpdateItemInput (edit mode)", () => {
     const state = formStateFromItem(textItem);
     state.text.body = "";
     expect(buildUpdateItemInput(state).ok).toBe(false);
+  });
+
+  it("prefills a palette item's per-color weight for editing (T11b B5)", () => {
+    const paletteItem: Item = {
+      ...textItem,
+      kind: "palette",
+      data: {
+        colors: [
+          { hex: "#F29A6B", weight: 60 },
+          { hex: "#5E4C82", weight: 40 },
+        ],
+      },
+    };
+    const state = formStateFromItem(paletteItem);
+    expect(state.palette.colors).toEqual([
+      { hex: "#F29A6B", name: undefined, weight: 60 },
+      { hex: "#5E4C82", name: undefined, weight: 40 },
+    ]);
   });
 });

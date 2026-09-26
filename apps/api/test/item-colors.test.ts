@@ -72,6 +72,47 @@ describe("item_colors indexing", () => {
     expect(rows.map((r) => r.hex).sort()).toEqual(["#112233", "#445566"]);
   });
 
+  it("normalizes a palette item's explicit per-color weights proportionally (T11b B5)", async () => {
+    const auth = await writeToken("colors-palette-weighted", "ig_colors_palette_weighted");
+    const res = await createItem(auth, {
+      kind: "palette",
+      source: "web",
+      data: {
+        colors: [
+          { hex: "#112233", weight: 30 },
+          { hex: "#445566", weight: 30 },
+          { hex: "#778899", weight: 40 },
+        ],
+      },
+    });
+    expect(res.status).toBe(201);
+    const item = await res.json<{ id: string }>();
+
+    const rows = await itemColorRows(item.id);
+    expect(rows).toEqual([
+      { hex: "#778899", weight: 0.4 },
+      { hex: "#112233", weight: 0.3 },
+      { hex: "#445566", weight: 0.3 },
+    ]);
+  });
+
+  it("falls back to an even split when a palette item's colors have no weight (backward compatibility)", async () => {
+    const auth = await writeToken("colors-palette-even", "ig_colors_palette_even");
+    const res = await createItem(auth, {
+      kind: "palette",
+      source: "web",
+      data: { colors: [{ hex: "#112233" }, { hex: "#445566" }] },
+    });
+    expect(res.status).toBe(201);
+    const item = await res.json<{ id: string }>();
+
+    const rows = await itemColorRows(item.id);
+    expect([...rows].sort((a, b) => a.hex.localeCompare(b.hex))).toEqual([
+      { hex: "#112233", weight: 0.5 },
+      { hex: "#445566", weight: 0.5 },
+    ]);
+  });
+
   it("replaces item_colors on update instead of accumulating", async () => {
     const auth = await writeToken("colors-update", "ig_colors_update");
     const created = await createItem(auth, {

@@ -1,4 +1,5 @@
-import type { Item } from "@garden/shared";
+import type { Item, PaletteColor } from "@garden/shared";
+import { normalizePalette } from "@garden/shared";
 
 /**
  * Pure per-kind content derivation for card rendering (canvas painters,
@@ -69,11 +70,16 @@ export function textCardContent(item: TextItem): TextCardContent {
 
 export interface PaletteCardContent {
   name: string;
-  colors: PaletteItem["data"]["colors"];
+  /**
+   * Normalized via the shared `normalizePalette` (T11b B5): weights always
+   * sum to 1, so canvas band widths (and the detail view's swatch widths)
+   * can multiply directly by `weight` without renormalizing themselves.
+   */
+  colors: PaletteColor[];
 }
 
 export function paletteCardContent(item: PaletteItem): PaletteCardContent {
-  return { name: item.title?.trim() || "Palette", colors: item.data.colors };
+  return { name: item.title?.trim() || "Palette", colors: normalizePalette(item.data.colors) };
 }
 
 const DEFAULT_FONT_PANGRAM = "The quick brown fox jumps over the lazy dog";

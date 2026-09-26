@@ -191,6 +191,28 @@ describe("ItemDetailModal", () => {
       expect(screen.getByText("The full body text of this note, in full.")).toBeInTheDocument();
     });
 
+    it("palette: shows each color's normalized percentage, proportional to its weight (T11b B5)", () => {
+      const item = makeItem("pal2", "palette", {
+        colors: [
+          { hex: "#ff0000", weight: 75 },
+          { hex: "#00ff00", weight: 25 },
+        ],
+      });
+      render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+
+      expect(screen.getByText("75%")).toBeInTheDocument();
+      expect(screen.getByText("25%")).toBeInTheDocument();
+    });
+
+    it("palette: falls back to an even percentage split when no color has a weight", () => {
+      const item = makeItem("pal3", "palette", {
+        colors: [{ hex: "#ff0000" }, { hex: "#00ff00" }],
+      });
+      render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+
+      expect(screen.getAllByText("50%")).toHaveLength(2);
+    });
+
     it("palette: shows every swatch with its hex value, and copies to clipboard on click", async () => {
       const writeText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, { clipboard: { writeText } });

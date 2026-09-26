@@ -74,6 +74,15 @@ export const videoDataSchema = z.looseObject({
 export const paletteColorSchema = z.looseObject({
   hex: hexColorSchema,
   name: z.string().optional(),
+  /**
+   * Relative proportion of this color within the palette (T11b B5, owner
+   * decision 2026-09-26): any positive number, not required to sum to 1 or
+   * 100 across the palette's colors — `normalizePalette`
+   * (`packages/shared/src/palette.ts`) rescales proportionally against
+   * whatever the other colors carry. Omitted for backward compatibility with
+   * pre-B5 items, which fall back to an even split.
+   */
+  weight: z.number().positive().optional(),
 });
 
 export const paletteDataSchema = z.looseObject({

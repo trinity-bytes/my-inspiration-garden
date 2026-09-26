@@ -103,6 +103,21 @@ describe("paletteDataSchema", () => {
   it("rejects malformed hex", () => {
     expect(paletteDataSchema.safeParse({ colors: [{ hex: "ABCDEF" }] }).success).toBe(false);
   });
+
+  it("accepts an optional positive weight per color (T11b B5)", () => {
+    expect(paletteDataSchema.safeParse({ colors: [{ hex: "#ABCDEF", weight: 40 }] }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects a non-positive weight", () => {
+    expect(paletteDataSchema.safeParse({ colors: [{ hex: "#ABCDEF", weight: 0 }] }).success).toBe(
+      false,
+    );
+    expect(paletteDataSchema.safeParse({ colors: [{ hex: "#ABCDEF", weight: -5 }] }).success).toBe(
+      false,
+    );
+  });
 });
 
 describe("fontDataSchema", () => {

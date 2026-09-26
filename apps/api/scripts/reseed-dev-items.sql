@@ -9,8 +9,13 @@
 -- items_fts5 triggers on `items` keep the search index in sync
 -- automatically; item_colors IS refreshed below (T10) for `palette`
 -- items, matching the API's own derivation (`deriveItemColors` in
--- `apps/api/src/db/repositories/items-repository.ts`): one row per color,
--- `weight = 1 / colors.length`. `image` items are NOT covered here — none
+-- `apps/api/src/db/repositories/items-repository.ts`), which normalizes
+-- proportionally through the same shared `normalizePalette`
+-- (`packages/shared/src/palette.ts`) used everywhere a palette's per-color
+-- proportions matter (T11b B5, owner decision 2026-09-26): a color's
+-- `weight` in `data.colors` (if present) is rescaled against the others so
+-- the result sums to 1; a color missing a weight falls back to an even
+-- share of the palette first. `image` items are NOT covered here — none
 -- of this seed's image items carry a `data.palette` (the API only derives
 -- colors for an image item when its upload/import pipeline populated
 -- one), so there is nothing to compute from for the current dataset; add
@@ -106,30 +111,63 @@ UPDATE items SET
 WHERE id = '38eaaa45-5873-4277-9546-125d07fbd9bc';
 
 -- --- palette: bring every palette into the requested 4-6 color range ---
--- --- (two were seeded with only 3).                                  ---
+-- --- (two were seeded with only 3), and give each color a percentage   ---
+-- --- weight (T11b B5) so the canvas card's bands and the detail view's ---
+-- --- swatches actually render at different sizes locally instead of an---
+-- --- even split. Each palette's weights sum to 100 here, but that's not---
+-- --- required — `normalizePalette` rescales proportionally either way.---
 UPDATE items SET
-  data = '{"colors":[{"hex":"#F29A6B"},{"hex":"#E0784E"},{"hex":"#FCE3D3"},{"hex":"#FFB088"},{"hex":"#2A2140"}]}',
+  data = '{"colors":[{"hex":"#F29A6B","weight":35},{"hex":"#E0784E","weight":20},{"hex":"#FCE3D3","weight":15},{"hex":"#FFB088","weight":10},{"hex":"#2A2140","weight":20}]}',
   updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = 'e6744dc6-be07-48b2-954e-f8ff050da00d'; -- Apricot accent (3 -> 5)
 
 UPDATE items SET
-  data = '{"colors":[{"hex":"#2A2140"},{"hex":"#F6F3FA"},{"hex":"#8F7BB5"},{"hex":"#5E4C82"},{"hex":"#D5CBE8"}]}',
+  data = '{"colors":[{"hex":"#2A2140","weight":30},{"hex":"#F6F3FA","weight":10},{"hex":"#8F7BB5","weight":20},{"hex":"#5E4C82","weight":25},{"hex":"#D5CBE8","weight":15}]}',
   updated_at = '2026-09-24T12:00:00.000Z'
 WHERE id = '9b9b6309-0a99-4fa1-b099-4c31cea37692'; -- Ink & sky (3 -> 5)
 
--- --- item_colors: rebuild from every palette item's `data.colors` (T10) ---
--- --- so the color filter (`GET /api/items?color=`) has data locally --- --
--- --- instead of only working once an item is created through the live ---
--- --- API. Delete-then-reinsert so a re-run of this script is idempotent. --
+-- --- item_colors: rebuild from every palette item's `data.colors`      ---
+-- --- (T10, weights normalized proportionally per T11b B5) so the color ---
+-- --- filter (`GET /api/items?color=`) has data locally instead of only---
+-- --- working once an item is created through the live API.            ---
+-- --- Delete-then-reinsert so a re-run of this script is idempotent.    ---
 DELETE FROM item_colors WHERE item_id IN (SELECT id FROM items WHERE kind = 'palette');
 
+-- Mirrors `normalizePalette` (`packages/shared/src/palette.ts`): a color
+-- missing a weight (or carrying a non-positive one) contributes an even
+-- share of its palette; every contribution is then rescaled so each
+-- palette's weights sum to 1.
 INSERT INTO item_colors (item_id, hex, weight)
-SELECT
-  items.id,
-  json_extract(color.value, '$.hex'),
-  1.0 / (SELECT COUNT(*) FROM json_each(items.data, '$.colors'))
-FROM items, json_each(items.data, '$.colors') AS color
-WHERE items.kind = 'palette' AND items.deleted_at IS NULL;
+WITH palette_colors AS (
+  SELECT
+    items.id AS item_id,
+    json_extract(color.value, '$.hex') AS hex,
+    json_extract(color.value, '$.weight') AS raw_weight,
+    (SELECT COUNT(*) FROM json_each(items.data, '$.colors')) AS color_count
+  FROM items, json_each(items.data, '$.colors') AS color
+  WHERE items.kind = 'palette' AND items.deleted_at IS NULL
+),
+contributions AS (
+  SELECT
+    item_id,
+    hex,
+    CASE
+      WHEN raw_weight IS NOT NULL AND raw_weight > 0 THEN raw_weight
+      ELSE 1.0 / color_count
+    END AS contribution
+  FROM palette_colors
+),
+totals AS (
+  SELECT item_id, SUM(contribution) AS total FROM contributions GROUP BY item_id
+)
+-- `* 1.0` forces real (not integer) division — SQLite's `SUM()` of
+-- all-integer weights (e.g. 35/20/15/10/20) stays an INTEGER column, and
+-- integer-over-integer division truncates to 0 (verified: without this,
+-- every weight in an all-integer-percentage palette like the ones below
+-- came back as 0).
+SELECT contributions.item_id, contributions.hex, (contributions.contribution * 1.0) / totals.total
+FROM contributions
+JOIN totals ON totals.item_id = contributions.item_id;
 
 -- --- font: give one item a real, loadable sourceUrl (a stable jsDelivr ---
 -- --- CDN static font file) so the FontFace-loads-successfully path is  ---

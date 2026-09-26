@@ -118,10 +118,25 @@ describe("paletteCardContent", () => {
     expect(paletteCardContent(withoutTitle).name).toBe("Palette");
   });
 
-  it("passes through the colors array", () => {
+  it("returns colors normalized to an even split when none carry a weight", () => {
     const colors = [{ hex: "#ff0000" }, { hex: "#00ff00", name: "green" }];
     const item = makeItem("p3", "palette", { colors });
-    expect(paletteCardContent(item).colors).toEqual(colors);
+    expect(paletteCardContent(item).colors).toEqual([
+      { hex: "#ff0000", weight: 0.5, name: undefined },
+      { hex: "#00ff00", weight: 0.5, name: "green" },
+    ]);
+  });
+
+  it("normalizes explicit per-color weights proportionally (T11b B5)", () => {
+    const colors = [
+      { hex: "#ff0000", weight: 75 },
+      { hex: "#00ff00", weight: 25 },
+    ];
+    const item = makeItem("p4", "palette", { colors });
+    expect(paletteCardContent(item).colors).toEqual([
+      { hex: "#ff0000", weight: 0.75, name: undefined },
+      { hex: "#00ff00", weight: 0.25, name: undefined },
+    ]);
   });
 });
 

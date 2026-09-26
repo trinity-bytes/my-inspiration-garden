@@ -68,11 +68,58 @@ describe("normalizePalette", () => {
     ]);
   });
 
-  it("preserves explicit weights on object entries and defaults missing ones evenly", () => {
-    expect(normalizePalette([{ hex: "#ff0000", weight: 0.7 }, { hex: "#00ff00" }])).toEqual([
-      { hex: "#ff0000", weight: 0.7 },
+  it("defaults a missing weight to an even share, then normalizes proportionally against the explicit ones (T11b B5)", () => {
+    const result = normalizePalette([{ hex: "#ff0000", weight: 0.7 }, { hex: "#00ff00" }]);
+    // raw contributions [0.7, 0.5] (missing -> even share 1/2), total 1.2
+    expect(result[0]?.weight).toBeCloseTo(0.7 / 1.2);
+    expect(result[1]?.weight).toBeCloseTo(0.5 / 1.2);
+    expect((result[0]?.weight ?? 0) + (result[1]?.weight ?? 0)).toBeCloseTo(1);
+  });
+
+  it("normalizes explicit weights that don't sum to 1 proportionally", () => {
+    const result = normalizePalette([
+      { hex: "#ff0000", weight: 30 },
+      { hex: "#00ff00", weight: 30 },
+      { hex: "#0000ff", weight: 40 },
+    ]);
+    expect(result).toEqual([
+      { hex: "#ff0000", weight: 0.3 },
+      { hex: "#00ff00", weight: 0.3 },
+      { hex: "#0000ff", weight: 0.4 },
+    ]);
+  });
+
+  it("normalizes percentage-scale weights (summing to 100) the same as fraction-scale weights (summing to 1)", () => {
+    const fromPercent = normalizePalette([
+      { hex: "#ff0000", weight: 75 },
+      { hex: "#00ff00", weight: 25 },
+    ]);
+    const fromFraction = normalizePalette([
+      { hex: "#ff0000", weight: 0.75 },
+      { hex: "#00ff00", weight: 0.25 },
+    ]);
+    expect(fromPercent).toEqual(fromFraction);
+  });
+
+  it("treats a non-positive explicit weight as missing (falls back to even share)", () => {
+    const result = normalizePalette([
+      { hex: "#ff0000", weight: 0 },
+      { hex: "#00ff00", weight: -5 },
+    ]);
+    expect(result).toEqual([
+      { hex: "#ff0000", weight: 0.5 },
       { hex: "#00ff00", weight: 0.5 },
     ]);
+  });
+
+  it("preserves an object entry's name alongside its normalized weight", () => {
+    expect(normalizePalette([{ hex: "#ff0000", name: "Red", weight: 1 }])).toEqual([
+      { hex: "#ff0000", name: "Red", weight: 1 },
+    ]);
+  });
+
+  it("omits name for plain hex-string entries", () => {
+    expect(normalizePalette(["#ff0000"])[0]?.name).toBeUndefined();
   });
 });
 

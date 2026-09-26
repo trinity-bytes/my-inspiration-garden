@@ -22,6 +22,7 @@ export interface Rgb {
 export interface PaletteColor {
   hex: string;
   weight: number;
+  name?: string;
 }
 
 export interface ExtractPaletteOptions {
@@ -158,16 +159,35 @@ export function extractPalette(
 
 /**
  * Normalizes a palette entry list that may be either legacy plain hex
- * strings or `{ hex, weight? }` objects (see `imageDataSchema.palette` /
- * `paletteDataSchema.colors`) into uniform `PaletteColor[]`. Entries missing
- * a weight split the remaining weight evenly so the result still sums to ~1.
+ * strings or `{ hex, weight?, name? }` objects (see `imageDataSchema.palette`
+ * / `paletteDataSchema.colors`) into uniform `PaletteColor[]` whose weights
+ * always sum to 1 — the one shared normalization function used everywhere a
+ * palette's per-color proportions matter (item indexing, canvas card bands,
+ * the detail view's swatches; T11b B5, owner decision 2026-09-26).
+ *
+ * Any entry missing a weight (or carrying a non-positive one) falls back to
+ * an even share of the palette (`1 / entries.length`) *before* normalization
+ * — this is what keeps pre-B5 items (which never had a `weight` field at
+ * all) rendering exactly as before: when no entry has a weight, every
+ * fallback share is equal, so normalizing changes nothing. When some entries
+ * do carry an explicit weight (which need not sum to 1, or to 100 — a
+ * percentage-style input works exactly the same as a fraction-style one,
+ * since only the *ratio* between weights matters), every contribution is
+ * rescaled proportionally so the result still sums to 1.
  */
 export function normalizePalette(
-  entries: (string | { hex: string; weight?: number })[],
+  entries: (string | { hex: string; weight?: number; name?: string })[],
 ): PaletteColor[] {
   if (entries.length === 0) return [];
-  const hexes = entries.map((e) => (typeof e === "string" ? e : e.hex));
-  const explicitWeights = entries.map((e) => (typeof e === "string" ? undefined : e.weight));
-  const evenWeight = 1 / entries.length;
-  return hexes.map((hex, i) => ({ hex, weight: explicitWeights[i] ?? evenWeight }));
+  const evenShare = 1 / entries.length;
+  const contributions = entries.map((entry) => {
+    const weight = typeof entry === "string" ? undefined : entry.weight;
+    return typeof weight === "number" && weight > 0 ? weight : evenShare;
+  });
+  const total = contributions.reduce((sum, weight) => sum + weight, 0);
+  return entries.map((entry, i) => ({
+    hex: typeof entry === "string" ? entry : entry.hex,
+    weight: (contributions[i] as number) / total,
+    name: typeof entry === "string" ? undefined : entry.name,
+  }));
 }

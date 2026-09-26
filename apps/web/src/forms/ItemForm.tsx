@@ -168,7 +168,10 @@ export function ItemForm({
     updateKindData("palette", { colors: state.palette.colors.filter((_, i) => i !== index) });
   }
 
-  function updatePaletteColor(index: number, patch: { hex?: string; name?: string }): void {
+  function updatePaletteColor(
+    index: number,
+    patch: { hex?: string; name?: string; weight?: number },
+  ): void {
     updateKindData("palette", {
       colors: state.palette.colors.map((color, i) =>
         i === index ? { ...color, ...patch } : color,
@@ -398,6 +401,22 @@ export function ItemForm({
                   onChange={(event) => updatePaletteColor(index, { name: event.target.value })}
                 />
               </label>
+              <label htmlFor={`${formId}-palette-weight-${index}`}>
+                {`Color ${index + 1} weight (%)`}
+                <input
+                  id={`${formId}-palette-weight-${index}`}
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={color.weight ?? ""}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    updatePaletteColor(index, {
+                      weight: raw.trim().length > 0 ? Number(raw) : undefined,
+                    });
+                  }}
+                />
+              </label>
               <button type="button" onClick={() => removePaletteColor(index)}>
                 Remove color
               </button>
@@ -406,6 +425,12 @@ export function ItemForm({
           <button type="button" onClick={addPaletteColor}>
             Add color
           </button>
+          {state.palette.colors.length > 0 && (
+            <p className="item-form__hint item-form__palette-total">
+              {`Total: ${state.palette.colors.reduce((sum, c) => sum + (c.weight ?? 0), 0)}%`}
+              {" — weights not summing to 100 are normalized proportionally."}
+            </p>
+          )}
         </fieldset>
       )}
 
