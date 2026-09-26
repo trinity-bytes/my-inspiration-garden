@@ -10,14 +10,10 @@ import { describe, expect, it } from "vitest";
  * file wrangler's `main` points at) must never throw.
  */
 describe("Worker entry module", () => {
-  it(
-    "imports without throwing",
-    async () => {
-      // Dynamic import under the Cloudflare Workers vitest pool is slow, and
-      // slower still under full-workspace concurrent test load — this isn't
-      // a perf-sensitive assertion, just a startup-safety regression check.
-      await expect(import("../src/index")).resolves.toBeDefined();
-    },
-    20_000,
-  );
+  it("imports without throwing", async () => {
+    // Dynamic import under the Cloudflare Workers vitest pool is slow, and
+    // slower still under full-workspace concurrent test load — this isn't
+    // a perf-sensitive assertion, just a startup-safety regression check.
+    await expect(import("../src/index")).resolves.toBeDefined();
+  }, 20_000);
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createCategory,
   createItem,
+  createToken,
   deleteCategory,
   deleteItem,
   getCategoryTree,
@@ -11,8 +12,10 @@ import {
   importMedia,
   listItemRevisions,
   listItems,
+  listTokens,
   restoreItem,
   restoreItemRevision,
+  revokeToken,
   unfurlLink,
   updateCategory,
   updateItem,
@@ -484,5 +487,58 @@ describe("uploadMedia / importMedia (T11 quick-add image)", () => {
     expect(url).toContain("/api/media/import");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ url: "https://example.com/photo.jpg" });
+  });
+});
+
+describe("tokens (T12)", () => {
+  const originalFetch = globalThis.fetch;
+  const token = {
+    id: "01HZY3Q3G0K8R4S8T2V6W0X4Y9",
+    name: "agent-one",
+    scope: "read" as const,
+    createdAt: "2026-09-26T00:00:00.000Z",
+  };
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("requests /api/tokens and validates the token list, never a secret", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ tokens: [token] }));
+
+    const result = await listTokens();
+
+    expect(result).toEqual({ tokens: [token] });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain("/api/tokens");
+  });
+
+  it("POSTs /api/tokens and validates the created token (including the one-time secret)", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ ...token, token: "ig_plaintext" }, 201));
+
+    const result = await createToken({ name: "agent-one", scope: "read" });
+
+    expect(result).toEqual({ ...token, token: "ig_plaintext" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/tokens");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "agent-one", scope: "read" });
+  });
+
+  it("DELETEs /api/tokens/:id with a 204 empty body and resolves to undefined", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(revokeToken(token.id)).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/tokens/${token.id}`);
+    expect(init.method).toBe("DELETE");
   });
 });

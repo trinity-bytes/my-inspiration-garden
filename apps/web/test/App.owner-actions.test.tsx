@@ -20,6 +20,9 @@ vi.mock("../src/api/endpoints", () => ({
   createCategory: vi.fn(),
   updateCategory: vi.fn(),
   deleteCategory: vi.fn(),
+  listTokens: vi.fn(),
+  createToken: vi.fn(),
+  revokeToken: vi.fn(),
 }));
 
 import { App } from "../src/App";
@@ -33,6 +36,7 @@ import {
   getTags,
   listItemRevisions,
   listItems,
+  listTokens,
   restoreItem,
   restoreItemRevision,
   updateItem,
@@ -46,6 +50,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     vi.mocked(getSession).mockResolvedValue({ role: "owner" });
     vi.mocked(getCategoryTree).mockResolvedValue({ categories: [] });
     vi.mocked(getTags).mockResolvedValue({ tags: [] });
+    vi.mocked(listTokens).mockResolvedValue({ tokens: [] });
     vi.mocked(getItem).mockReset();
     window.history.replaceState({}, "", "/");
   });
@@ -215,6 +220,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     ["Add item", "Add item"],
     ["Trash", "Trash"],
     ["Categories", "Categories"],
+    ["API tokens", "API tokens"],
   ])(
     "pauses canvas navigation while the %s dialog is open (owner QA)",
     async (button, dialogName) => {

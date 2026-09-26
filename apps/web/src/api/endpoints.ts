@@ -1,11 +1,12 @@
 import type {
   Category,
+  CreateApiTokenInput,
   CreateCategoryInput,
   CreateItemInput,
   UpdateCategoryInput,
   UpdateItemInput,
 } from "@garden/shared";
-import { categorySchema, itemSchema } from "@garden/shared";
+import { apiTokenPublicSchema, categorySchema, itemSchema } from "@garden/shared";
 import { z } from "zod";
 import { apiFetch } from "./client";
 
@@ -211,4 +212,28 @@ export type SessionResult = z.infer<typeof sessionResultSchema>;
  */
 export function getSession(): Promise<SessionResult> {
   return apiFetch("/api/session", { schema: sessionResultSchema });
+}
+
+const tokensResultSchema = z.object({ tokens: z.array(apiTokenPublicSchema) });
+export type TokensResult = z.infer<typeof tokensResultSchema>;
+
+/** `GET /api/tokens` — owner-only (T12). Never includes a token's plaintext secret or hash. */
+export function listTokens(): Promise<TokensResult> {
+  return apiFetch("/api/tokens", { schema: tokensResultSchema });
+}
+
+const createdApiTokenSchema = apiTokenPublicSchema.extend({ token: z.string() });
+export type CreatedApiToken = z.infer<typeof createdApiTokenSchema>;
+
+/**
+ * `POST /api/tokens` — owner-only (T12). The response's `token` field is the
+ * plaintext secret; it is returned exactly once and never retrievable again.
+ */
+export function createToken(input: CreateApiTokenInput): Promise<CreatedApiToken> {
+  return apiFetch("/api/tokens", { schema: createdApiTokenSchema, method: "POST", body: input });
+}
+
+/** `DELETE /api/tokens/:id` — owner-only (T12). Revokes the token immediately. */
+export function revokeToken(id: string): Promise<void> {
+  return apiFetch(`/api/tokens/${encodeURIComponent(id)}`, { schema: z.void(), method: "DELETE" });
 }

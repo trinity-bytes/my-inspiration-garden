@@ -14,6 +14,7 @@ import { RevisionHistoryModal } from "./forms/RevisionHistoryModal";
 import { useCategories } from "./forms/useCategories";
 import { useGardenItems } from "./items/useGardenItems";
 import { useOwnerSession } from "./session/useOwnerSession";
+import { TokensModal } from "./tokens/TokensModal";
 import { TrashModal } from "./trash/TrashModal";
 
 export function App() {
@@ -42,6 +43,8 @@ export function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   // T11b B6: owner-only category manager, opened from the navbar.
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  // T12: owner-only API tokens manager, opened from the navbar.
+  const [isTokensOpen, setIsTokensOpen] = useState(false);
 
   const handleCloseDetail = useCallback(() => {
     setIsEditOpen(false);
@@ -88,7 +91,8 @@ export function App() {
           isFilterPanelOpen ||
           isQuickAddOpen ||
           isTrashOpen ||
-          isCategoriesOpen
+          isCategoriesOpen ||
+          isTokensOpen
         }
       />
       <Navbar
@@ -99,6 +103,7 @@ export function App() {
         onAddClick={isOwner ? () => setIsQuickAddOpen(true) : undefined}
         onTrashClick={isOwner ? () => setIsTrashOpen(true) : undefined}
         onCategoriesClick={isOwner ? () => setIsCategoriesOpen(true) : undefined}
+        onTokensClick={isOwner ? () => setIsTokensOpen(true) : undefined}
       />
       <LoadingScreen ready={canvasReady} message="Growing the garden…" />
       {selectedItem && (
@@ -125,6 +130,7 @@ export function App() {
       {isOwner && isCategoriesOpen && (
         <CategoryManagerModal categories={categories} onClose={() => setIsCategoriesOpen(false)} />
       )}
+      {isOwner && isTokensOpen && <TokensModal onClose={() => setIsTokensOpen(false)} />}
       {isOwner && selectedItem && isEditOpen && (
         <EditItemModal
           item={selectedItem}

@@ -26,6 +26,8 @@ export interface NavbarProps {
   onTrashClick?: () => void;
   /** T11b B6: opens the owner-only category manager modal. Only rendered when `isOwner` and this is provided. */
   onCategoriesClick?: () => void;
+  /** T12: opens the owner-only API tokens modal. Only rendered when `isOwner` and this is provided. */
+  onTokensClick?: () => void;
 }
 
 /**
@@ -42,6 +44,7 @@ export function Navbar({
   onAddClick,
   onTrashClick,
   onCategoriesClick,
+  onTokensClick,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   const filtersDisclosure = useDisclosure();
@@ -77,6 +80,11 @@ export function Navbar({
       {isOwner && onCategoriesClick && (
         <button type="button" className="navbar__categories-button" onClick={onCategoriesClick}>
           Categories
+        </button>
+      )}
+      {isOwner && onTokensClick && (
+        <button type="button" className="navbar__tokens-button" onClick={onTokensClick}>
+          API tokens
         </button>
       )}
       {isOwner && (
