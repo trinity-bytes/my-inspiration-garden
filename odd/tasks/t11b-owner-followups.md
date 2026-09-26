@@ -23,7 +23,7 @@ T11 shipped with four simplifying defaults. The owner reviewed them live and rej
 ## Open decisions
 
 - Palette proportion input: **decided (owner, 2026-09-26)** — a numeric percentage field per color; values that don't sum to 100 are normalized proportionally.
-- Category delete behavior: today the DB promotes children to root and unlinks items (confirm or change).
+- Category delete behavior: **decided (owner, 2026-09-26)** — direct children move up to the deleted category's parent (not to root, which the DB's `ON DELETE SET NULL` does today); items only lose that category link.
 
 ## Tasks
 
