@@ -210,4 +210,26 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     );
     expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(listItemsCallsBefore);
   });
+
+  it.each([
+    ["Add item", "Add item"],
+    ["Trash", "Trash"],
+    ["Categories", "Categories"],
+  ])(
+    "pauses canvas navigation while the %s dialog is open (owner QA)",
+    async (button, dialogName) => {
+      render(<App />);
+      const canvasHost = screen.getByTestId("canvas-host");
+
+      fireEvent.click(await screen.findByRole("button", { name: button }));
+      await screen.findByRole("dialog", { name: dialogName });
+      expect(canvasHost).toHaveAttribute("data-paused", "true");
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: dialogName })).not.toBeInTheDocument(),
+      );
+      expect(canvasHost).toHaveAttribute("data-paused", "false");
+    },
+  );
 });

@@ -83,7 +83,13 @@ export function App() {
         items={items}
         itemsStatus={itemsStatus}
         onItemOpen={openItem}
-        paused={Boolean(selectedItem) || isFilterPanelOpen}
+        paused={
+          Boolean(selectedItem) ||
+          isFilterPanelOpen ||
+          isQuickAddOpen ||
+          isTrashOpen ||
+          isCategoriesOpen
+        }
       />
       <Navbar
         isOwner={isOwner}
