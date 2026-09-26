@@ -1,0 +1,40 @@
+.form-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50; /* above the navbar (30) and loading screen (40), matches ItemDetailModal */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  overflow-y: auto;
+
+  background: rgb(42 33 64 / 45%);
+}
+
+.form-modal-dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  border-radius: var(--radius-lg);
+
+  background: var(--glass-surface-fallback);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  color: var(--color-text);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .form-modal-dialog {
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+}
+
+.form-modal__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heading);
+}
