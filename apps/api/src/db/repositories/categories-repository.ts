@@ -149,9 +149,7 @@ export class CategoriesRepository {
         .select({ slug: categories.slug })
         .from(categories)
         .where(
-          newParentId === null
-            ? isNull(categories.parentId)
-            : eq(categories.parentId, newParentId),
+          newParentId === null ? isNull(categories.parentId) : eq(categories.parentId, newParentId),
         );
       const takenSlugs = new Set(siblingRows.map((row) => row.slug));
 
@@ -168,6 +166,6 @@ export class CategoriesRepository {
     }
     statements.push(this.db.delete(categories).where(eq(categories.id, id)));
 
-    await this.db.batch(statements as Parameters<Db["batch"]>[0]);
+    await this.db.batch(statements as unknown as Parameters<Db["batch"]>[0]);
   }
 }

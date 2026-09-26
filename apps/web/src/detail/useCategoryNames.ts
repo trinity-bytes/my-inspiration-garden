@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCategoryTree } from "../api/endpoints";
+import { useCategoriesVersion } from "../categories/useCategoriesVersion";
 
 /**
  * `categoryId` -> display name, fetched once from `GET /api/categories`.
@@ -8,11 +9,15 @@ import { getCategoryTree } from "../api/endpoints";
  * instead of raw ids; T10 owns the full category tree UI and can reuse or
  * replace this. Fails soft: a fetch error leaves the map empty rather than
  * throwing, and callers fall back to showing the raw id (see
- * `ItemDetailModal`'s `categoryNames[id] ?? id`).
+ * `ItemDetailModal`'s `categoryNames[id] ?? id`). Refetches whenever the
+ * category manager modal changes a category (T11b B6), via the shared
+ * `useCategoriesVersion` invalidation signal.
  */
 export function useCategoryNames(): Record<string, string> {
   const [names, setNames] = useState<Record<string, string>>({});
+  const categoriesVersion = useCategoriesVersion();
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: categoriesVersion is a deliberate re-fetch trigger, not read in the effect body.
   useEffect(() => {
     let cancelled = false;
     getCategoryTree()
@@ -30,7 +35,7 @@ export function useCategoryNames(): Record<string, string> {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [categoriesVersion]);
 
   return names;
 }

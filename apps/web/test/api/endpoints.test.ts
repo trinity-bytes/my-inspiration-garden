@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createCategory,
   createItem,
+  deleteCategory,
   deleteItem,
   getCategoryTree,
   getItem,
@@ -12,6 +14,7 @@ import {
   restoreItem,
   restoreItemRevision,
   unfurlLink,
+  updateCategory,
   updateItem,
   uploadMedia,
 } from "../../src/api/endpoints";
@@ -127,6 +130,71 @@ describe("getCategoryTree", () => {
     expect(result).toEqual({ categories: [category] });
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain("/api/categories");
+  });
+});
+
+describe("createCategory / updateCategory / deleteCategory (T11b B6 category manager)", () => {
+  const originalFetch = globalThis.fetch;
+  const category = {
+    id: "01HZY3Q3G0K8R4S8T2V6W0X4YA",
+    name: "Color",
+    slug: "color",
+    parentId: null,
+    position: 0,
+  };
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs /api/categories and validates the created category", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse(category, 201));
+
+    const result = await createCategory({ name: "Color" });
+
+    expect(result).toEqual(category);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/categories");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Color" });
+  });
+
+  it("PATCHes /api/categories/:id and validates the updated category", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ ...category, name: "Renamed" }));
+
+    const result = await updateCategory(category.id, { name: "Renamed" });
+
+    expect(result.name).toBe("Renamed");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/categories/${category.id}`);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string)).toEqual({ name: "Renamed" });
+  });
+
+  it("DELETEs /api/categories/:id with a 204 empty body and resolves to undefined", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(deleteCategory(category.id)).resolves.toBeUndefined();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`/api/categories/${category.id}`);
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("propagates a typed ApiError when the delete request fails", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: { code: "category_cycle", message: "nope" } }, 422),
+    );
+
+    await expect(deleteCategory(category.id)).rejects.toBeInstanceOf(ApiError);
   });
 });
 

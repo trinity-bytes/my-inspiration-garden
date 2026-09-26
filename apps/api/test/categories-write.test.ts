@@ -132,7 +132,9 @@ describe("categories write group", () => {
     expect(del.status).toBe(204);
 
     const listRes = await SELF.fetch("https://example.com/api/categories");
-    const list = await listRes.json<{ categories: { id: string; parentId: string | null; slug: string }[] }>();
+    const list = await listRes.json<{
+      categories: { id: string; parentId: string | null; slug: string }[];
+    }>();
     const leaf = list.categories.find((c) => c.id === leafId);
     expect(leaf?.parentId).toBe(grandId);
     expect(leaf?.slug).toBe("clash-2");

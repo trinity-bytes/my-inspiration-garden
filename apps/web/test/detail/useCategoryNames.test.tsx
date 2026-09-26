@@ -7,6 +7,7 @@ vi.mock("../../src/api/endpoints", () => ({
 }));
 
 import { getCategoryTree } from "../../src/api/endpoints";
+import { invalidateCategories } from "../../src/categories/categories-store";
 
 describe("useCategoryNames", () => {
   it("starts empty and fills in id -> name once the category tree loads", async () => {
@@ -30,5 +31,21 @@ describe("useCategoryNames", () => {
 
     await waitFor(() => expect(getCategoryTree).toHaveBeenCalled());
     expect(result.current).toEqual({});
+  });
+
+  it("refetches after invalidateCategories() is called (T11b B6 manager invalidation)", async () => {
+    vi.mocked(getCategoryTree).mockResolvedValue({
+      categories: [{ id: "c1", name: "First", slug: "first", parentId: null, position: 0 }],
+    });
+
+    const { result } = renderHook(() => useCategoryNames());
+    await waitFor(() => expect(result.current).toEqual({ c1: "First" }));
+
+    vi.mocked(getCategoryTree).mockResolvedValue({
+      categories: [{ id: "c2", name: "Second", slug: "second", parentId: null, position: 0 }],
+    });
+    invalidateCategories();
+
+    await waitFor(() => expect(result.current).toEqual({ c2: "Second" }));
   });
 });

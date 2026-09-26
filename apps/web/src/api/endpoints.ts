@@ -1,4 +1,10 @@
-import type { CreateItemInput, UpdateItemInput } from "@garden/shared";
+import type {
+  Category,
+  CreateCategoryInput,
+  CreateItemInput,
+  UpdateCategoryInput,
+  UpdateItemInput,
+} from "@garden/shared";
 import { categorySchema, itemSchema } from "@garden/shared";
 import { z } from "zod";
 import { apiFetch } from "./client";
@@ -155,6 +161,35 @@ export type CategoryTreeResult = z.infer<typeof categoryTreeResultSchema>;
  */
 export function getCategoryTree(): Promise<CategoryTreeResult> {
   return apiFetch("/api/categories", { schema: categoryTreeResultSchema });
+}
+
+/** `POST /api/categories` — owner-only category creation (T11b B6 manager). */
+export function createCategory(input: CreateCategoryInput): Promise<Category> {
+  return apiFetch("/api/categories", { schema: categorySchema, method: "POST", body: input });
+}
+
+/**
+ * `PATCH /api/categories/:id` — owner-only rename and/or move (via
+ * `parentId`; `null` moves to top level) (T11b B6 manager).
+ */
+export function updateCategory(id: string, input: UpdateCategoryInput): Promise<Category> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, {
+    schema: categorySchema,
+    method: "PATCH",
+    body: input,
+  });
+}
+
+/**
+ * `DELETE /api/categories/:id` — owner-only category delete (T11b B6
+ * manager). Direct children are re-parented server-side; the response body
+ * is empty (204).
+ */
+export function deleteCategory(id: string): Promise<void> {
+  return apiFetch(`/api/categories/${encodeURIComponent(id)}`, {
+    schema: z.void(),
+    method: "DELETE",
+  });
 }
 
 const tagWithCountSchema = z.object({ id: z.string(), name: z.string(), count: z.number() });
