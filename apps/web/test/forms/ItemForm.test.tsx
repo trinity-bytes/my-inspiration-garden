@@ -23,7 +23,11 @@ describe("ItemForm — common fields and kind switching", () => {
     fireEvent.change(screen.getByLabelText("Body"), { target: { value: "hello garden" } });
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "My note" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Illustration" }));
-    fireEvent.change(screen.getByLabelText("Tags"), { target: { value: "ui, nature" } });
+    const tagsInput = screen.getByLabelText("Tags");
+    fireEvent.change(tagsInput, { target: { value: "ui" } });
+    fireEvent.keyDown(tagsInput, { key: "Enter" });
+    fireEvent.change(tagsInput, { target: { value: "nature" } });
+    fireEvent.keyDown(tagsInput, { key: "Enter" });
     fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -128,7 +132,7 @@ describe("ItemForm — edit mode", () => {
     expect(screen.queryByLabelText("Kind")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toHaveValue("Existing");
     expect(screen.getByLabelText("Body")).toHaveValue("existing body");
-    expect(screen.getByLabelText("Tags")).toHaveValue("ui");
+    expect(screen.getByRole("button", { name: "Remove tag ui" })).toBeInTheDocument();
   });
 });
 

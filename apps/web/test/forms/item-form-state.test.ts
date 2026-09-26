@@ -5,7 +5,6 @@ import {
   buildUpdateItemInput,
   createEmptyFormState,
   formStateFromItem,
-  parseTagsInput,
 } from "../../src/forms/item-form-state";
 
 describe("createEmptyFormState", () => {
@@ -13,22 +12,12 @@ describe("createEmptyFormState", () => {
     const state = createEmptyFormState("text");
     expect(state.kind).toBe("text");
     expect(state.categoryIds).toEqual([]);
-    expect(state.tagsInput).toBe("");
+    expect(state.tags).toEqual([]);
     expect(state.text.body).toBe("");
   });
 
   it("defaults the video provider to youtube", () => {
     expect(createEmptyFormState("video").video.provider).toBe("youtube");
-  });
-});
-
-describe("parseTagsInput", () => {
-  it("splits on commas, trims whitespace, and drops empty entries", () => {
-    expect(parseTagsInput(" ui,  Nature ,, dribbble")).toEqual(["ui", "Nature", "dribbble"]);
-  });
-
-  it("returns an empty array for blank input", () => {
-    expect(parseTagsInput("   ")).toEqual([]);
   });
 });
 
@@ -42,7 +31,7 @@ describe("buildCreateItemInput", () => {
   it("builds a valid text item input", () => {
     const state = createEmptyFormState("text");
     state.title = "My note";
-    state.tagsInput = "ui, nature";
+    state.tags = ["ui", "nature"];
     state.categoryIds = ["cat-1"];
     state.text.body = "hello garden";
 
@@ -198,7 +187,7 @@ describe("formStateFromItem / buildUpdateItemInput (edit mode)", () => {
     const state = formStateFromItem(textItem);
     expect(state.kind).toBe("text");
     expect(state.title).toBe("Existing note");
-    expect(state.tagsInput).toBe("ui, nature");
+    expect(state.tags).toEqual(["ui", "nature"]);
     expect(state.categoryIds).toEqual(["cat-1"]);
     expect(state.text.body).toBe("existing body");
   });

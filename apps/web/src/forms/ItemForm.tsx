@@ -16,6 +16,7 @@ import {
 } from "./item-form-state";
 import "./ItemForm.css";
 import { type ImageUploadResult, uploadImageFile } from "./media-upload";
+import { TagInput } from "./TagInput";
 
 const KIND_OPTIONS: { value: ItemKind; label: string }[] = [
   { value: "image", label: "Image" },
@@ -434,13 +435,7 @@ export function ItemForm({
 
       <label className="item-form__field" htmlFor={`${formId}-tags`}>
         Tags
-        <input
-          id={`${formId}-tags`}
-          type="text"
-          placeholder="comma, separated, tags"
-          value={state.tagsInput}
-          onChange={(event) => update({ tagsInput: event.target.value })}
-        />
+        <TagInput id={`${formId}-tags`} tags={state.tags} onChange={(tags) => update({ tags })} />
       </label>
 
       {categoryTree.length > 0 && (

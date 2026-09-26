@@ -68,7 +68,7 @@ export interface ItemFormState {
   title: string;
   url: string;
   notes: string;
-  tagsInput: string;
+  tags: string[];
   categoryIds: string[];
   text: TextFormData;
   link: LinkFormData;
@@ -80,25 +80,13 @@ export interface ItemFormState {
 
 export type BuildItemInputResult<T> = { ok: true; input: T } | { ok: false; error: string };
 
-/** Splits free-text tag input on commas, trims each entry, and drops empties. Server normalizes case/dedup. */
-export function parseTagsInput(input: string): string[] {
-  return input
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0);
-}
-
-function tagsInputFrom(tags: readonly string[]): string {
-  return tags.join(", ");
-}
-
 export function createEmptyFormState(kind: ItemKind): ItemFormState {
   return {
     kind,
     title: "",
     url: "",
     notes: "",
-    tagsInput: "",
+    tags: [],
     categoryIds: [],
     text: { body: "" },
     link: {},
@@ -115,7 +103,7 @@ export function formStateFromItem(item: Item): ItemFormState {
   state.title = item.title ?? "";
   state.url = item.url ?? "";
   state.notes = item.notes ?? "";
-  state.tagsInput = tagsInputFrom(item.tags);
+  state.tags = [...item.tags];
   state.categoryIds = [...item.categoryIds];
 
   switch (item.kind) {
@@ -168,7 +156,7 @@ export function buildCreateItemInput(
     title: title.length > 0 ? title : undefined,
     notes: notes.length > 0 ? notes : undefined,
     categoryIds: state.categoryIds,
-    tags: parseTagsInput(state.tagsInput),
+    tags: state.tags,
   };
 
   switch (state.kind) {
