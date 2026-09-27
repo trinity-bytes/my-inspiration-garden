@@ -111,7 +111,25 @@ const unfurlResultSchema = z.object({
 const storedMediaSchema = z.object({ r2Key: z.string(), mime: z.string(), size: z.number() });
 const mediaImportRequestSchema = z.object({ url: z.string() });
 
-const healthSchema = z.object({ ok: z.boolean() });
+const configProblemSchema = z.object({
+  id: z.string().describe("The env binding at fault, e.g. `ACCESS_AUD`."),
+  message: z.string().describe("What is wrong, and what to do about it."),
+});
+
+const healthSchema = z.object({
+  ok: z
+    .boolean()
+    .describe("True only when the deployment has no unresolved configuration problems."),
+  config: z.object({
+    problems: z
+      .array(configProblemSchema)
+      .describe(
+        "Placeholder values from `wrangler.jsonc` that would break owner auth in production. " +
+          "Empty on a correctly configured deployment, and empty under the local " +
+          "`DEV_OWNER_BYPASS`, where the shipped placeholders are the correct values.",
+      ),
+  }),
+});
 
 // ---------------------------------------------------------------------------
 // Shared building blocks

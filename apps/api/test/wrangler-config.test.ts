@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import schemaText from "../node_modules/wrangler/config-schema.json?raw";
+import apiPackageText from "../package.json?raw";
+import { DEPLOY_CONFIG_PLACEHOLDERS, REQUIRED_CONFIG_BINDINGS } from "../src/config/deploy-config";
 import configText from "../wrangler.jsonc?raw";
 
 /**
@@ -67,7 +69,7 @@ interface WranglerConfig {
     not_found_handling?: string;
     run_worker_first?: string[] | boolean;
   };
-  d1_databases?: { binding: string; database_id: string }[];
+  d1_databases?: { binding: string; database_name: string; database_id: string }[];
   vars?: Record<string, string>;
 }
 
@@ -129,6 +131,58 @@ describe("wrangler.jsonc local-owner escape hatch", () => {
     // The local bypass belongs only in the gitignored apps/api/.dev.vars.
     // Shipping it in `vars` would make every deployed request the owner.
     expect(config.vars).not.toHaveProperty("DEV_OWNER_BYPASS");
+  });
+});
+
+describe("wrangler.jsonc d1 binding", () => {
+  // The all-zeros `database_id` placeholder cannot be asserted against here:
+  // the owner has no Cloudflare account yet, so the placeholder is the only
+  // truthful value in the file, and inventing a real-looking id would be a
+  // lie. It is a manual checklist item instead (README "Deployment"), and
+  // `wrangler d1 migrations apply --remote` fails loudly on a wrong id.
+  //
+  // What IS assertable is that the database *name* the config binds matches
+  // the name the migration scripts target — the real way that pairing breaks.
+  it("binds the D1 database the migration scripts target", () => {
+    const apiPackage = JSON.parse(apiPackageText) as {
+      scripts: Record<string, string>;
+    };
+
+    for (const database of config.d1_databases ?? []) {
+      for (const script of ["db:migrate:local", "db:migrate:remote"]) {
+        const command = apiPackage.scripts[script];
+        expect(command, `apps/api/package.json is missing the ${script} script`).toBeTruthy();
+        expect(
+          command,
+          `${script} must target the d1_databases[].database_name "${database.database_name}"`,
+        ).toContain(database.database_name);
+      }
+    }
+  });
+});
+
+describe("wrangler.jsonc and the health check's placeholder detection", () => {
+  it("declares every binding the health check looks for", () => {
+    // Keeps the two in step: a required binding dropped from `vars` would
+    // otherwise only surface as a runtime surprise.
+    for (const binding of REQUIRED_CONFIG_BINDINGS) {
+      expect(
+        config.vars,
+        `wrangler.jsonc vars is missing ${binding}, which GET /api/health checks`,
+      ).toHaveProperty(binding);
+    }
+  });
+
+  it("does not mark a var as deploy-required while it still holds its placeholder", () => {
+    // A binding the health check ignores is a binding whose placeholder can
+    // ship unnoticed. This fails loudly rather than silently once the owner
+    // adds a new `vars` entry that is still a placeholder.
+    const placeholders = new Set(DEPLOY_CONFIG_PLACEHOLDERS.flatMap((entry) => entry.placeholders));
+    const untracked = Object.entries(config.vars ?? {})
+      .filter(([, value]) => placeholders.has(value))
+      .map(([binding]) => binding)
+      .filter((binding) => !REQUIRED_CONFIG_BINDINGS.includes(binding));
+    expect(untracked, `untracked placeholder var(s): ${untracked.join(", ")}`).toEqual([]);
   });
 });
 

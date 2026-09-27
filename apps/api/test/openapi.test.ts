@@ -41,6 +41,24 @@ describe("GET /api/openapi.json", () => {
     expect(bearerAuth.description ?? "").toMatch(/write.*implies.*read/i);
   });
 
+  it("documents the health response shape the route actually returns", async () => {
+    // `/api/health` gained a `config.problems` report in T13. The route-drift
+    // guard below only catches missing *paths*, so this pins the *shape* of
+    // this one response, which is the only one agents poll to decide whether
+    // a deployment is correctly configured.
+    const res = await app.request("/api/openapi.json", {}, testEnv());
+    const doc = await res.json<OpenApiDoc>();
+
+    // biome-ignore lint/suspicious/noExplicitAny: walking the generated JSON Schema has no exported element type name.
+    const get = (doc.paths["/api/health"] as any).get;
+    const schema = get.responses["200"].content["application/json"].schema;
+
+    expect(Object.keys(schema.properties).sort()).toEqual(["config", "ok"]);
+    const problems = schema.properties.config.properties.problems;
+    expect(problems.type).toBe("array");
+    expect(Object.keys(problems.items.properties).sort()).toEqual(["id", "message"]);
+  });
+
   it("has no route registered in the app that is missing from the document (drift guard)", async () => {
     const res = await app.request("/api/openapi.json", {}, testEnv());
     const doc = await res.json<OpenApiDoc>();

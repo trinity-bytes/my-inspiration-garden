@@ -53,6 +53,25 @@ visitors can browse and filter.
   send `Origin` on same-origin `POST`/`PUT`/`PATCH`/`DELETE` too, so the
   site's own origin must be listed or every owner write returns `403`.
 
+## Health (T13)
+
+- **`GET /api/health`** — public, no credential. `{ "ok": boolean, "config":
+  { "problems": [{ "id", "message" }] } }`.
+  `wrangler.jsonc` ships with placeholder values on purpose (this repo has no
+  Cloudflare account, and inventing an account id or Access AUD tag would be a
+  lie). `ok` is `true` only when none of those placeholders survived into the
+  running Worker — so a deploy that left `ACCESS_AUD`, `OWNER_EMAIL`,
+  `ACCESS_TEAM_DOMAIN` or a localhost-only `CORS_ORIGINS` in place reports
+  `ok: false` and names each one, instead of looking healthy while owner auth
+  is broken. The check is pure and per-request, never module-scope, so a bad
+  config cannot stop the Worker from starting. Always HTTP 200: a
+  misconfigured value is not a server fault. Under the local
+  `DEV_OWNER_BYPASS` the report is always empty, because local development has
+  no Access application and the shipped placeholders are the correct local
+  values. The D1 `database_id` is not covered — a Worker cannot read its own
+  config (`env.DB` exposes no id), so that one is a manual checklist step.
+  Implementation: `apps/api/src/config/deploy-config.ts`.
+
 ## Media
 
 - `POST /api/media` — multipart upload (`file` field). Accepts `image/jpeg`,
@@ -102,9 +121,16 @@ visitors can browse and filter.
 Cloudflare setup this feature's auth model depends on (do at deploy time,
 not automated here):
 
-- **Routes**: the Worker (`garden-api`) and the Pages/Worker-served web app
-  share one hostname; route `/api/*` and `/auth/*` to the Worker, everything
-  else to the web app.
+- **Routes**: ONE Worker (`garden-api`) serves both the API and the built web
+  app's static assets from a single hostname — no Cloudflare Pages project.
+  `apps/api/wrangler.jsonc` does this with an `assets` block
+  (`directory: ../web/dist`, SPA fallback) plus
+  `run_worker_first: ["/api/*", "/auth/*"]`, so only those two globs reach
+  Worker code and every other request is served straight from the assets
+  directory. Both globs are required: dropping `/auth/*` lets the SPA fallback
+  answer `/auth/login` with `index.html` and HTTP 200 instead of its 302.
+  Because the web build output must exist at deploy time, deploy via the root
+  `pnpm deploy`, which builds the web app first.
 - **Access application**: create one Cloudflare Access application scoped
   to **only** `/auth/login` on that hostname (not `/api/*`, not the rest of
   the site) — this is what makes the owner login flow work while keeping
