@@ -40,9 +40,11 @@
     {
       "binding": "DB",
       "database_name": "inspiration-garden",
-      // PLACEHOLDER — OWNER MUST REPLACE. Create the database with
-      // `wrangler d1 create inspiration-garden` and paste the printed id here.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Created 2026-09-27 via `wrangler d1 create inspiration-garden`
+      // (region ENAM). The binding stays `DB` — the app reads `env.DB`, and
+      // wrangler's suggested snippet names the binding `inspiration_garden`,
+      // which would silently break every D1 call.
+      "database_id": "f825cc62-083b-44ff-b098-23c8954921a2",
       "migrations_dir": "migrations"
     }
   ],
