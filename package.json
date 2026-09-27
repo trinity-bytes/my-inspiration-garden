@@ -9,7 +9,9 @@
     "test": "pnpm -r --if-present run test",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "typecheck": "pnpm -r --if-present run typecheck"
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "build": "pnpm -r --if-present run build",
+    "deploy": "pnpm --filter @garden/web build && pnpm --filter @garden/api deploy"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

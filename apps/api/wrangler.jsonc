@@ -4,10 +4,44 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-01-03",
   "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    // Workers Logs, so production errors are inspectable in the dashboard.
+    // Included on both the Free and Paid plans.
+    "enabled": true
+  },
+  "assets": {
+    // Deploy topology: ONE Worker serves BOTH the API and the built web app.
+    // `directory` is resolved relative to this config file (apps/api/), so the
+    // web app's Vite build output is `../web/dist`. That directory MUST exist
+    // when `wrangler deploy` runs — the root `pnpm build` script (web first)
+    // exists for exactly this reason.
+    "directory": "../web/dist",
+    // Deep links and client-side routes have no matching file, so serve the SPA
+    // shell for them. Must stay `single-page-application`: `404-page` would
+    // break every client-side route, and `none` would 404 the app entirely.
+    "not_found_handling": "single-page-application",
+    // ONLY these path globs reach the User Worker; everything else is served
+    // from `assets.directory` without ever invoking Worker code (so there is no
+    // Worker-side asset handler in `src/index.ts`).
+    //
+    // BOTH globs are load-bearing — verify before editing (see
+    // `test/wrangler-config.test.ts`):
+    //   - "/api/*"  — every API route.
+    //   - "/auth/*" — `/auth/login` is a real top-level route
+    //                (`src/http/routes/auth.ts`) that 302-redirects to "/".
+    //                It is also the ONLY path Cloudflare Access protects.
+    //                Drop this glob and the SPA fallback above swallows
+    //                /auth/login, answering with index.html + HTTP 200
+    //                instead of the 302 — owner login breaks silently, with
+    //                no error anywhere.
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "inspiration-garden",
+      // PLACEHOLDER — OWNER MUST REPLACE. Create the database with
+      // `wrangler d1 create inspiration-garden` and paste the printed id here.
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
@@ -15,18 +49,34 @@
   "r2_buckets": [
     {
       "binding": "MEDIA",
+      // PLACEHOLDER — OWNER MUST VERIFY. Create the bucket with
+      // `wrangler r2 bucket create inspiration-garden-media`, or rename the
+      // binding to point at a bucket that already exists.
       "bucket_name": "inspiration-garden-media"
     }
   ],
   "vars": {
+    // PLACEHOLDERS BELOW — every value in this block ships as a placeholder.
+    // OWNER MUST REPLACE each one before deploying; a deployment that keeps
+    // them boots and looks healthy while owner auth is broken or wide open.
+    // `GET /api/health` reports any placeholder that survived, under
+    // `config.problems` — see `src/config/deploy-config.ts`.
+
     // Cloudflare Access team domain, e.g. "your-team.cloudflareaccess.com".
     "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
-    // Access application AUD tag for this app.
+    // Access application AUD tag for the app scoped to /auth/login.
     "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
     // Only this Access-authenticated email is treated as the owner.
     "OWNER_EMAIL": "owner@example.com",
     // Comma-separated allowlist for CORS; supports a trailing `*` wildcard
     // (e.g. "chrome-extension://*", "moz-extension://*").
+    //
+    // NOT just cross-origin clients. The CSRF guard
+    // (`src/http/middleware/csrf.ts`) checks SAME-origin owner writes against
+    // this same allowlist, so the production site's own origin
+    // (e.g. "https://garden.example.com" — exact, no trailing slash) MUST be
+    // listed or every owner write fails with `403 csrf check failed`.
+    // Never widen this with a broad wildcard to silence a 403.
     "CORS_ORIGINS": "http://localhost:5173",
     // Max upload/import size in bytes per media kind (POST /api/media,
     // /api/media/import). Defaults in code: 15 MB images, 50 MB video.

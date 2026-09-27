@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply inspiration-garden --local",
+    "db:migrate:remote": "wrangler d1 migrations apply inspiration-garden --remote",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
