@@ -66,7 +66,7 @@ Inspiration found across the web (Dribbble, Pinterest, X, sites) is scattered. T
 | T10 | Filter panel: category tree, tags, kinds, color, search | delegated | [x] `2389ce8`, `48c5bbe` |
 | T11 | Quick-add + edit UI (owner only), revision history/restore, trash | delegated | [x] `184a2f1`, `f9b367d`, `7494cbb`, `cea13a2`, `019c468`, `d35663d`, `36f2e85` |
 | T12 | Token management UI + API docs (OpenAPI) for agents | delegated (writer trigger: 2+ files) | [x] `bfa5cd8`, `76a3e49` |
-| T13 | Deploy: single Worker (API + web static assets) + D1 + R2 + Access setup, README | delegated | [~] local prep done on `feat/t13-deploy`; remote steps blocked on `wrangler login` |
+| T13 | Deploy: single Worker (API + web static assets) + D1 + R2 + Access setup, README | delegated | [x] deployed 2026-09-30 to garden-api.trinity-bytes.workers.dev; owner browser login pending |
 
 ## Acceptance criteria
 
