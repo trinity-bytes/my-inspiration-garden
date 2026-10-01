@@ -65,11 +65,11 @@
     // `config.problems` — see `src/config/deploy-config.ts`.
 
     // Cloudflare Access team domain, e.g. "your-team.cloudflareaccess.com".
-    "ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
+    "ACCESS_TEAM_DOMAIN": "trinity-bytes.cloudflareaccess.com",
     // Access application AUD tag for the app scoped to /auth/login.
     "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
     // Only this Access-authenticated email is treated as the owner.
-    "OWNER_EMAIL": "owner@example.com",
+    "OWNER_EMAIL": "jahatjassiel@gmail.com",
     // Comma-separated allowlist for CORS; supports a trailing `*` wildcard
     // (e.g. "chrome-extension://*", "moz-extension://*").
     //
@@ -79,7 +79,7 @@
     // (e.g. "https://garden.example.com" — exact, no trailing slash) MUST be
     // listed or every owner write fails with `403 csrf check failed`.
     // Never widen this with a broad wildcard to silence a 403.
-    "CORS_ORIGINS": "http://localhost:5173",
+    "CORS_ORIGINS": "https://garden-api.trinity-bytes.workers.dev,http://localhost:5173",
     // Max upload/import size in bytes per media kind (POST /api/media,
     // /api/media/import). Defaults in code: 15 MB images, 50 MB video.
     "MAX_IMAGE_BYTES": "15728640",
