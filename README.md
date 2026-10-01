@@ -107,7 +107,7 @@ yet.**
    `CORS_ORIGINS`.
 6. **Apply migrations to the remote database** —
    `mise exec -- pnpm --filter @garden/api db:migrate:remote`.
-7. **Deploy** — `mise exec -- pnpm deploy` from the repository root. This builds the web app
+7. **Deploy** — `mise exec -- pnpm run deploy` from the repository root. This builds the web app
    *first*, because `assets.directory` must exist when the Worker is deployed; deploying in the
    other order fails. Prefer this over `pnpm --filter @garden/api deploy` for exactly that reason.
 8. **Verify** — `curl https://<your-hostname>/api/health`. `{"ok":true,"config":{"problems":[]}}`
