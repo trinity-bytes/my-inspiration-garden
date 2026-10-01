@@ -67,7 +67,7 @@
     // Cloudflare Access team domain, e.g. "your-team.cloudflareaccess.com".
     "ACCESS_TEAM_DOMAIN": "trinity-bytes.cloudflareaccess.com",
     // Access application AUD tag for the app scoped to /auth/login.
-    "ACCESS_AUD": "REPLACE_WITH_ACCESS_AUD",
+    "ACCESS_AUD": "16c3a9e6e1cda89d9e1f15c93d9c9d3d722daf3dd3ed673f1af6915888f90c03",
     // Only this Access-authenticated email is treated as the owner.
     "OWNER_EMAIL": "jahatjassiel@gmail.com",
     // Comma-separated allowlist for CORS; supports a trailing `*` wildcard
