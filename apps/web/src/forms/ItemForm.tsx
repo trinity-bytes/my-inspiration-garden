@@ -6,6 +6,7 @@ import {
   unfurlLink,
   uploadMedia,
 } from "../api/endpoints";
+import { resolveMediaRef } from "../api/media-ref";
 import { CategoryTree } from "../filters/CategoryTree";
 import { buildCategoryTree } from "../filters/filter-state";
 import {
@@ -271,7 +272,11 @@ export function ItemForm({
             />
           </label>
           {state.link.previewImage && (
-            <img className="item-form__preview" src={state.link.previewImage} alt="Link preview" />
+            <img
+              className="item-form__preview"
+              src={resolveMediaRef(state.link.previewImage)}
+              alt="Link preview"
+            />
           )}
         </>
       )}

@@ -8,9 +8,10 @@ import type { Hono } from "hono";
 import { createDb } from "../../db/client";
 import { ItemsRepository } from "../../db/repositories/items-repository";
 import { AppError } from "../../lib/errors";
+import { importLinkPreview } from "../../lib/link-preview";
 import { actorLabel, computeItemSource } from "../actor-label";
 import { requireAuth } from "../middleware/require";
-import type { Actor, AppEnv } from "../types";
+import type { Actor, AppDeps, AppEnv } from "../types";
 
 function canSeeDeleted(actor: Actor): boolean {
   return actor.type === "owner" || (actor.type === "token" && scopeSatisfies(actor.scope, "write"));
@@ -24,7 +25,9 @@ async function parseJsonBody(request: Request): Promise<Record<string, unknown>>
   return body as Record<string, unknown>;
 }
 
-export function registerItemRoutes(app: Hono<AppEnv>): void {
+export function registerItemRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+
   app.get("/api/items", async (c) => {
     const raw = {
       kind: c.req.queries("kind"),
@@ -77,7 +80,10 @@ export function registerItemRoutes(app: Hono<AppEnv>): void {
       throw AppError.badRequest("invalid_body", "invalid item payload", parsed.error.issues);
 
     const repo = new ItemsRepository(createDb(c.env.DB));
-    const item = await repo.create(parsed.data, actorLabel(actor));
+    const item = await repo.create(
+      await importLinkPreview(c.env, fetchImpl, parsed.data),
+      actorLabel(actor),
+    );
     return c.json(item, 201);
   });
 
@@ -89,7 +95,11 @@ export function registerItemRoutes(app: Hono<AppEnv>): void {
       throw AppError.badRequest("invalid_body", "invalid item payload", parsed.error.issues);
 
     const repo = new ItemsRepository(createDb(c.env.DB));
-    const item = await repo.update(c.req.param("id"), parsed.data, actorLabel(c.get("actor")));
+    const item = await repo.update(
+      c.req.param("id"),
+      await importLinkPreview(c.env, fetchImpl, parsed.data),
+      actorLabel(c.get("actor")),
+    );
     return c.json(item);
   });
 

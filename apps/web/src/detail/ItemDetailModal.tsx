@@ -1,6 +1,7 @@
 import type { Item } from "@garden/shared";
 import { normalizePalette } from "@garden/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { resolveMediaRef } from "../api/media-ref";
 import { contrastTextColor } from "../color-contrast";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
 import { useLoadedFontFamily } from "./useLoadedFontFamily";
@@ -157,7 +158,7 @@ function ItemDetailBody({ item }: { item: Item }) {
           {item.data.previewImage && (
             <img
               className="item-detail__link-preview"
-              src={item.data.previewImage}
+              src={resolveMediaRef(item.data.previewImage)}
               alt=""
               aria-hidden="true"
             />

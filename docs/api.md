@@ -116,6 +116,22 @@ visitors can browse and filter.
   (including a revision restore). `GET /api/items?color=#RRGGBB` matches
   against these rows.
 
+## Link preview images
+
+On link item create and update (when the patch sets `data.previewImage`), an
+`http(s)` `previewImage` is imported into R2 server-side and replaced with its
+R2 key (`media/...`, served by `GET /api/media/*`). Import is best effort: on
+any failure (unsafe URL, non-image, oversize, fetch error) the original URL is
+kept and the save still succeeds. Values that are already keys are untouched.
+
+One-off backfill for existing link items (write-scope token; use `--dry-run`
+first):
+
+```sh
+GARDEN_API_URL=https://garden.example.com GARDEN_API_TOKEN=ig_xxx \
+  node apps/api/scripts/backfill-link-previews.mjs --dry-run
+```
+
 ## Deploy notes (T13)
 
 Cloudflare setup this feature's auth model depends on (do at deploy time,

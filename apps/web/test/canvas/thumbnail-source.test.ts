@@ -20,6 +20,13 @@ describe("thumbnailUrlForItem", () => {
     expect(thumbnailUrlForItem(item)).toBe("https://cdn.example.com/preview.jpg");
   });
 
+  it("resolves a link previewImage stored as an R2 key through the media endpoint", () => {
+    const item = makeItem("link3", "link", { previewImage: "media/2026/10/abc.png" });
+    expect(thumbnailUrlForItem(item, "https://api.test")).toBe(
+      "https://api.test/api/media/media/2026/10/abc.png",
+    );
+  });
+
   it("returns null for a link item without a preview image", () => {
     const item = makeItem("link2", "link", {});
     expect(thumbnailUrlForItem(item)).toBeNull();

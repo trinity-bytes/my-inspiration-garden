@@ -35,7 +35,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   registerSessionRoutes(app);
   registerAuthRoutes(app);
-  registerItemRoutes(app);
+  registerItemRoutes(app, deps);
   registerCategoryRoutes(app);
   registerTagRoutes(app);
   registerTokenRoutes(app);
