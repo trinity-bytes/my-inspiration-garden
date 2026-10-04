@@ -1,5 +1,6 @@
 import { applyD1Migrations, env, SELF } from "cloudflare:test";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { createApp } from "../src/http/app";
 import { hashHex, insertApiToken, insertCategory } from "./helpers";
 
 beforeAll(async () => {
@@ -170,5 +171,140 @@ describe("revisions restore", () => {
     );
     const after = await afterRevisionsRes.json<{ revisions: unknown[] }>();
     expect(after.revisions).toHaveLength(3);
+  });
+});
+
+describe("link previewImage import into R2", () => {
+  const PNG_BYTES = new Uint8Array([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0xd, 0x49, 0x48, 0x44, 0x52,
+  ]);
+  const pngFetch = () =>
+    vi.fn(
+      async () =>
+        new Response(PNG_BYTES, { status: 200, headers: { "content-type": "image/png" } }),
+    );
+
+  function send(
+    fetchImpl: ReturnType<typeof vi.fn>,
+    auth: Record<string, string>,
+    method: "POST" | "PATCH",
+    path: string,
+    body: unknown,
+  ) {
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+    return app.request(
+      `https://example.com${path}`,
+      {
+        method,
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  const linkBody = (previewImage: string | undefined) => ({
+    kind: "link",
+    source: "web",
+    url: "https://example.com/post",
+    data: previewImage === undefined ? { siteName: "Example" } : { previewImage },
+  });
+
+  it("imports an http(s) previewImage on create and stores the R2 key", async () => {
+    const auth = await writeToken("pv-create", "ig_pv_create");
+    const fetchImpl = pngFetch();
+    const res = await send(
+      fetchImpl,
+      auth,
+      "POST",
+      "/api/items",
+      linkBody("https://cdn.example.com/p.png"),
+    );
+    expect(res.status).toBe(201);
+    const item = await res.json<{ data: { previewImage: string } }>();
+    expect(item.data.previewImage).toMatch(/^media\/\d{4}\/\d{2}\/.+\.png$/);
+    expect(await env.MEDIA.get(item.data.previewImage)).not.toBeNull();
+  });
+
+  it("keeps the remote URL and still saves when the import fails", async () => {
+    const auth = await writeToken("pv-fail", "ig_pv_fail");
+    const cases: [string, ReturnType<typeof vi.fn>][] = [
+      [
+        "https://cdn.example.com/page.html",
+        vi.fn(
+          async () =>
+            new Response("<html>", { status: 200, headers: { "content-type": "text/html" } }),
+        ),
+      ],
+      [
+        "https://cdn.example.com/down.png",
+        vi.fn(async () => {
+          throw new Error("boom");
+        }),
+      ],
+      [
+        "https://cdn.example.com/missing.png",
+        vi.fn(async () => new Response("no", { status: 404 })),
+      ],
+      ["http://169.254.169.254/x.png", vi.fn()],
+    ];
+    for (const [url, fetchImpl] of cases) {
+      const res = await send(fetchImpl, auth, "POST", "/api/items", linkBody(url));
+      expect(res.status).toBe(201);
+      const item = await res.json<{ data: { previewImage: string } }>();
+      expect(item.data.previewImage).toBe(url);
+    }
+  });
+
+  it("leaves a value that is already an R2 key untouched", async () => {
+    const auth = await writeToken("pv-key", "ig_pv_key");
+    const fetchImpl = pngFetch();
+    const key = "media/2026/10/abc.png";
+    const res = await send(fetchImpl, auth, "POST", "/api/items", linkBody(key));
+    expect(res.status).toBe(201);
+    const item = await res.json<{ data: { previewImage: string } }>();
+    expect(item.data.previewImage).toBe(key);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("imports on update when the patch sets data.previewImage", async () => {
+    const auth = await writeToken("pv-update", "ig_pv_update");
+    const created = await send(vi.fn(), auth, "POST", "/api/items", linkBody(undefined));
+    const { id } = await created.json<{ id: string }>();
+
+    const res = await send(pngFetch(), auth, "PATCH", `/api/items/${id}`, {
+      kind: "link",
+      data: { previewImage: "https://cdn.example.com/new.png" },
+    });
+    expect(res.status).toBe(200);
+    const item = await res.json<{ data: { previewImage: string } }>();
+    expect(item.data.previewImage).toMatch(/^media\//);
+  });
+
+  it("does not fetch on update when the patch has no previewImage", async () => {
+    const auth = await writeToken("pv-update-none", "ig_pv_update_none");
+    const created = await send(vi.fn(), auth, "POST", "/api/items", linkBody(undefined));
+    const { id } = await created.json<{ id: string }>();
+    const fetchImpl = pngFetch();
+    const res = await send(fetchImpl, auth, "PATCH", `/api/items/${id}`, {
+      kind: "link",
+      title: "renamed",
+    });
+    expect(res.status).toBe(200);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("does not touch non-link items", async () => {
+    const auth = await writeToken("pv-text", "ig_pv_text");
+    const fetchImpl = pngFetch();
+    const res = await send(fetchImpl, auth, "POST", "/api/items", {
+      kind: "text",
+      source: "web",
+      data: { body: "hi", previewImage: "https://cdn.example.com/p.png" },
+    });
+    expect(res.status).toBe(201);
+    const item = await res.json<{ data: { previewImage: string } }>();
+    expect(item.data.previewImage).toBe("https://cdn.example.com/p.png");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
