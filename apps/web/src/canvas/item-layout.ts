@@ -29,14 +29,16 @@ import { approxMeasure, wrapText } from "./wrap-text";
  * viewport + margin are ever instantiated by the caller (see
  * `visibleCardInstances`).
  *
- * Column construction (see `columnPeriod`): each column gets its OWN
- * full-period item permutation (a distinct coprime step + starting phase,
- * both deterministically hashed from the column index), not merely a
- * rotation of one shared sequence. A shared sequence rotated per column
- * would still guarantee adjacent columns differ, but it produces
- * predictable diagonals where the same item recurs at a constant
- * (Δcolumn, Δrow) offset — visually a repeating pattern. Independent
- * per-column permutations avoid that structural artifact.
+ * Column construction (see `columnPeriod`): every column walks the SAME
+ * fixed, deterministic shuffle of the items (`sharedOrder`), each starting
+ * at its own golden-ratio phase. Owner feedback 2026-10-04: with
+ * independent per-column permutations, a window showed many duplicate cards
+ * (birthday-problem collisions: ~12.6 on average at 34 items, one item up
+ * to 5 times). One shared order means two columns can only show the same
+ * item when their phases put them within a window's height of each other,
+ * and golden-ratio phases are the most evenly spread offsets, so duplicates
+ * only appear once the visible slots outnumber the items. The shuffle (not
+ * the input order) keeps the shared sequence from reading as a pattern.
  *
  * Row lookup (`rowForWorldY`) is a binary search over each column's
  * precomputed cumulative-height table — O(log itemCount) (virtualized along one
@@ -86,17 +88,6 @@ function mod(value: number, modulus: number): number {
 
 function floorDiv(a: number, b: number): number {
   return Math.floor(a / b);
-}
-
-function gcd(a: number, b: number): number {
-  let x = a;
-  let y = b;
-  while (y !== 0) {
-    const t = y;
-    y = x % y;
-    x = t;
-  }
-  return x;
 }
 
 const KIND_DEFAULT_ASPECT: Record<ItemKind, number> = {
@@ -209,107 +200,38 @@ export function cardHeightForItem(item: Item, columnWidth: number): number {
   return columnWidth / cardAspectForItem(item, columnWidth);
 }
 
-const STEP_CHANNEL = 180_077;
-const PHASE_CHANNEL = 966_859;
-/** Only used to re-roll `columnPhase` away from a collision with its left neighbor (see `columnPhase`) — a distinct hash channel gives a fresh, still-deterministic candidate rather than a predictable "+1" shift. */
-const PHASE_FALLBACK_CHANNEL = 725_453;
+const SHUFFLE_CHANNEL = 180_077;
+/** Fractional part of the golden ratio: successive multiples mod 1 are the most evenly spread offsets. */
+const GOLDEN_RATIO_CONJUGATE = 0.6180339887498949;
 
 /**
- * A full-period step for this column's item permutation: `(phase + k*step)
- * % itemCount` for `k = 0..itemCount-1` must visit every item exactly once
- * (`gcd(step, itemCount) === 1`), so a column never repeats an item within
- * one period, and the wrap from its last row back to its first also
- * differs. Deterministically seeded per column (hash of `columnIndex`)
- * rather than shared, so two columns are independent permutations — see
- * the module doc for why that matters.
+ * The one item order every column shares: a Fisher-Yates shuffle of
+ * `0..itemCount-1` driven by `hash32`. Seeded only by `itemCount` and the
+ * position (never item ids), so it stays a pure function of the same inputs
+ * the `columnPeriod` cache key covers.
  */
-function columnStep(columnIndex: number, itemCount: number): number {
-  if (itemCount <= 2) {
-    return 1;
+function sharedOrder(itemCount: number): number[] {
+  const order = Array.from({ length: itemCount }, (_, index) => index);
+  for (let i = itemCount - 1; i > 0; i--) {
+    const j = hash32(itemCount, i, SHUFFLE_CHANNEL) % (i + 1);
+    const swap = order[i] as number;
+    order[i] = order[j] as number;
+    order[j] = swap;
   }
-  let step = 1 + (hash32(columnIndex, 0, STEP_CHANNEL) % (itemCount - 1));
-  while (gcd(step, itemCount) !== 1) {
-    step += 1;
-    if (step >= itemCount) {
-      step = 1;
-      break;
-    }
-  }
-  return step;
-}
-
-function rawColumnPhase(columnIndex: number, itemCount: number, channel: number): number {
-  return hash32(columnIndex, 0, channel) % itemCount;
+  return order;
 }
 
 /**
- * Below this item count, hash-based collision avoidance is the wrong tool:
- * the birthday paradox makes a raw hash collision the COMMON case (at
- * itemCount=2 a fresh 32-bit hash mod 2 collides with its neighbor roughly
- * half the time, and genuine 3+, 4+, ... long collision *chains* are
- * realistic, not rare), and any fixed-depth chain-resolution scheme built
- * from independently-called, per-column pure functions runs into a real
- * mathematical limit: each `columnPhase(columnIndex, ...)` call must be
- * evaluable on its own (no shared state across calls — this stays a pure
- * function of its arguments, correctly memoizable/cacheable — see
- * `columnPeriod`'s cache below), so it can only ever look at a FIXED set of
- * relative offsets from `columnIndex`. Two independently-called columns
- * that are OFF BY ONE necessarily examine those offsets from different
- * absolute anchor points, so any fixed-depth "resolve the collision chain"
- * construction is only self-consistent up to however deep an actual chain
- * runs — which is unbounded in the worst case, and, at these item counts,
- * not vanishingly rare. Below `SMALL_ITEM_COUNT_THRESHOLD`, use a trivial
- * closed form instead: `columnIndex mod itemCount` trivially differs for
- * every pair of adjacent columns (consecutive integers are never congruent
- * mod N for N >= 2), fully sidestepping the hash-collision problem. It is
- * not hash-shuffled (a plain per-column offset, not independently
- * "random"), but with this few items every column cycles through nearly
- * all of them within a couple of rows regardless of starting phase, so the
- * shuffled-looking placement a hash buys elsewhere is not visually
- * meaningful at this scale anyway.
- */
-const SMALL_ITEM_COUNT_THRESHOLD = 6;
-
-/**
- * This column's starting item (period position 0), independently hashed
- * from `columnStep` so two columns rarely start AND step alike — PLUS an
- * explicit, enforced collision guard (T9 carried follow-up) against its
- * immediate left neighbor: a column's own raw hash candidate is compared
- * against `columnIndex - 1`'s raw hash (`leftRaw`) and, when `leftRaw`
- * itself collided with ITS OWN left neighbor (`columnIndex - 2`, so
- * `columnIndex - 1`'s TRUE resolved phase is actually its re-rolled
- * fallback, not `leftRaw`), that fallback is used as the true left phase
- * instead. On a collision with the true left phase, this column re-rolls
- * through a second, independent hash channel; if that also collides
- * (needing three consecutive raw hashes to agree on both channels — rare
- * once `itemCount` clears `SMALL_ITEM_COUNT_THRESHOLD`), a plain `+1`
- * guarantees a distinct value whenever `itemCount > 1`. This — plus the
- * `SMALL_ITEM_COUNT_THRESHOLD` special case above for the item counts
- * where even this two-level guard is not enough — makes "adjacent columns
- * never start with the same item" an enforced property, not an accident of
- * how the tuned hash constants happen to behave for one specific item
- * count (previously true only by luck at exactly 24 items — see
- * item-layout.test.ts's property test across many item counts).
+ * This column's offset into `sharedOrder`: golden-ratio spread, correct for
+ * negative column indices. With two items the floor() can land neighbors on
+ * the same phase, so they simply alternate.
  */
 function columnPhase(columnIndex: number, itemCount: number): number {
-  if (itemCount <= 1) {
-    return 0;
+  if (itemCount === 2) {
+    return mod(columnIndex, 2);
   }
-  if (itemCount <= SMALL_ITEM_COUNT_THRESHOLD) {
-    return mod(columnIndex, itemCount);
-  }
-
-  const candidate = rawColumnPhase(columnIndex, itemCount, PHASE_CHANNEL);
-  const leftRaw = rawColumnPhase(columnIndex - 1, itemCount, PHASE_CHANNEL);
-  const leftLeftRaw = rawColumnPhase(columnIndex - 2, itemCount, PHASE_CHANNEL);
-  const leftFallback = rawColumnPhase(columnIndex - 1, itemCount, PHASE_FALLBACK_CHANNEL);
-  const leftPhase = leftRaw === leftLeftRaw ? leftFallback : leftRaw;
-
-  if (candidate !== leftPhase) {
-    return candidate;
-  }
-  const fallback = rawColumnPhase(columnIndex, itemCount, PHASE_FALLBACK_CHANNEL);
-  return fallback !== leftPhase ? fallback : mod(candidate + 1, itemCount);
+  const scaled = columnIndex * GOLDEN_RATIO_CONJUGATE;
+  return Math.floor((scaled - Math.floor(scaled)) * itemCount);
 }
 
 export interface ItemPeriod {
@@ -337,7 +259,7 @@ function columnPeriodCacheKey(columnIndex: number, columnWidth: number, itemCoun
 
 /**
  * The full, precomputed item period for one column: a deterministic
- * permutation of `items` (see `columnStep`/`columnPhase`) plus the
+ * rotation of the shared shuffle of `items` (see `sharedOrder`/`columnPhase`) plus the
  * cumulative heights `rowForWorldY`'s binary search needs. Pure —
  * `columnIndex` (and `items`/`columnWidth`) fully determine the result, so
  * two calls with the same arguments are `toEqual`. `cache`, when supplied,
@@ -362,14 +284,14 @@ export function columnPeriod(
     return cached;
   }
 
-  const step = columnStep(columnIndex, itemCount);
+  const shared = sharedOrder(itemCount);
   const phase = columnPhase(columnIndex, itemCount);
   const order: number[] = new Array(itemCount);
   const heights: number[] = new Array(itemCount);
   const tops: number[] = new Array(itemCount);
   let cursor = 0;
   for (let k = 0; k < itemCount; k++) {
-    const itemIndex = mod(phase + k * step, itemCount);
+    const itemIndex = shared[(phase + k) % itemCount] as number;
     const item = items[itemIndex] as Item;
     const height = cardHeightForItem(item, columnWidth);
     order[k] = itemIndex;

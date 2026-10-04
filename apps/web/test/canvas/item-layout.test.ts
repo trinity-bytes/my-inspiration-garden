@@ -226,6 +226,24 @@ describe("columnPeriod", () => {
     expect(last).not.toBe(first);
   });
 
+  it("periodHeight is identical for every column (all columns share one set of items, so they stay vertically coherent)", () => {
+    const items = seedItems();
+    const expected = columnPeriod(items, 220, 0).periodHeight;
+    for (let c = -12; c <= 12; c++) {
+      expect(columnPeriod(items, 220, c).periodHeight).toBeCloseTo(expected, 5);
+    }
+  });
+
+  it("every column is a rotation of one shared order (the coordinated-columns design)", () => {
+    const items = seedItems(34);
+    const base = columnPeriod(items, 220, 0).order;
+    for (let c = -6; c <= 6; c++) {
+      const order = columnPeriod(items, 220, c).order;
+      const offset = base.indexOf(order[0] as number);
+      expect(order).toEqual(base.map((_, k) => base[(offset + k) % base.length]));
+    }
+  });
+
   it("adjacent columns start with a different item (owner: horizontally adjacent columns should not align)", () => {
     const items = seedItems();
     let distinctPairs = 0;
@@ -238,20 +256,15 @@ describe("columnPeriod", () => {
         distinctPairs++;
       }
     }
-    // Every adjacent pair in this deterministic scheme must differ (not just
-    // "usually" — see item-layout.ts's `columnPhase`/`columnStep`).
+    // Every adjacent pair must differ (see item-layout.ts's `columnPhase`).
     expect(distinctPairs).toBe(totalPairs);
   });
 
-  // T9 carried follow-up (T8b): the collision-free property above was true
-  // only by luck of the tuned hash constants for ONE fixed item count (24)
-  // over a small column range — it was never actually enforced. This is a
-  // real property test: a wide range of item counts (including small ones,
-  // where a birthday-paradox collision is far more likely) and a wide
-  // column-index range, always starting at a negative offset so the "first
-  // column ever computed" case is exercised too (columnPhase has no prior
-  // neighbor to compare against there).
-  it.each([1, 2, 3, 4, 5, 6, 8, 13, 24, 40, 60, 100, 150])(
+  // Property test across item counts and a wide column range that starts at
+  // a negative offset (columns go negative). Adjacent golden-ratio phases
+  // differ by about 0.618 * N, so adjacent starts differ for every N >= 3;
+  // with exactly 2 items `columnPhase` alternates instead (see there).
+  it.each([1, 2, 3, 4, 5, 6, 8, 13, 24, 34, 40, 60, 100, 150])(
     "property: adjacent columns never start with the same item, for any item count (%i items)",
     (itemCount) => {
       const items = seedItems(itemCount);
@@ -498,22 +511,10 @@ describe("visibleCardInstances", () => {
     expect(checkedAnyColumn).toBe(true);
   });
 
-  // NOTE on "no item appears more than once" at exactly 24 items: at
-  // 1440px, columnLayoutFor gives 5-6 columns, and 24 real-world items'
-  // mixed aspect ratios average ~4 rows visible per column in 900px — i.e.
-  // the EXACT viewport (no margin) shows ~23-24 card slots for 24 items, a
-  // ~1:1 slot-to-item ratio. At that ratio, SOME repeat is a mathematical
-  // certainty for ANY assignment scheme that keeps each column's own full
-  // N-item period (required so a column doesn't just cycle a handful of
-  // items forever) — a brute-force search over both a shared linear
-  // (column, row) lattice and this module's actual per-column hashed
-  // step/phase confirmed no parameter choice reaches zero collisions here
-  // (best found: 2 items appearing twice, 21/23 unique — see the git log
-  // for the search). What's genuinely fixable (and was the actual reported
-  // bug: the OLD hash-grid showed the same text item 3 times) is the WORST
-  // case: no single item should dominate. `STEP_CHANNEL`/`PHASE_CHANNEL`
-  // were tuned against this exact scenario to minimize the max repeat
-  // count.
+  // NOTE: at exactly 24 items the 1440x900 window shows roughly as many card
+  // slots as items, so some repeat is unavoidable for any scheme that keeps
+  // a full N-item period per column. The bound below only guards the worst
+  // case: no single item should dominate the window.
   it("distribution: in a 1440x900 window with 24 items, no item appears more than 3 times", () => {
     // T9b: COLUMN_GUTTER_PX dropped 100 -> 56 (owner feedback: cards were
     // too far apart), which packs more slots into the same viewport, so the
@@ -574,6 +575,39 @@ describe("visibleCardInstances", () => {
       }
     },
   );
+
+  // Owner feedback 2026-10-04: too many duplicate cards on screen. All
+  // columns share one shuffled order with golden-ratio phases, so a window
+  // only repeats an item when slots exceed the item count.
+  it("distribution: coordinated columns keep on-screen duplicates low (34 items) or zero (100 items)", () => {
+    const { columnWidth: desktopColumnWidth } = columnLayoutFor(1440);
+    let seed = 12_345;
+    const nextCenter = () => {
+      seed = (Math.imul(seed, 1_664_525) + 1_013_904_223) >>> 0;
+      return (seed / 0x1_0000_0000) * 100_000 - 50_000;
+    };
+    const centers = Array.from({ length: 200 }, () => ({ x: nextCenter(), y: nextCenter() }));
+    const duplicatesAt = (itemCount: number) => {
+      const items = seedItems(itemCount);
+      return centers.map((center) => {
+        const instances = visibleCardInstances(
+          items,
+          center,
+          1440,
+          900,
+          desktopColumnWidth,
+          0,
+          DEFAULT_MAX_CARD_POOL_SIZE,
+        );
+        return instances.length - new Set(instances.map((i) => i.item.id)).size;
+      });
+    };
+    const d34 = duplicatesAt(34);
+    const avg34 = d34.reduce((a, b) => a + b, 0) / d34.length;
+    console.log("avg34", avg34);
+    expect(avg34).toBeLessThanOrEqual(7);
+    expect(duplicatesAt(100).every((d) => d === 0)).toBe(true);
+  });
 
   it("distribution: adjacent columns' starting (topmost visible) items differ", () => {
     const items24 = seedItems(24);
