@@ -23,8 +23,12 @@ import { clamp } from "./deadzone";
  * real per-kind card content (T9) was in place — one constant still drives
  * both axes, so tightening it removes the excess space uniformly instead of
  * retuning either axis independently.
+ *
+ * Halved to 28 (owner feedback, 2026-10-04): once the sky background was
+ * replaced with a solid color, the empty space between cards read as too
+ * wide.
  */
-export const COLUMN_GUTTER_PX = 56;
+export const COLUMN_GUTTER_PX = 28;
 
 /** Column width is clamped into this range regardless of viewport size, so extreme viewports never produce a degenerate (near-zero or absurdly wide) column. */
 export const MIN_COLUMN_WIDTH_PX = 140;

@@ -7,8 +7,8 @@ import {
 } from "../../src/canvas/column-layout";
 
 describe("COLUMN_GUTTER_PX", () => {
-  it("is reduced to 56 (owner feedback T9b: cards were too far apart both horizontally and vertically)", () => {
-    expect(COLUMN_GUTTER_PX).toBe(56);
+  it("is halved to 28 once the background became solid (owner feedback 2026-10-04: cards still too far apart)", () => {
+    expect(COLUMN_GUTTER_PX).toBe(28);
   });
 });
 

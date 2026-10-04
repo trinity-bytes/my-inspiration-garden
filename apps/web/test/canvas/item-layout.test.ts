@@ -539,7 +539,11 @@ describe("visibleCardInstances", () => {
       expect(count).toBeLessThanOrEqual(3);
     }
     // Still meaningfully better than a 1:1 slot-to-item ratio would suggest.
-    expect(counts.size).toBeGreaterThanOrEqual(instances.length - 8);
+    // 2026-10-04: COLUMN_GUTTER_PX 56 -> 28 packs 32 slots into this window,
+    // more than the 24 items, so `slots - 8` would demand every single item;
+    // "nearly every item shows up" is the meaningful bound once slots exceed
+    // items.
+    expect(counts.size).toBeGreaterThanOrEqual(Math.min(instances.length - 8, items24.length - 2));
   });
 
   // Slot count in a 1440x900 window stays roughly constant (~21-25) as item
