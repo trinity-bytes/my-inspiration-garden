@@ -32,7 +32,7 @@ Owner feedback after using production v0.1.0 (2026-10-03).
 ## Decisions
 
 - Panel style: **light solid surfaces with thick dark border and hard offset shadow** (owner, 2026-10-03).
-- Speed: **1.5x** — cursor 1140, keyboard 1260 (owner, 2026-10-03).
+- Speed: **1.5x** — cursor 1140, keyboard 1260 (owner, 2026-10-03); after the live check, **another 1.5x** — cursor 1710, keyboard 1890 (owner, 2026-10-04).
 - Loading screen photo removed too (orchestrator, follows the owner's "no sky imagery").
 
 ## Tasks
@@ -42,6 +42,7 @@ Owner feedback after using production v0.1.0 (2026-10-03).
 | S1 | Speed: raise max cursor and keyboard speeds 1.5x (test first) | delegated | [x] |
 | S2 | Background: remove sky/haze/cloud layers, shaders, helpers, tests and assets; solid dark clear color; CSS fallback and loading screen use the same color | delegated | [x] |
 | S3 | Surfaces: replace glass tokens and `backdrop-filter` with solid cartoon tokens across all affected components | delegated | [x] |
+| S4 | Speed: another 1.5x after the live check (cursor 1710, keyboard 1890; drag stays 1:1) | inline | [x] |
 
 Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one writer handles S1–S3 sequentially.
 
@@ -49,7 +50,7 @@ Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one 
 
 - No sky, cloud or landscape imagery is requested or shipped; the canvas and loading screen show a solid dark background.
 - No `backdrop-filter` or translucent glass tokens remain; panels are opaque with a thick border and hard offset shadow.
-- Max cursor speed 1140 and keyboard speed 1260.
+- Max cursor speed 1710 and keyboard speed 1890 (S4 supersedes the S1 values).
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` pass.
 
 ## Progress
@@ -58,3 +59,4 @@ Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one 
 - 2026-10-03: S1 done. RED (expected 1140, got 760) then GREEN, navigation-controller tests 20/20. Commit 463c4ce.
 - 2026-10-03: S2 done. RED (background module missing) then GREEN (4 tests); removed sky/haze/clouds layers, 4 shaders, cloud-*/texture-format modules + tests, 14 image assets; clear color and --color-canvas #1c1830, barrel edge tint follows it. web tests 604 pass, typecheck, lint, build ok. Commit e51cc27.
 - 2026-10-03: S3 done. Glass tokens and all backdrop-filter removed (rg clean); --surface-* tokens (solid #f6f3fa, 3px #2a2140 border, 4px hard shadow); pure CSS, verified by typecheck/lint/build, tests 604+204+78 pass. Commit dd74e01.
+- 2026-10-04: Live check in dev: owner approved the look. Local D1 was empty (the T13 database_id change orphaned the miniflare file); local data restored, not a branch issue. S4 done: RED (expected 1140 to be 1710) then GREEN; tests 604+204+78, typecheck, lint pass; owner approved the feel live.
