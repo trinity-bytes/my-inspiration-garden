@@ -1,0 +1,62 @@
+# Solid dark background, cartoon surfaces, faster navigation
+
+## Objective
+
+Replace the sky/cloud background with a solid dark color, replace glassmorphism with a solid cartoon style, and raise the maximum navigation speed by 1.5x.
+
+## Problem
+
+In real use the sky and cloud background goes unnoticed: it neither draws attention nor adds to the experience. The translucent glass surfaces no longer fit. Navigation feels slow when crossing the garden.
+
+## Why
+
+Owner feedback after using production v0.1.0 (2026-10-03).
+
+## Scope
+
+- In:
+  - Canvas: remove the sky, haze and cloud layers and their textures; the canvas clears to a solid dark color. Remove now-unused modules, shaders, tests and `public/images` assets (`sky`, `cloud-1..4`).
+  - CSS fallback: `.canvas-host` uses the same solid dark color instead of the sky image.
+  - Loading screen: drop the landscape photo (`landscape-1280/2560`) for the same solid dark color, for consistency with "no sky imagery".
+  - Surfaces: replace glass tokens and every `backdrop-filter` with a solid cartoon style: opaque cream surface, thick dark border, hard offset shadow (no blur), generous radius. Applies to navbar, filter panel, detail modal, form modals, the canvas message pill, the loading message and other glass-shadow users.
+  - Speed: `DEFAULT_MAX_SPEED` 760 → 1140 and `DEFAULT_KEYBOARD_SPEED` 840 → 1260.
+- Out: dark-mode text palette (panels stay light, so existing text colors stay); WebGL card visuals (no glass there).
+
+## Constraints
+
+- Branch `feat/solid-cartoon-style` from `main` (independent of `fix/link-preview-r2`). Work-unit commits local; push/PR are the owner's call.
+- TDD on (source: explicit user choice, 2026-09-23; see `garden-mvp.md`). Runner: Vitest 4. Commands: `mise exec -- pnpm test`, `mise exec -- pnpm typecheck`, `mise exec -- pnpm lint`. TDD applies to extractable logic (speed constants, background color); pure styling is checked by build and visual readback.
+- Centralize the new look in `apps/web/src/styles/tokens.css` (surface, border, offset shadow, background color tokens).
+- RDD: off (global). Delivery: forecast ~400–600 authored lines, mostly deletions of the sky/cloud stack; single PR, cohesive visual change.
+
+## Decisions
+
+- Panel style: **light solid surfaces with thick dark border and hard offset shadow** (owner, 2026-10-03).
+- Speed: **1.5x** — cursor 1140, keyboard 1260 (owner, 2026-10-03); after the live check, **another 1.5x** — cursor 1710, keyboard 1890 (owner, 2026-10-04).
+- Loading screen photo removed too (orchestrator, follows the owner's "no sky imagery").
+
+## Tasks
+
+| ID | Task | Route | Status |
+|----|------|-------|--------|
+| S1 | Speed: raise max cursor and keyboard speeds 1.5x (test first) | delegated | [x] |
+| S2 | Background: remove sky/haze/cloud layers, shaders, helpers, tests and assets; solid dark clear color; CSS fallback and loading screen use the same color | delegated | [x] |
+| S3 | Surfaces: replace glass tokens and `backdrop-filter` with solid cartoon tokens across all affected components | delegated | [x] |
+| S4 | Speed: another 1.5x after the live check (cursor 1710, keyboard 1890; drag stays 1:1) | inline | [x] |
+
+Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one writer handles S1–S3 sequentially.
+
+## Acceptance criteria
+
+- No sky, cloud or landscape imagery is requested or shipped; the canvas and loading screen show a solid dark background.
+- No `backdrop-filter` or translucent glass tokens remain; panels are opaque with a thick border and hard offset shadow.
+- Max cursor speed 1710 and keyboard speed 1890 (S4 supersedes the S1 values).
+- `pnpm test`, `pnpm typecheck`, `pnpm lint` pass.
+
+## Progress
+
+- 2026-10-03: Mapping done, owner decided style and speed; feature document created. Next: S1.
+- 2026-10-03: S1 done. RED (expected 1140, got 760) then GREEN, navigation-controller tests 20/20. Commit 463c4ce.
+- 2026-10-03: S2 done. RED (background module missing) then GREEN (4 tests); removed sky/haze/clouds layers, 4 shaders, cloud-*/texture-format modules + tests, 14 image assets; clear color and --color-canvas #1c1830, barrel edge tint follows it. web tests 604 pass, typecheck, lint, build ok. Commit e51cc27.
+- 2026-10-03: S3 done. Glass tokens and all backdrop-filter removed (rg clean); --surface-* tokens (solid #f6f3fa, 3px #2a2140 border, 4px hard shadow); pure CSS, verified by typecheck/lint/build, tests 604+204+78 pass. Commit dd74e01.
+- 2026-10-04: Live check in dev: owner approved the look. Local D1 was empty (the T13 database_id change orphaned the miniflare file); local data restored, not a branch issue. S4 done: RED (expected 1140 to be 1710) then GREEN; tests 604+204+78, typecheck, lint pass; owner approved the feel live. Commit ad24edd.

@@ -31,7 +31,7 @@ export interface NavbarProps {
 }
 
 /**
- * Frosted-glass top navbar: brand wordmark, search (⌘K/Ctrl+K focuses it,
+ * Solid cartoon-style top navbar: brand wordmark, search (⌘K/Ctrl+K focuses it,
  * drives `FilterState.q`), a Filters button that opens the filter panel
  * (category tree, tags, kinds, color — T10) and — for the owner only — a
  * sign-out link.

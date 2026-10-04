@@ -5,7 +5,7 @@
  * opacity from `card-fade.ts`, and a subtle hover highlight (mixes toward
  * the apricot-soft accent — `styles/tokens.css`'s `--garden-accent-soft`).
  * Premultiplied-alpha output + (ONE, ONE_MINUS_SRC_ALPHA) blending, same
- * technique as `shaders/cloud.ts`, to avoid dark edge fringing.
+ * technique to avoid dark edge fringing.
  */
 export const CARD_VERTEX_GLSL = /* glsl */ `
 varying vec2 vUv;

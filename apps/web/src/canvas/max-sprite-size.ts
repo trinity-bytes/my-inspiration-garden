@@ -6,10 +6,8 @@
  * capped by the engine at 2).
  *
  * `maxUpscaleFactor` defaults to 1 (no upscale — the original T8a rule,
- * still what cards use, see layers/cards.ts). T8b-3 owner feedback: soft,
- * blurred atmospheric cloud sprites tolerate a bounded upscale better than
- * crisp cards do, so layers/clouds.ts passes 1.5 to keep growing cloud size
- * even when the clamp would otherwise cap it at high DPR.
+ * still what cards use, see layers/cards.ts). A caller with soft, blurred
+ * sprites may pass a larger factor to tolerate a bounded upscale.
  */
 export function maxSpriteCssSize(
   texturePx: number,
@@ -28,22 +26,4 @@ export function clampSpriteCssSize(
   maxUpscaleFactor: number = 1,
 ): number {
   return Math.min(requestedCssSize, maxSpriteCssSize(texturePx, dpr, maxUpscaleFactor));
-}
-
-/**
- * On-screen quad size for a sprite that preserves its texture's aspect ratio
- * (owner feedback, T8a: square quads squashed wide clouds). `requestedCssWidth`
- * is the desired width; the width is clamped by the texture width (times
- * `maxUpscaleFactor`, see `maxSpriteCssSize`), which also bounds the height
- * since both axes scale together.
- */
-export function spriteQuadCssSize(
-  requestedCssWidth: number,
-  textureWidthPx: number,
-  textureHeightPx: number,
-  dpr: number,
-  maxUpscaleFactor: number = 1,
-): { width: number; height: number } {
-  const width = clampSpriteCssSize(requestedCssWidth, textureWidthPx, dpr, maxUpscaleFactor);
-  return { width, height: (width * textureHeightPx) / textureWidthPx };
 }

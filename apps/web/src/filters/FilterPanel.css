@@ -8,18 +8,10 @@
   overflow-y: auto;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
-  background: var(--glass-surface);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  box-shadow: var(--glass-shadow);
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
+  box-shadow: var(--surface-shadow);
   color: var(--color-text);
-}
-
-@supports not (backdrop-filter: blur(1px)) {
-  .filter-panel {
-    background: var(--glass-surface-fallback);
-  }
 }
 
 .filter-panel__header {

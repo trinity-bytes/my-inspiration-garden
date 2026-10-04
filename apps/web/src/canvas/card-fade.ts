@@ -6,14 +6,14 @@ import type { Vec2 } from "./types";
 /**
  * Fade transparent → solid entering view: purely spatial (no per-card timer
  * or mutable animation state — cards are pooled and reassigned to different
- * items every frame, like `layers/clouds.ts`), so opacity is a function of
+ * items every frame), so opacity is a function of
  * where a card sits relative to the viewport edge right now. The ramp runs
  * across the visible edge band — a card entirely outside is transparent, a
  * card whose outer edge is `fadeInsetPx` inside the viewport is solid — so
  * the fade is actually seen as cards enter and leave the screen.
  */
 
-/** A card's on-screen bounding rect, CSS px, y-down, relative to the viewport center — same shape as `cloud-screen-rect.ts`'s `ScreenRect`. */
+/** A card's on-screen bounding rect, CSS px, y-down, relative to the viewport center (`ScreenRect`). */
 export interface CardScreenRect {
   center: Vec2;
   halfWidth: number;

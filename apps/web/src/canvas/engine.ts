@@ -1,8 +1,8 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
+import { canvasBackgroundRgb01 } from "./background";
 import { entryScaledWorldRect } from "./card-fade";
-import { cloudDepthStyle, cloudOpacityRange } from "./cloud-depth";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
 import { selectDomMirrorCards } from "./dom-mirror";
@@ -15,19 +15,14 @@ import {
   visibleCardInstances,
 } from "./item-layout";
 import { CardLayer } from "./layers/cards";
-import type { CloudLayerRuntimeConfig } from "./layers/clouds";
-import { CloudLayer } from "./layers/clouds";
-import { HazeLayer } from "./layers/haze";
-import { SkyLayer } from "./layers/sky";
 import { LruCache } from "./lru-cache";
 import { NavigationController } from "./navigation-controller";
 import { PointerInteractionController } from "./pointer-interaction";
 import { BarrelPass } from "./post/barrel";
-import { detectAvifSupport, selectTextureFormat, textureUrl } from "./texture-format";
 import type { Vec2 } from "./types";
 
 export interface CanvasEngineOptions {
-  /** Fired once texture assets are loaded AND the first frame is drawn (or immediately, on the WebGL-unavailable fallback path). */
+  /** Fired once the first frame is drawn (or immediately, on the WebGL-unavailable fallback path). */
   onReady?: () => void;
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
   onError?: (error: unknown) => void;
@@ -49,55 +44,8 @@ export interface WorldState {
 
 const DPR_CAP = 2;
 
-// Parallax factors: how much each layer moves relative to the navigation
-// world offset. Smaller = more distant/slower.
-const SKY_PARALLAX = 0.05;
-const HAZE_PARALLAX = 0.12;
-
-// Exported so cloud-visibility.test.ts can assert the cloud layers' parallax
-// stays "barely faster" than the sky it drifts across (T8b-3 owner
-// feedback), against the real constant instead of a hardcoded copy.
-export { SKY_PARALLAX };
-
-// Aerial perspective (owner feedback, T8a): two cloud depths (far/mid)
-// built from cloudDepthStyle so speed, opacity, atmospheric tint, size and
-// draw order all come from the SAME depth value — a nearer, faster layer
-// is always more solid, less tinted, larger, and drawn over a farther,
-// slower, hazier one. cellSize/density/scaleMin/scaleMax/baseSpriteSizePx
-// stay hand-tuned per layer (not depth-derived) to keep a few clouds
-// visible at 1440x900 without clutter.
-//
-// T8b owner feedback: the near (fastest, most opaque) cloud layer was
-// REMOVED — cards now supply the depth cue, and a solid near cloud layer
-// competed with them visually.
-//
-// T8b-2 owner feedback: retune far+mid TOGETHER — bigger sprites (base
-// size 480->720, 1.5x, see cloud-depth.ts's PARALLAX/OPACITY/ATMOSPHERE_MIX
-// _FAR/NEAR for the parallax/opacity/atmosphereMix side), slower parallax,
-// a little more atmospheric perspective. CLOUD_DEPTH_MID is lowered
-// 0.5->0.4 so mid samples closer to far on the same retuned curve (keeps
-// mid cohesive with far rather than reading as a separate near layer,
-// while still staying nearer/more-solid than far).
-//
-// T8b-3 owner feedback (second retune — "the motion still doesn't feel
-// right", goal = realism): bigger again (base 720->1008, 1.4x — see
-// max-sprite-size.ts's `maxUpscaleFactor` and layers/clouds.ts's
-// `CLOUD_MAX_UPSCALE_FACTOR` for how the DPR=2 clamp is kept from eating
-// this bump) and CLOUD_DEPTH_MID lowered again 0.4->0.3 (pulls mid's
-// opacity/atmosphereMix even closer to far's, matching cloud-depth.ts's
-// stronger-atmosphere retune, while PARALLAX_FAR/NEAR there independently
-// hit the new "barely faster than sky" parallax targets at this same
-// depth). cellSize/density below are retuned alongside the size bump so
-// the bigger sprites still land on screen without crowding (see
-// cloud-visibility.test.ts's 2-4 combined on-screen target at 1440x900).
-const CLOUD_DEPTH_FAR = 0;
-const CLOUD_DEPTH_MID = 0.3;
-const CLOUD_BASE_SPRITE_SIZE_PX = 1008;
-
-// Cards draw above every cloud layer (decision recorded in
-// odd/tasks/garden-mvp.md: "cards above clouds"). Cloud renderOrder tops
-// out at 100 (cloudDepthStyle's RENDER_ORDER_SCALE), so 200 leaves
-// headroom.
+// Cards render above everything else in the scene (nothing else is drawn but
+// the solid clear color today; the headroom keeps room for future layers).
 const CARD_RENDER_ORDER = 200;
 const CARD_TEXTURE_CACHE_SIZE = 120;
 // A CardInstance's content is a pure, deterministic function of its cell
@@ -109,67 +57,14 @@ const CARD_TEXTURE_CACHE_SIZE = 120;
 // currently-visible set.
 const CARD_INSTANCE_CACHE_SIZE = DEFAULT_MAX_CARD_POOL_SIZE * 3;
 
-function cloudLayerConfig(
-  layerId: number,
-  depth: number,
-  cellSize: number,
-  density: number,
-): CloudLayerRuntimeConfig {
-  const style = cloudDepthStyle(depth);
-  const opacityRange = cloudOpacityRange(depth);
-  return {
-    layerId,
-    cellSize,
-    density,
-    scaleMin: 0.85,
-    scaleMax: 1.15,
-    opacityMin: opacityRange.min,
-    opacityMax: opacityRange.max,
-    parallax: style.parallax,
-    marginCells: 1,
-    maxPoolSize: 40,
-    zDepth: 7 - depth * 2,
-    baseSpriteSizePx: CLOUD_BASE_SPRITE_SIZE_PX,
-    sizeScale: style.sizeScale,
-    atmosphereMix: style.atmosphereMix,
-    renderOrder: style.renderOrder,
-  };
-}
-
-// Exported so cloud-visibility.test.ts can verify actual on-screen
-// placement against the exact constants the engine renders with (no
-// risk of the test's copy silently drifting from production).
-//
-// cellSize bug (T8a): 800/650/520 were each comparable to or larger than
-// the 900px viewport height, so a cell's own footprint almost always
-// straddled a screen edge — no cell was ever geometrically guaranteed to
-// land on screen, and the density-selected cells' random offsets landed
-// off-screen far more often than on. Densities are unchanged; cellSize
-// reduced so most cells are meaningfully smaller than the viewport.
-//
-// T8b-2 retune: cellSize raised (550->600, 450->500) and density trimmed
-// slightly (0.24->0.22, 0.2->0.18) to offset the bigger sprites above —
-// verified against a grid search over cloud-field.ts's real placement math
-// to land back in the 2-4 on-screen range at 1440x900 (see
-// cloud-visibility.test.ts).
-//
-// T8b-3 retune: cellSize raised again (600->700, 500->600) and density
-// trimmed again (0.22->0.18, 0.18->0.16) for the same reason, re-verified
-// with the same grid-search approach against the now-bigger (1008px base,
-// 1.5x-upscale-capable) sprites — still lands at 2-4 on screen (far=2,
-// mid=1, total=3 at the exact constants below).
-export const FAR_CLOUD_CONFIG = cloudLayerConfig(0, CLOUD_DEPTH_FAR, 700, 0.18);
-export const MID_CLOUD_CONFIG = cloudLayerConfig(1, CLOUD_DEPTH_MID, 600, 0.16);
-
 /**
- * Owns the full WebGL scene: sky, procedural haze, two cloud parallax
- * layers and the barrel-distortion post-process, driven by a
- * `NavigationController`. `mount`/`dispose` are idempotent and safe to call
+ * Owns the full WebGL scene: the card layer on a solid background and the
+ * barrel-distortion post-process, driven by a `NavigationController`. `mount`/`dispose` are idempotent and safe to call
  * from React effect mount/cleanup, including under StrictMode's double
  * invocation (each invocation should use its own `CanvasEngine` instance).
  *
  * If WebGL is unavailable, `mount` catches the failure, leaves the
- * existing CSS sky fallback (see `CanvasHost.css`) alone, and still calls
+ * existing CSS background (see `CanvasHost.css`) alone, and still calls
  * `onReady` so the loading screen clears.
  */
 export class CanvasEngine {
@@ -187,12 +82,7 @@ export class CanvasEngine {
   private postCamera: THREE.OrthographicCamera | null = null;
   private barrelPass: BarrelPass | null = null;
 
-  private sky: SkyLayer | null = null;
-  private haze: HazeLayer | null = null;
-  private cloudsFar: CloudLayer | null = null;
-  private cloudsMid: CloudLayer | null = null;
   private cards: CardLayer | null = null;
-  private boundTextures: THREE.Texture[] = [];
 
   private items: Item[];
   /** The full visible-card set computed last frame (hit-testing/hover use this; the DOM mirror uses a smaller, sorted subset — see `dom-mirror.ts`). Reused in place every frame (`visibleCardInstances`'s `out` param) rather than reassigned, so the array itself isn't reallocated either. */
@@ -216,13 +106,11 @@ export class CanvasEngine {
 
   private rafHandle: number | null = null;
   private lastFrameTime: number | null = null;
-  private elapsedTime = 0;
   private readonly distortionK = DEFAULT_BARREL_K;
   private dpr = 1;
 
   private disposed = false;
   private readyFired = false;
-  private texturesLoaded = false;
 
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
@@ -279,7 +167,12 @@ export class CanvasEngine {
     // texture below stays NoColorSpace (raw sRGB-encoded bytes, no hardware
     // decode-on-sample) so texture2D() reads match the source image bytes.
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.setClearColor(0x000000, 1);
+    // The solid background. Raw channels (LinearSRGBColorSpace = no
+    // conversion): the scene renders into a NoColorSpace target and the
+    // shaders pass sRGB-encoded bytes straight through, so the clear color
+    // must be those same bytes (see the comment above).
+    const [bgR, bgG, bgB] = canvasBackgroundRgb01();
+    renderer.setClearColor(new THREE.Color().setRGB(bgR, bgG, bgB, THREE.LinearSRGBColorSpace), 1);
     canvas.style.width = "100%";
     canvas.style.height = "100%";
     canvas.style.display = "block";
@@ -293,8 +186,7 @@ export class CanvasEngine {
     this.postScene = new THREE.Scene();
     this.postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // Cards don't wait on the sky/cloud texture load (loadAssetsAndBuildScene,
-    // below): they load their own textures independently (layers/cards.ts).
+    // Cards load their own textures independently (layers/cards.ts).
     this.cards = new CardLayer({
       maxPoolSize: DEFAULT_MAX_CARD_POOL_SIZE,
       textureCacheSize: CARD_TEXTURE_CACHE_SIZE,
@@ -335,8 +227,6 @@ export class CanvasEngine {
 
     document.addEventListener("visibilitychange", this.handleVisibilityChange);
 
-    void this.loadAssetsAndBuildScene();
-
     this.rafHandle = requestAnimationFrame(this.tick);
   }
 
@@ -361,23 +251,10 @@ export class CanvasEngine {
     this.pointerInteraction?.dispose();
     this.pointerInteraction = null;
 
-    this.sky?.dispose();
-    this.haze?.dispose();
-    this.cloudsFar?.dispose();
-    this.cloudsMid?.dispose();
     this.cards?.dispose();
     this.barrelPass?.dispose();
-    this.sky = null;
-    this.haze = null;
-    this.cloudsFar = null;
-    this.cloudsMid = null;
     this.cards = null;
     this.barrelPass = null;
-
-    for (const texture of this.boundTextures) {
-      texture.dispose();
-    }
-    this.boundTextures = [];
 
     this.renderTarget?.dispose();
     this.renderTarget = null;
@@ -417,56 +294,6 @@ export class CanvasEngine {
       viewportHeight: viewport.height,
       distortionK: this.distortionK,
     };
-  }
-
-  private async loadAssetsAndBuildScene(): Promise<void> {
-    try {
-      const avifSupported = await detectAvifSupport();
-      const format = selectTextureFormat(avifSupported);
-      const loader = new THREE.TextureLoader();
-      const loadTexture = (basePath: string) =>
-        new Promise<THREE.Texture>((resolve, reject) => {
-          loader.load(textureUrl(basePath, format), resolve, undefined, reject);
-        });
-
-      const [skyTexture, cloud1, cloud2, cloud3, cloud4] = await Promise.all([
-        loadTexture("/images/sky"),
-        loadTexture("/images/cloud-1"),
-        loadTexture("/images/cloud-2"),
-        loadTexture("/images/cloud-3"),
-        loadTexture("/images/cloud-4"),
-      ]);
-
-      if (this.disposed || !this.scene) {
-        for (const texture of [skyTexture, cloud1, cloud2, cloud3, cloud4]) {
-          texture.dispose();
-        }
-        return;
-      }
-
-      // NoColorSpace (default) throughout — see the renderer.outputColorSpace
-      // comment in mount(). The cloud sprite shader also composites in raw
-      // sRGB-encoded byte space, so no per-texture conversion here either.
-      this.boundTextures = [skyTexture, cloud1, cloud2, cloud3, cloud4];
-
-      this.sky = new SkyLayer({ texture: skyTexture, parallax: SKY_PARALLAX });
-      this.haze = new HazeLayer({ parallax: HAZE_PARALLAX });
-      this.cloudsFar = new CloudLayer([cloud1, cloud2, cloud3, cloud4], FAR_CLOUD_CONFIG);
-      this.cloudsMid = new CloudLayer([cloud1, cloud2, cloud3, cloud4], MID_CLOUD_CONFIG);
-
-      // Draw order far -> mid also matches insertion order here;
-      // renderOrder (set per layer from cloud-depth.ts) is what actually
-      // guarantees it regardless of insertion or z position.
-      this.scene.add(this.sky.mesh, this.haze.mesh, this.cloudsFar.group, this.cloudsMid.group);
-
-      this.texturesLoaded = true;
-    } catch (error) {
-      this.options.onError?.(error);
-      // Assets failed; keep whatever rendered so far (or the CSS fallback)
-      // and still resolve readiness so the loading screen does not hang.
-      this.texturesLoaded = true;
-      this.fireReady();
-    }
   }
 
   private getViewportSize(): { width: number; height: number } {
@@ -573,42 +400,11 @@ export class CanvasEngine {
   }
 
   /**
-   * coords.ts: worldToScreen(world, offset, parallax) = world + offset*parallax.
-   * A cloud's own cell position is fixed ("world"); the group translation
-   * realizes "+offset*parallax" directly (x matches three.js's scene x; y
-   * is negated — scene space is y-up, this engine's world convention is
-   * y-down, see coords.ts and clouds.ts). visibleCellRange (inside
-   * `update`) needs "which world point is at screen center", i.e.
-   * screenToWorld(0, offset, parallax) = -offset*parallax.
-   */
-  private updateCloudLayer(
-    layer: CloudLayer | null,
-    parallax: number,
-    world: Vec2,
-    viewport: { width: number; height: number },
-  ): void {
-    if (!layer) {
-      return;
-    }
-    layer.group.position.x = world.x * parallax;
-    layer.group.position.y = -(world.y * parallax);
-    layer.update(
-      { x: -world.x * parallax, y: -world.y * parallax },
-      viewport.width,
-      viewport.height,
-      this.dpr,
-    );
-  }
-
-  /**
-   * Cards use parallax 1 (they pan 1:1 with navigation, unlike the ambient
-   * sky/cloud layers) — the same `group.position = world * parallax` +
-   * fixed-local-position technique as `updateCloudLayer`, with parallax
-   * fixed at 1. Recomputes the visible-card set every frame from the
-   * current `this.items` (`item-layout.ts`'s `visibleCardInstances`, pure
-   * and cheap — no per-frame allocation beyond the returned array itself,
-   * matching the cloud layers' own per-frame recompute) and notifies
-   * `onVisibleCardsChange` only when the DOM-mirrored subset actually
+   * Cards use parallax 1 (they pan 1:1 with navigation):
+   * `group.position = world` with fixed local card positions. Recomputes the visible-card set
+   * every frame from the current `this.items` (`item-layout.ts`'s `visibleCardInstances`, pure
+   * and cheap — no per-frame allocation beyond the returned array itself)
+   * and notifies `onVisibleCardsChange` only when the DOM-mirrored subset actually
    * changes (`dom-mirror.ts`), so React doesn't re-render every frame.
    */
   private updateCards(world: Vec2, viewport: { width: number; height: number }): void {
@@ -680,10 +476,6 @@ export class CanvasEngine {
     const dt = this.lastFrameTime === null ? 0 : nowSeconds - this.lastFrameTime;
     this.lastFrameTime = nowSeconds;
 
-    if (!this.reducedMotion) {
-      this.elapsedTime += Math.min(Math.max(dt, 0), 1 / 30);
-    }
-
     this.navigation?.update(dt);
 
     if (
@@ -700,12 +492,6 @@ export class CanvasEngine {
     const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
     const viewport = this.getViewportSize();
 
-    this.sky?.update(viewport, world, this.elapsedTime);
-    this.haze?.update(viewport, world, this.elapsedTime);
-
-    this.updateCloudLayer(this.cloudsFar, FAR_CLOUD_CONFIG.parallax, world, viewport);
-    this.updateCloudLayer(this.cloudsMid, MID_CLOUD_CONFIG.parallax, world, viewport);
-
     this.updateCards(world, viewport);
 
     this.renderer.setRenderTarget(this.renderTarget);
@@ -713,8 +499,6 @@ export class CanvasEngine {
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.postScene, this.postCamera);
 
-    if (this.texturesLoaded) {
-      this.fireReady();
-    }
+    this.fireReady();
   };
 }

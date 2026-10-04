@@ -218,7 +218,7 @@ function ItemDetailBody({ item }: { item: Item }) {
 }
 
 /**
- * Frosted-glass modal overlay showing an item's full detail (T9 scope B).
+ * Solid cartoon-style modal overlay showing an item's full detail (T9 scope B).
  * `role="dialog"` + `aria-modal`, labelled by the item's title; traps Tab
  * focus within itself, closes on Esc or a backdrop click, and returns
  * focus to whatever was focused before it opened. Owner-only editing (T11):

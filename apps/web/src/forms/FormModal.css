@@ -19,18 +19,10 @@
   padding: var(--space-6) var(--space-5) var(--space-5);
   border-radius: var(--radius-lg);
 
-  background: var(--glass-surface-fallback);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
+  box-shadow: var(--surface-shadow);
   color: var(--color-text);
-}
-
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .form-modal-dialog {
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  }
 }
 
 .form-modal__title {

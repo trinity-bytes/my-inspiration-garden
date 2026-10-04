@@ -6,29 +6,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Lift the message into the clean sky, clear of the hills in the lower third. */
-  padding: var(--space-5) var(--space-5) 30vh;
-
-  background-color: var(--garden-lavender-50);
-  background-repeat: no-repeat;
-  background-position: center bottom;
-  background-size: cover;
-  background-image: image-set(
-    url("/images/landscape-1280.avif") type("image/avif"),
-    url("/images/landscape-1280.webp") type("image/webp")
-  );
+  padding: var(--space-5);
+  background-color: var(--color-canvas);
 
   opacity: 1;
   transition: opacity var(--motion-duration-slow) var(--motion-easing-standard);
-}
-
-@media (min-width: 1024px) {
-  .loading-screen {
-    background-image: image-set(
-      url("/images/landscape-2560.avif") type("image/avif"),
-      url("/images/landscape-2560.webp") type("image/webp")
-    );
-  }
 }
 
 .loading-screen--ready {
@@ -37,13 +19,14 @@
 }
 
 .loading-screen__message {
-  background: var(--glass-surface-fallback);
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
   color: var(--color-text);
   font-weight: var(--font-weight-label);
   letter-spacing: var(--tracking-label);
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-full);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--surface-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {
