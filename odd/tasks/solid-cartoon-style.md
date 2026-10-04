@@ -57,3 +57,4 @@ Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one 
 - 2026-10-03: Mapping done, owner decided style and speed; feature document created. Next: S1.
 - 2026-10-03: S1 done. RED (expected 1140, got 760) then GREEN, navigation-controller tests 20/20. Commit 463c4ce.
 - 2026-10-03: S2 done. RED (background module missing) then GREEN (4 tests); removed sky/haze/clouds layers, 4 shaders, cloud-*/texture-format modules + tests, 14 image assets; clear color and --color-canvas #1c1830, barrel edge tint follows it. web tests 604 pass, typecheck, lint, build ok. Commit e51cc27.
+- 2026-10-03: S3 done. Glass tokens and all backdrop-filter removed (rg clean); --surface-* tokens (solid #f6f3fa, 3px #2a2140 border, 4px hard shadow); pure CSS, verified by typecheck/lint/build, tests 604+204+78 pass. Commit dd74e01.
