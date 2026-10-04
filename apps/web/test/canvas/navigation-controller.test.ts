@@ -6,9 +6,9 @@ import {
 } from "../../src/canvas/navigation-controller";
 
 describe("navigation speed defaults", () => {
-  it("doubles the original drift and keyboard speeds (owner feedback: 2x max speed)", () => {
-    expect(DEFAULT_MAX_SPEED).toBe(760);
-    expect(DEFAULT_KEYBOARD_SPEED).toBe(840);
+  it("raises the doubled speeds by another 1.5x (owner feedback 2026-10-03)", () => {
+    expect(DEFAULT_MAX_SPEED).toBe(1140);
+    expect(DEFAULT_KEYBOARD_SPEED).toBe(1260);
   });
 });
 
