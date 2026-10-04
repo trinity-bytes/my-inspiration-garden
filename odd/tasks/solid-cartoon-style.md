@@ -41,7 +41,7 @@ Owner feedback after using production v0.1.0 (2026-10-03).
 |----|------|-------|--------|
 | S1 | Speed: raise max cursor and keyboard speeds 1.5x (test first) | delegated | [x] |
 | S2 | Background: remove sky/haze/cloud layers, shaders, helpers, tests and assets; solid dark clear color; CSS fallback and loading screen use the same color | delegated | [x] |
-| S3 | Surfaces: replace glass tokens and `backdrop-filter` with solid cartoon tokens across all affected components | delegated | [ ] |
+| S3 | Surfaces: replace glass tokens and `backdrop-filter` with solid cartoon tokens across all affected components | delegated | [x] |
 
 Route evidence: S2 and S3 each touch 2+ non-trivial files (writer trigger); one writer handles S1–S3 sequentially.
 

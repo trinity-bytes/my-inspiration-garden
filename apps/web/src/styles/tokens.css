@@ -43,13 +43,13 @@
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
-  /* Frosted glass */
-  --glass-surface: rgb(246 243 250 / 65%);
-  --glass-surface-fallback: rgb(246 243 250 / 96%);
-  --glass-border: rgb(255 255 255 / 45%);
-  --glass-blur: 18px;
-  --glass-saturate: 180%;
-  --glass-shadow: 0 8px 32px rgb(42 33 64 / 16%);
+  /* Solid cartoon surfaces: opaque light fill, thick dark border, hard
+     offset shadow (no blur). Ink on the fill is ~14:1 (WCAG AAA). */
+  --surface-solid: var(--garden-lavender-50);
+  --surface-border-width: 3px;
+  --surface-border-color: var(--garden-ink);
+  --surface-shadow: 4px 4px 0 var(--garden-ink);
+  --surface-shadow-sm: 2px 2px 0 var(--garden-ink);
 
   /* Radii */
   --radius-sm: 6px;

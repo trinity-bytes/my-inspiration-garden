@@ -29,7 +29,9 @@
   margin: 0;
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-full);
-  background: var(--glass-surface-fallback);
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
+  box-shadow: var(--surface-shadow);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   text-align: center;

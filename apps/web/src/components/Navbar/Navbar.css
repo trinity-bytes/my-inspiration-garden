@@ -11,20 +11,9 @@
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
 
-  /* Frosted glass: translucent surface + blur/saturate the content behind
-     it. Falls back to a near-solid surface when backdrop-filter is
-     unsupported, so the navbar stays legible either way. */
-  background: var(--glass-surface-fallback);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-}
-
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .navbar {
-    background: var(--glass-surface);
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  }
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
+  box-shadow: var(--surface-shadow);
 }
 
 .navbar__brand {

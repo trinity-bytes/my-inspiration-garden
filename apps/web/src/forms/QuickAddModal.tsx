@@ -15,7 +15,7 @@ export interface QuickAddModalProps {
   createItem?: (input: CreateItemFormInput) => Promise<{ id: string }>;
 }
 
-/** Owner-only quick-add dialog (T11): a frosted-glass modal wrapping `ItemForm`. */
+/** Owner-only quick-add dialog (T11): a solid cartoon-style modal wrapping `ItemForm`. */
 export function QuickAddModal({
   categories,
   onClose,

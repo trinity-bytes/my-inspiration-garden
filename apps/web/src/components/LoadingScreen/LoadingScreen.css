@@ -19,13 +19,14 @@
 }
 
 .loading-screen__message {
-  background: var(--glass-surface-fallback);
+  background: var(--surface-solid);
+  border: var(--surface-border-width) solid var(--surface-border-color);
   color: var(--color-text);
   font-weight: var(--font-weight-label);
   letter-spacing: var(--tracking-label);
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-full);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--surface-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {
