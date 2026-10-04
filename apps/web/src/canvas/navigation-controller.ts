@@ -33,6 +33,12 @@ export interface NavigationControllerOptions {
 // 1710/1890).
 export const DEFAULT_MAX_SPEED = 1710;
 export const DEFAULT_KEYBOARD_SPEED = 1890;
+/**
+ * Marks UI that floats over the canvas (the navbar) where cursor drift must
+ * stop: the pointer is there to use the UI, not to travel (owner feedback,
+ * 2026-10-04). Keyboard panning and drag are unaffected.
+ */
+export const NAVIGATION_BLOCKER_ATTRIBUTE = "data-navigation-blocker";
 const DEFAULT_SMOOTHING_K = 6;
 const DEFAULT_DRAG_DECAY_HALF_LIFE = 0.35;
 const RELEASE_STOP_EPSILON = 0.05;
@@ -64,6 +70,7 @@ export class NavigationController {
   private motionState: MotionState = "idle";
 
   private pointerInWindow = false;
+  private pointerOverBlocker = false;
   private pointerX = 0;
   private pointerY = 0;
   private lastPointerType: string | null = null;
@@ -228,6 +235,7 @@ export class NavigationController {
       !this.reducedMotion &&
       this.lastPointerType !== "touch" &&
       this.pointerInWindow &&
+      !this.pointerOverBlocker &&
       !this.documentHidden;
 
     if (!driftAllowed) {
@@ -259,6 +267,9 @@ export class NavigationController {
     if (this.motionState === "dragging") {
       return;
     }
+    this.pointerOverBlocker =
+      event.target instanceof Element &&
+      event.target.closest(`[${NAVIGATION_BLOCKER_ATTRIBUTE}]`) !== null;
     this.updatePointerPosition(event.clientX, event.clientY);
   };
 

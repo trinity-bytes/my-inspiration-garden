@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../canvas/navigation-controller";
 import { FilterPanel } from "../../filters/FilterPanel";
 import { defaultFilterState, type FilterState } from "../../filters/filter-state";
 import { useFilterOptions } from "../../filters/useFilterOptions";
@@ -59,7 +60,7 @@ export function Navbar({
   }, [filtersDisclosure.isOpen, onFilterPanelOpenChange]);
 
   return (
-    <header className="navbar">
+    <header className="navbar" {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}>
       <h1 className="navbar__brand">Inspiration Garden</h1>
       <SearchInput
         ref={searchRef}

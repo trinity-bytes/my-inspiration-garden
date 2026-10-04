@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../src/canvas/navigation-controller";
 import { Navbar } from "../../src/components/Navbar/Navbar";
 import { defaultFilterState } from "../../src/filters/filter-state";
 
@@ -27,6 +28,11 @@ describe("Navbar", () => {
   it("renders the brand wordmark", () => {
     render(<Navbar />);
     expect(screen.getByRole("heading", { name: "Inspiration Garden" })).toBeInTheDocument();
+  });
+
+  it("marks itself as a navigation blocker so hovering it stops cursor drift", () => {
+    render(<Navbar />);
+    expect(screen.getByRole("banner")).toHaveAttribute(NAVIGATION_BLOCKER_ATTRIBUTE);
   });
 
   it("focuses the search input on Ctrl+K", () => {

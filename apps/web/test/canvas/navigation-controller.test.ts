@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULT_KEYBOARD_SPEED,
   DEFAULT_MAX_SPEED,
+  NAVIGATION_BLOCKER_ATTRIBUTE,
   NavigationController,
 } from "../../src/canvas/navigation-controller";
 
@@ -153,6 +154,37 @@ describe("NavigationController", () => {
     const velocityAfter = controller.getVelocity();
     expect(Math.hypot(velocityAfter.x, velocityAfter.y)).toBeCloseTo(0, 1);
 
+    controller.dispose();
+  });
+
+  it("stops drifting while the pointer is over a navigation blocker (the navbar) and resumes after leaving it", () => {
+    const controller = new NavigationController({
+      container,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+      maxSpeed: 300,
+    });
+    controller.mount();
+    const navbar = document.createElement("header");
+    navbar.setAttribute(NAVIGATION_BLOCKER_ATTRIBUTE, "");
+    const navbarButton = document.createElement("button");
+    navbar.appendChild(navbarButton);
+    document.body.appendChild(navbar);
+
+    dispatchPointerMove(window, 500, 0);
+    controller.update(1 / 60);
+    expect(Math.hypot(...Object.values(controller.getVelocity()))).toBeGreaterThan(0);
+
+    dispatchPointerMove(navbarButton, 500, 0);
+    for (let i = 0; i < 120; i++) {
+      controller.update(1 / 60);
+    }
+    expect(Math.hypot(...Object.values(controller.getVelocity()))).toBeCloseTo(0, 1);
+
+    dispatchPointerMove(container, 500, 0);
+    controller.update(1 / 60);
+    expect(Math.hypot(...Object.values(controller.getVelocity()))).toBeGreaterThan(0);
+
+    navbar.remove();
     controller.dispose();
   });
 
