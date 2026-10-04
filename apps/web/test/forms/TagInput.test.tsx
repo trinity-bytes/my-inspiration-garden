@@ -77,6 +77,58 @@ describe("TagInput", () => {
     expect(onChange).toHaveBeenCalledWith(["nature"]);
   });
 
+  it("commits the top suggestion on Tab when none is highlighted", async () => {
+    const onChange = vi.fn();
+    const getTags = makeGetTags([
+      { id: "1", name: "nature", count: 5 },
+      { id: "2", name: "naval", count: 12 },
+    ]);
+    render(<TagInput id="tags" tags={[]} onChange={onChange} getTags={getTags} />);
+
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "na" } });
+    await screen.findByRole("listbox");
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    expect(onChange).toHaveBeenCalledWith(["naval"]);
+  });
+
+  it("commits the highlighted suggestion on Tab", async () => {
+    const onChange = vi.fn();
+    const getTags = makeGetTags([
+      { id: "1", name: "nature", count: 5 },
+      { id: "2", name: "naval", count: 12 },
+    ]);
+    render(<TagInput id="tags" tags={[]} onChange={onChange} getTags={getTags} />);
+
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "na" } });
+    await screen.findByRole("listbox");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Tab" });
+
+    expect(onChange).toHaveBeenCalledWith(["nature"]);
+  });
+
+  it("keeps focus in the field when Tab commits a tag, so more tags can follow", () => {
+    render(<TagInput id="tags" tags={[]} onChange={vi.fn()} getTags={makeGetTags([])} />);
+
+    const input = screen.getByRole("combobox");
+    fireEvent.change(input, { target: { value: "nature" } });
+    const notCancelled = fireEvent.keyDown(input, { key: "Tab" });
+
+    expect(notCancelled).toBe(false);
+  });
+
+  it("lets Tab move focus normally when the field is empty", () => {
+    render(<TagInput id="tags" tags={[]} onChange={vi.fn()} getTags={makeGetTags([])} />);
+
+    const notCancelled = fireEvent.keyDown(screen.getByRole("combobox"), { key: "Tab" });
+
+    expect(notCancelled).toBe(true);
+  });
+
   it("ignores blank input on Enter", () => {
     const onChange = vi.fn();
     render(<TagInput id="tags" tags={["ui"]} onChange={onChange} getTags={makeGetTags([])} />);
@@ -113,6 +165,25 @@ describe("TagInput", () => {
     expect(options).toHaveLength(2);
     expect(options[0]).toHaveTextContent("naval");
     expect(options[1]).toHaveTextContent("nature");
+  });
+
+  it("ranks suggestions by closeness first (exact, prefix, word prefix, substring), then by count", async () => {
+    const getTags = makeGetTags([
+      { id: "1", name: "build-ui", count: 40 },
+      { id: "2", name: "fluid", count: 30 },
+      { id: "3", name: "ui-kits", count: 5 },
+      { id: "4", name: "ui", count: 2 },
+      { id: "5", name: "ui-patterns", count: 9 },
+    ]);
+    render(<TagInput id="tags" tags={[]} onChange={vi.fn()} getTags={getTags} />);
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ui" } });
+
+    const listbox = await screen.findByRole("listbox");
+    const names = within(listbox)
+      .getAllByRole("option")
+      .map((option) => option.firstChild?.textContent);
+    expect(names).toEqual(["ui", "ui-patterns", "ui-kits", "build-ui", "fluid"]);
   });
 
   it("filters suggestions case/accent-insensitively", async () => {

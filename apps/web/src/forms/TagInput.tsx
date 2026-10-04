@@ -15,13 +15,30 @@ function normalize(value: string): string {
 }
 
 /**
+ * How closely a normalized tag name matches the normalized query, lower is
+ * closer: 0 exact, 1 prefix, 2 prefix of a later word (after a non-letter or
+ * digit, e.g. "build-ui" for "ui"), 3 any other substring. `null` when the
+ * name does not contain the query. Ties are broken by item count, so the top
+ * suggestion (the one Tab takes) is the closest match, not just the most used.
+ */
+function matchRank(name: string, query: string): number | null {
+  if (name === query) return 0;
+  if (name.startsWith(query)) return 1;
+  if (!name.includes(query)) return null;
+  const wordStart = name
+    .split(/[^\p{L}\p{N}]+/u)
+    .some((word) => word.length > 0 && word.startsWith(query));
+  return wordStart ? 2 : 3;
+}
+
+/**
  * Accessible chip-based tag input with autocomplete (T11b B3). Replaces the
  * old comma-separated free-text field: existing tags render as removable
  * chips, and typing suggests matches from `GET /api/tags` (excluding
- * already-selected tags, sorted by item count). Enter/comma/Tab commits the
+ * already-selected tags, sorted by item count). Enter/comma commits the
  * highlighted suggestion, or the typed text as a brand-new tag when nothing
- * is highlighted. Free entry always works, even if the tag list fails to
- * load (fail-soft).
+ * is highlighted; Tab autocompletes to the top suggestion instead. Free entry
+ * always works, even if the tag list fails to load (fail-soft).
  */
 export function TagInput({ id, tags, onChange, getTags = getTagsDefault }: TagInputProps) {
   const [draft, setDraft] = useState("");
@@ -49,8 +66,10 @@ export function TagInput({ id, tags, onChange, getTags = getTagsDefault }: TagIn
     const selected = new Set(tags.map(normalize));
     return availableTags
       .filter((tag) => !selected.has(normalize(tag.name)))
-      .filter((tag) => normalize(tag.name).includes(query))
-      .sort((a, b) => b.count - a.count);
+      .map((tag) => ({ tag, rank: matchRank(normalize(tag.name), query) }))
+      .filter((entry) => entry.rank !== null)
+      .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0) || b.tag.count - a.tag.count)
+      .map((entry) => entry.tag);
   }, [draft, availableTags, tags]);
 
   function addTag(rawValue: string): void {
@@ -90,7 +109,17 @@ export function TagInput({ id, tags, onChange, getTags = getTagsDefault }: TagIn
       return;
     }
     if (event.key === "Tab") {
-      if (draft.trim().length > 0 || highlightedIndex >= 0) commitDraft();
+      if (draft.trim().length === 0 && highlightedIndex < 0) return;
+      // Stay in the field so several tags can be entered in a row; an empty
+      // field lets Tab move focus as usual.
+      event.preventDefault();
+      // Tab autocompletes: without an explicit highlight it takes the top
+      // suggestion (owner feedback, 2026-10-04). Enter/comma still commit the
+      // typed text, so a tag that is a substring of an existing one can be
+      // created.
+      const topSuggestion = highlightedIndex < 0 ? suggestions[0] : undefined;
+      if (topSuggestion) addTag(topSuggestion.name);
+      else commitDraft();
       return;
     }
     if (event.key === "Backspace" && draft.length === 0 && tags.length > 0) {
