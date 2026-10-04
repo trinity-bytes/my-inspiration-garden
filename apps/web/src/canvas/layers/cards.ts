@@ -43,14 +43,11 @@ interface PoolEntry {
 }
 
 /**
- * One dense, pooled layer of item cards (every visible cell has a card,
- * unlike the sparse `layers/clouds.ts`). Reuses the same pooling technique:
+ * One dense, pooled layer of item cards (every visible cell has a card):
  * a bounded set of meshes is reassigned to whichever `CardInstance`s are
  * currently visible each frame (`item-layout.ts` computes that set; this
- * class only owns the three.js side). Cards render above the cloud layers
- * (see `engine.ts`'s scene insertion order / `renderOrder`) — the near
- * cloud layer stays visually behind cards, matching the "cards above
- * clouds" decision recorded in `odd/tasks/garden-mvp.md`.
+ * class only owns the three.js side). Cards draw over the solid
+ * canvas background (see `engine.ts`'s `renderOrder`).
  */
 export class CardLayer {
   readonly group: THREE.Group;
@@ -257,8 +254,7 @@ export class CardLayer {
    * `visibleCardInstances`, already computed by the caller — this class
    * does not do virtualization math itself). `worldOffset`/`viewport` drive
    * the fade-in opacity (`card-fade.ts`); `dpr` clamps loaded-thumbnail
-   * sprite size to the texture's own resolution, same convention as
-   * `layers/clouds.ts`.
+   * sprite size to the texture's own resolution.
    */
   update(
     instances: readonly CardInstance[],
@@ -313,7 +309,7 @@ export class CardLayer {
       const height = instance.worldRect.height * scaleFactor;
 
       // Y negated: mesh position is scene space (y-up); worldRect is this
-      // engine's y-down world convention (coords.ts), same as clouds.ts.
+      // engine's y-down world convention (coords.ts), same as every other layer.
       entry.mesh.position.set(instance.worldRect.x, -instance.worldRect.y, 0);
       entry.mesh.scale.set(width, height, 1);
       entry.mesh.visible = true;

@@ -3,15 +3,10 @@
   inset: 0;
   overflow: hidden;
 
-  /* Static CSS fallback for the sky ambient: T8 mounts the WebGL canvas
-     into this element and takes over the visual; until then (and if WebGL
-     is unavailable) this tiled background stands in for it. */
-  background-color: var(--garden-lavender-100);
-  background-repeat: repeat;
-  background-image: image-set(
-    url("/images/sky.avif") type("image/avif"),
-    url("/images/sky.webp") type("image/webp")
-  );
+  /* Solid background: the same color the WebGL canvas clears to
+     (canvas/background.ts), so it also stands in until the engine mounts
+     and when WebGL is unavailable. */
+  background-color: var(--color-canvas);
 }
 
 .canvas-host__webgl-target {
@@ -25,8 +20,7 @@
   outline-offset: calc(-1 * var(--focus-ring-width));
 }
 
-/* Empty/fetch-error state (T8b): the sky still renders behind this, per
-   `odd/tasks/garden-mvp.md`'s "canvas still renders the sky" requirement. */
+/* Empty/fetch-error state (T8b): the canvas still renders behind this. */
 .canvas-host__message {
   position: absolute;
   left: 50%;

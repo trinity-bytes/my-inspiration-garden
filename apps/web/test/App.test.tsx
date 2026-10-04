@@ -85,7 +85,7 @@ describe("App", () => {
     await waitFor(() =>
       expect(screen.getByText("Couldn't load the garden's items right now.")).toBeInTheDocument(),
     );
-    // The sky/canvas host still renders alongside the message.
+    // The canvas host still renders alongside the message.
     expect(screen.getByTestId("canvas-host")).toBeInTheDocument();
   });
 });

@@ -40,14 +40,14 @@ function cardAriaLabel(card: CardInstance): string {
  * focusable navigation region (arrow keys / WASD pan it while focused; see
  * `canvas/navigation-controller.ts`), so it carries `tabIndex=0` and an
  * accessible label instead of `aria-hidden`. Until (or unless) the engine
- * mounts, `CanvasHost.css` shows the tiled sky as a static CSS background.
+ * mounts, `CanvasHost.css` paints the solid canvas color as a static CSS background.
  *
  * T8b adds: item cards (hover/click handled inside the engine via
  * hit-testing through the barrel distortion, see `canvas/hit-test.ts`), a
  * parallel DOM/ARIA card list (`.canvas-host__card-list`, visually hidden
  * — keyboard-focusable, mirrors whatever cards are currently visible;
  * focusing one pans the canvas to center it), and a subtle empty/error
- * message shown alongside the still-rendering sky.
+ * message shown alongside the still-rendering canvas.
  */
 export function CanvasHost({
   onReady,
@@ -86,7 +86,7 @@ export function CanvasHost({
       items: initialItemsRef.current,
       onReady: () => onReadyRef.current?.(),
       // WebGL failures (unsupported, lost context, texture load errors) fall
-      // back to the CSS sky background in CanvasHost.css; nothing to do here.
+      // back to the CSS background in CanvasHost.css; nothing to do here.
       onError: () => {},
       onItemOpen: (itemId) => onItemOpenRef.current?.(itemId),
       onVisibleCardsChange: (cards) => setVisibleCards(cards),

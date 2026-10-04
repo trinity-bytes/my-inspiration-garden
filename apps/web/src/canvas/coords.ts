@@ -4,10 +4,10 @@ import type { Vec2 } from "./types";
  * The one coordinate convention for the whole canvas engine: world space is
  * screen-like — x right, y DOWN, 1 unit = 1 CSS px — matching the pointer,
  * drag and keyboard math in `navigation-controller.ts` (which are already
- * CSS/DOM convention: `clientY` grows downward). Every uniform (sky/haze
- * shaders) and every sprite position (clouds) must go through these two
+ * CSS/DOM convention: `clientY` grows downward). Every uniform (shaders)
+ * and every sprite position (cards) must go through these two
  * functions so the sign convention never diverges between subsystems again
- * (see the T8a "Y axis inverted" correction: the previous sky/haze shaders
+ * (see the T8a "Y axis inverted" correction: the previous background shaders
  * derived `screenPx` from clip-space, which is y-UP, and mixed it directly
  * with this y-DOWN `worldOffset`).
  *
@@ -17,7 +17,7 @@ import type { Vec2 } from "./types";
  *
  * The `parallax` factor scales how much a layer reacts to `worldOffset`
  * (1 = tracks 1:1, as a "grabbed" foreground item should during a drag;
- * < 1 = distant/slow, as the ambient sky/haze/cloud layers are).
+ * < 1 = distant/slow, as an ambient background layer would be).
  */
 
 /** World-space point (screen-like, y-down) → screen-space point relative to the viewport center (CSS px, y-down). */

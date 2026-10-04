@@ -20,5 +20,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./test/setup.ts"],
+    // Let the design-token parity test read tokens.css via `?raw` (CSS is otherwise stubbed empty).
+    css: { include: [/tokens\.css/] },
   },
 });

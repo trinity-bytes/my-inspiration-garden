@@ -1,8 +1,6 @@
 export interface MotionPolicy {
   /** Cursor-driven drift toward the pointer direction. */
   autoDrift: boolean;
-  /** Time-animated procedural haze. */
-  hazeAnimation: boolean;
   /** Inertia glide: smoothed approach to a moving target, and post-drag decay. */
   inertiaGlide: boolean;
 }
@@ -13,5 +11,5 @@ export interface MotionPolicy {
  */
 export function motionPolicyFor(reducedMotion: boolean): MotionPolicy {
   const enabled = !reducedMotion;
-  return { autoDrift: enabled, hazeAnimation: enabled, inertiaGlide: enabled };
+  return { autoDrift: enabled, inertiaGlide: enabled };
 }

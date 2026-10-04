@@ -81,7 +81,7 @@ export function createPlaceholderTexture(
 ): THREE.Texture {
   const canvas = paintPlaceholderCanvas(item, widthPx, heightPx);
   const texture = new THREE.CanvasTexture(canvas);
-  // NoColorSpace throughout the canvas engine (see engine.ts / layers/sky.ts):
+  // NoColorSpace throughout the canvas engine (see engine.ts):
   // the card shader composites in raw sRGB-encoded byte space, no per-texture
   // conversion.
   texture.colorSpace = THREE.NoColorSpace;

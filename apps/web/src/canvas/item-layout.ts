@@ -39,9 +39,8 @@ import { approxMeasure, wrapText } from "./wrap-text";
  * per-column permutations avoid that structural artifact.
  *
  * Row lookup (`rowForWorldY`) is a binary search over each column's
- * precomputed cumulative-height table — O(log itemCount) — matching the
- * same virtualization spirit as `cloud-field.ts`'s cell-range approach, but
- * along one infinite axis per column instead of a 2D cell grid.
+ * precomputed cumulative-height table — O(log itemCount) (virtualized along one
+ * infinite axis per column).
  */
 
 export const CARD_ASPECT_MIN = 0.5;
@@ -69,7 +68,7 @@ export interface CardInstance {
   worldRect: CardWorldRect;
 }
 
-/** Small, deterministic 32-bit integer hash (bit-mixing, no external state) — same technique as `cloud-field.ts`'s hash. */
+/** Small, deterministic 32-bit integer hash (bit-mixing, no external state). */
 function hash32(a: number, b: number, c: number): number {
   let h =
     (Math.imul(a | 0, 374_761_393) ^

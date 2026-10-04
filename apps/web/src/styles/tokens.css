@@ -16,6 +16,7 @@
   --garden-accent-strong: #e0784e;
   --garden-accent-soft: #fce3d3;
   --garden-white: #ffffff;
+  --color-canvas: #1c1830; /* solid canvas background; keep in sync with canvas/background.ts */
 
   /* Semantic: surfaces */
   --color-surface: var(--garden-lavender-50);

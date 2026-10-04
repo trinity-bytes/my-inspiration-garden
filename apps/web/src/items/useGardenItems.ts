@@ -18,7 +18,7 @@ export interface UseGardenItemsResult {
  * public list endpoint until either the cursor is exhausted or the
  * pagination cap is reached (`fetch-plan.ts`). Any fetch failure resolves
  * to `"error"`; a successful fetch with zero items resolves to `"empty"` —
- * both are surfaced by `CanvasHost` as a subtle DOM message while the sky
+ * both are surfaced by `CanvasHost` as a subtle DOM message while the canvas
  * still renders (T8b "Empty state and fetch error"). Never updates state
  * after unmount. `filters` (T10's filter panel state) restarts the fetch
  * from scratch whenever it changes — filtering always re-pages from the

@@ -1,9 +1,13 @@
+import { canvasBackgroundRgb01 } from "../background";
+
+const [EDGE_R, EDGE_G, EDGE_B] = canvasBackgroundRgb01().map((c) => c.toFixed(3));
+
 /**
  * Full-screen barrel post-process: for each output pixel, finds where in
  * the (undistorted) rendered scene it should sample from by inverting the
  * forward barrel mapping (see `../distortion.ts`, kept in sync by hand —
- * this is the GLSL twin of `barrelInverse`), then fades — toward a light
- * lavender, never toward black — right at the far corners, so the effect
+ * this is the GLSL twin of `barrelInverse`), then fades toward the solid
+ * canvas background right at the far corners, so the effect
  * never hard-clips or reads as a darkening vignette.
  */
 export const BARREL_FRAGMENT_GLSL = /* glsl */ `
@@ -12,7 +16,7 @@ uniform float u_k;
 uniform float u_aspect;
 varying vec2 vUv;
 
-const vec3 EDGE_TINT = vec3(0.965, 0.953, 0.980); // #F6F3FA
+const vec3 EDGE_TINT = vec3(${EDGE_R}, ${EDGE_G}, ${EDGE_B}); // canvas background
 
 vec2 barrelInverse(vec2 p, float k) {
   float rd = length(p);
