@@ -36,7 +36,7 @@
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
-  color: var(--color-accent-strong, var(--color-accent));
+  color: var(--color-accent-text);
 }
 
 .tokens-modal__meta {
@@ -90,5 +90,5 @@
   display: inline-block;
   margin-top: var(--space-1);
   font-size: 0.8rem;
-  color: var(--color-accent-strong, var(--color-accent));
+  color: var(--color-accent-text);
 }

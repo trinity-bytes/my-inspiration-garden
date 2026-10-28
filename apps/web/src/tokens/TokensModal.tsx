@@ -137,7 +137,7 @@ export function TokensModal({
     <div className="form-modal-backdrop" data-testid="tokens-backdrop" onClick={onClose}>
       <div
         ref={dialogRef}
-        className="form-modal-dialog tokens-modal-dialog"
+        className="glass form-modal-dialog tokens-modal-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

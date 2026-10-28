@@ -52,7 +52,7 @@ export function QuickAddModal({
     <div className="form-modal-backdrop" data-testid="quick-add-backdrop" onClick={onClose}>
       <div
         ref={dialogRef}
-        className="form-modal-dialog"
+        className="glass form-modal-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

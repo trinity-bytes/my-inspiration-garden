@@ -56,7 +56,7 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
   }
 
   return (
-    <section className="filter-panel" aria-label="Filters">
+    <section className="glass filter-panel" aria-label="Filters">
       <div className="filter-panel__header">
         <h2 className="filter-panel__title">Filters</h2>
         {isFilterActive(filters) && (

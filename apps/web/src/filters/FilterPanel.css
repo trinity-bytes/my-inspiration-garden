@@ -8,10 +8,6 @@
   overflow-y: auto;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
-  background: var(--surface-solid);
-  border: var(--surface-border-width) solid var(--surface-border-color);
-  box-shadow: var(--surface-shadow);
-  color: var(--color-text);
 }
 
 .filter-panel__header {
@@ -31,7 +27,7 @@
 .filter-panel__clear {
   border: none;
   background: none;
-  color: var(--color-accent-strong);
+  color: var(--color-accent-text);
   font-size: 0.85rem;
   cursor: pointer;
   padding: 0;

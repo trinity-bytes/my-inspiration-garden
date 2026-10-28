@@ -42,7 +42,7 @@ export function ConfirmDialog({
     <div className="form-modal-backdrop" data-testid="confirm-dialog-backdrop" onClick={onCancel}>
       <div
         ref={dialogRef}
-        className="form-modal-dialog confirm-dialog"
+        className="glass form-modal-dialog confirm-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

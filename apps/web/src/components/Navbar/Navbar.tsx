@@ -69,7 +69,7 @@ export function Navbar({
 
   return (
     <header
-      className="navbar"
+      className="glass navbar"
       onPointerMove={trackGlassHighlight}
       {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}
     >

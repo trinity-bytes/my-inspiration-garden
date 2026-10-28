@@ -92,7 +92,7 @@ export function CategoryManagerModal({
     <div className="form-modal-backdrop" data-testid="category-manager-backdrop" onClick={onClose}>
       <div
         ref={dialogRef}
-        className="form-modal-dialog category-manager-dialog"
+        className="glass form-modal-dialog category-manager-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

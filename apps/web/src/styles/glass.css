@@ -1,0 +1,28 @@
+/**
+ * Liquid glass surfaces (navbar, filter panel, modals) floating over the dark
+ * canvas: translucent dark tint + backdrop blur, a hairline light border, an
+ * inner top highlight and a soft drop shadow.
+ *
+ * Inside a `.glass` surface the semantic tokens switch to their on-dark
+ * values, so content styled with them (inputs, lists, chips, buttons) adapts
+ * without per-component overrides. The dark base tint keeps both text tones
+ * at WCAG AA even over a pure white card (text 5.3:1, muted 4.6:1).
+ */
+.glass {
+  --color-text: var(--garden-lavender-50);
+  --color-text-muted: var(--garden-lavender-100);
+  --color-surface-raised: rgb(255 255 255 / 0.08);
+  --color-surface-popover: rgb(42 33 64 / 0.96);
+  --color-border: rgb(255 255 255 / 0.18);
+  --color-accent-soft: rgb(242 154 107 / 0.24);
+  --color-accent-text: var(--garden-accent);
+
+  color-scheme: dark;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+  color: var(--color-text);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border-color);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  backdrop-filter: var(--glass-backdrop);
+}
