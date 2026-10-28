@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { type PointerEvent, useEffect, useRef } from "react";
 import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../canvas/navigation-controller";
 import { FilterPanel } from "../../filters/FilterPanel";
 import { defaultFilterState, type FilterState } from "../../filters/filter-state";
@@ -31,8 +31,16 @@ export interface NavbarProps {
   onTokensClick?: () => void;
 }
 
+/** Feeds the pointer position (as % of the navbar box) to the liquid-glass highlight in `Navbar.css`. */
+function trackGlassHighlight(event: PointerEvent<HTMLElement>) {
+  const navbar = event.currentTarget;
+  const rect = navbar.getBoundingClientRect();
+  navbar.style.setProperty("--glass-x", `${((event.clientX - rect.left) / rect.width) * 100}%`);
+  navbar.style.setProperty("--glass-y", `${((event.clientY - rect.top) / rect.height) * 100}%`);
+}
+
 /**
- * Solid cartoon-style top navbar: brand wordmark, search (⌘K/Ctrl+K focuses it,
+ * Liquid-glass top navbar: brand wordmark, search (⌘K/Ctrl+K focuses it,
  * drives `FilterState.q`), a Filters button that opens the filter panel
  * (category tree, tags, kinds, color — T10) and — for the owner only — a
  * sign-out link.
@@ -60,7 +68,11 @@ export function Navbar({
   }, [filtersDisclosure.isOpen, onFilterPanelOpenChange]);
 
   return (
-    <header className="navbar" {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}>
+    <header
+      className="navbar"
+      onPointerMove={trackGlassHighlight}
+      {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}
+    >
       <h1 className="navbar__brand">Inspiration Garden</h1>
       <SearchInput
         ref={searchRef}

@@ -35,6 +35,17 @@ describe("Navbar", () => {
     expect(screen.getByRole("banner")).toHaveAttribute(NAVIGATION_BLOCKER_ATTRIBUTE);
   });
 
+  it("tracks the pointer so the liquid-glass highlight follows it", () => {
+    render(<Navbar />);
+    const navbar = screen.getByRole("banner");
+    vi.spyOn(navbar, "getBoundingClientRect").mockReturnValue(new DOMRect(100, 20, 400, 80));
+
+    fireEvent.pointerMove(navbar, { clientX: 200, clientY: 40 });
+
+    expect(navbar.style.getPropertyValue("--glass-x")).toBe("25%");
+    expect(navbar.style.getPropertyValue("--glass-y")).toBe("25%");
+  });
+
   it("focuses the search input on Ctrl+K", () => {
     render(<Navbar />);
     const search = screen.getByLabelText("Search the garden");
