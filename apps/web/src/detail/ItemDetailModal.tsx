@@ -319,7 +319,7 @@ export function ItemDetailModal({
     >
       <div
         ref={dialogRef}
-        className="item-detail-dialog"
+        className="glass item-detail-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

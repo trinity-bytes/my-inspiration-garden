@@ -22,6 +22,7 @@
   --color-surface: var(--garden-lavender-50);
   --color-surface-raised: var(--garden-white);
   --color-border: var(--garden-lavender-200);
+  --color-border-strong: var(--garden-lavender-300); /* hovered fields, unchecked checkboxes */
 
   /* Semantic: text */
   --color-text: var(--garden-ink);

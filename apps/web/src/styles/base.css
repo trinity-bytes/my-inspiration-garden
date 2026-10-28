@@ -39,8 +39,8 @@ p {
   margin: 0;
 }
 
-button,
-input {
+/* Zero specificity so the control styles in styles/controls.css can override it. */
+:where(button, input) {
   font-family: inherit;
   color: inherit;
 }
