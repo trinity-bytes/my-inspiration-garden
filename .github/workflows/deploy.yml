@@ -1,0 +1,53 @@
+# Deploys every published GitHub release to production (the single
+# Cloudflare Worker that serves both the API and the web app).
+# Requires the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets.
+name: Deploy
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# Never run two production deploys at once; a newer release waits for the
+# running one instead of cancelling it mid-deploy.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://garden-api.trinity-bytes.workers.dev
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # Node and pnpm versions come from mise.toml, same as local development.
+      - uses: jdx/mise-action@v5
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # Migrations go first: the new Worker may already depend on the new schema.
+      - run: pnpm --filter @garden/api db:migrate:remote
+
+      # Builds the web app before `wrangler deploy`, which needs `apps/web/dist`.
+      - run: pnpm run deploy
+
+      - name: Health check
+        run: |
+          body=$(curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors \
+            https://garden-api.trinity-bytes.workers.dev/api/health)
+          echo "$body"
+          echo "$body" | jq -e '.ok == true'
