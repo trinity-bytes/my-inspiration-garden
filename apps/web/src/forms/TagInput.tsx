@@ -1,3 +1,4 @@
+import { Tag, X } from "lucide-react";
 import { useEffect, useId, useMemo, useState } from "react";
 import { getTags as getTagsDefault, type TagsResult } from "../api/endpoints";
 import "./TagInput.css";
@@ -132,17 +133,18 @@ export function TagInput({ id, tags, onChange, getTags = getTagsDefault }: TagIn
 
   return (
     <div className="tag-input">
+      <Tag className="tag-input__icon" size={16} aria-hidden="true" />
       <ul className="tag-input__chips">
         {tags.map((tag) => (
-          <li key={tag} className="tag-input__chip">
+          <li key={tag} className="chip chip--removable">
             <span className="tag-input__chip-label">{tag}</span>
             <button
               type="button"
-              className="tag-input__chip-remove"
+              className="chip__remove"
               aria-label={`Remove tag ${tag}`}
               onClick={() => removeTag(tag)}
             >
-              ×
+              <X size={12} aria-hidden="true" />
             </button>
           </li>
         ))}

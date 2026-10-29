@@ -2,6 +2,7 @@ import type { Category, Item, UpdateItemInput } from "@garden/shared";
 import { useRef, useState } from "react";
 import { updateItem as updateItemDefault } from "../api/endpoints";
 import { ApiError } from "../api/errors";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import "./FormModal.css";
 import { ItemForm } from "./ItemForm";
@@ -61,9 +62,7 @@ export function EditItemModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
-        <h2 id={titleId} className="form-modal__title">
-          Edit item
-        </h2>
+        <DialogHeader titleId={titleId} title="Edit item" onClose={onClose} />
         <ItemForm
           mode="edit"
           initialState={formStateFromItem(item)}

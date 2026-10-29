@@ -176,6 +176,32 @@ describe("ItemForm — link kind", () => {
 });
 
 describe("ItemForm — image kind", () => {
+  it("flags the image field itself when saving without an upload, and shows the picked file name", async () => {
+    const onSubmit = vi.fn();
+    const uploadImage = vi.fn(() => new Promise<never>(() => {}));
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("image")}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        uploadImage={uploadImage}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Upload an image before saving.");
+    expect(screen.getByText("Required for image items.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Image file")).toHaveAttribute("aria-invalid", "true");
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    const file = new File(["abc"], "photo.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Image file"), { target: { files: [file] } });
+    expect(screen.getByText("photo.png")).toBeInTheDocument();
+  });
+
   it("uploads a selected file via the injected uploadImage and enables submit once it resolves", async () => {
     const uploadImage = vi.fn().mockResolvedValue({
       r2Key: "media/2026/09/a.png",

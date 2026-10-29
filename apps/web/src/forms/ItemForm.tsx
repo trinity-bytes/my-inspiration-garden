@@ -1,4 +1,5 @@
 import type { Category, ItemKind } from "@garden/shared";
+import { Check, CircleAlert, Link, Plus, Sparkles, Upload, Video, X } from "lucide-react";
 import { useId, useState } from "react";
 import {
   type StoredMedia,
@@ -7,8 +8,11 @@ import {
   uploadMedia,
 } from "../api/endpoints";
 import { resolveMediaRef } from "../api/media-ref";
+import { Button } from "../components/Button/Button";
+import { IconButton } from "../components/IconButton/IconButton";
 import { CategoryTree } from "../filters/CategoryTree";
 import { buildCategoryTree } from "../filters/filter-state";
+import { KIND_ICONS } from "../items/kind-icons";
 import {
   buildCreateItemInput,
   buildUpdateItemInput,
@@ -65,6 +69,7 @@ export function ItemForm({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [unfurlStatus, setUnfurlStatus] = useState<"idle" | "loading" | "error">("idle");
   const [uploadStatus, setUploadStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [pickedFileName, setPickedFileName] = useState<string | null>(null);
   const formId = useId();
   const categoryTree = buildCategoryTree(categories);
 
@@ -181,11 +186,15 @@ export function ItemForm({
   }
 
   const error = validationError ?? submitError;
+  const KindIcon = KIND_ICONS[state.kind];
+  // The banner says what's wrong; the image field itself also carries it.
+  const imageMissing = state.kind === "image" && validationError !== null && !state.image.r2Key;
 
   return (
     <form className="item-form" onSubmit={handleSubmit}>
       {error && (
-        <p className="item-form__error" role="alert">
+        <p className="dialog-error" role="alert">
+          <CircleAlert size={16} aria-hidden="true" />
           {error}
         </p>
       )}
@@ -193,17 +202,21 @@ export function ItemForm({
       {mode === "create" && (
         <label className="item-form__field" htmlFor={`${formId}-kind`}>
           Kind
-          <select
-            id={`${formId}-kind`}
-            value={state.kind}
-            onChange={(event) => update({ kind: event.target.value as ItemKind })}
-          >
-            {KIND_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <span className="control-with-icon">
+            <KindIcon size={16} aria-hidden="true" />
+            <select
+              id={`${formId}-kind`}
+              value={state.kind}
+              onChange={(event) => update({ kind: event.target.value as ItemKind })}
+              data-autofocus
+            >
+              {KIND_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </span>
         </label>
       )}
 
@@ -214,6 +227,7 @@ export function ItemForm({
           type="text"
           value={state.title}
           onChange={(event) => update({ title: event.target.value })}
+          data-autofocus={mode === "edit" || undefined}
         />
       </label>
 
@@ -221,22 +235,29 @@ export function ItemForm({
         <label className="item-form__field" htmlFor={`${formId}-url`}>
           URL
           <div className="item-form__url-row">
-            <input
-              id={`${formId}-url`}
-              type="url"
-              value={state.url}
-              onChange={(event) => update({ url: event.target.value })}
-            />
-            <button
-              type="button"
+            <span className="control-with-icon">
+              <Link size={16} aria-hidden="true" />
+              <input
+                id={`${formId}-url`}
+                type="url"
+                value={state.url}
+                onChange={(event) => update({ url: event.target.value })}
+                placeholder="https://"
+              />
+            </span>
+            <Button
+              icon={Sparkles}
               onClick={handleFetchPreview}
               disabled={unfurlStatus === "loading" || state.url.trim().length === 0}
             >
               Fetch preview
-            </button>
+            </Button>
           </div>
           {unfurlStatus === "error" && (
-            <span className="item-form__hint">Could not fetch a preview.</span>
+            <span className="field__error">
+              <CircleAlert size={14} aria-hidden="true" />
+              Could not fetch a preview.
+            </span>
           )}
         </label>
       )}
@@ -282,16 +303,45 @@ export function ItemForm({
       )}
 
       {state.kind === "image" && (
-        <label className="item-form__field" htmlFor={`${formId}-image-file`}>
-          Image file
-          <input
-            id={`${formId}-image-file`}
-            type="file"
-            accept="image/*"
-            onChange={(event) => void handleImageFileChange(event.target.files?.[0])}
-          />
+        <div className="item-form__field">
+          <label htmlFor={`${formId}-image-file`}>Image file</label>
+          {/* A second label: clicking anywhere on the picker opens the file dialog. */}
+          <label
+            className="file-picker"
+            htmlFor={`${formId}-image-file`}
+            data-invalid={imageMissing || undefined}
+          >
+            <input
+              id={`${formId}-image-file`}
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              aria-invalid={imageMissing || undefined}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                setPickedFileName(file?.name ?? null);
+                void handleImageFileChange(file);
+              }}
+            />
+            <span className="button button--secondary button--sm" aria-hidden="true">
+              <Upload size={16} />
+              Upload image
+            </span>
+            <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
+          </label>
+          {imageMissing && (
+            <span className="field__error">
+              <CircleAlert size={14} aria-hidden="true" />
+              Required for image items.
+            </span>
+          )}
           {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
-          {uploadStatus === "error" && <span className="item-form__hint">Upload failed.</span>}
+          {uploadStatus === "error" && (
+            <span className="field__error">
+              <CircleAlert size={14} aria-hidden="true" />
+              Upload failed.
+            </span>
+          )}
           {state.image.r2Key && (
             <img
               className="item-form__preview"
@@ -299,7 +349,7 @@ export function ItemForm({
               alt="Uploaded"
             />
           )}
-        </label>
+        </div>
       )}
 
       {state.kind === "video" && (
@@ -308,19 +358,23 @@ export function ItemForm({
             <label className="item-form__field" htmlFor={`${formId}-video-url`}>
               Video URL
               <div className="item-form__url-row">
-                <input
-                  id={`${formId}-video-url`}
-                  type="url"
-                  value={state.url}
-                  onChange={(event) => update({ url: event.target.value })}
-                />
-                <button
-                  type="button"
+                <span className="control-with-icon">
+                  <Video size={16} aria-hidden="true" />
+                  <input
+                    id={`${formId}-video-url`}
+                    type="url"
+                    value={state.url}
+                    onChange={(event) => update({ url: event.target.value })}
+                    placeholder="https://"
+                  />
+                </span>
+                <Button
+                  icon={Sparkles}
                   onClick={handleFetchVideoPreview}
                   disabled={unfurlStatus === "loading" || state.url.trim().length === 0}
                 >
                   Detect video
-                </button>
+                </Button>
               </div>
               {unfurlStatus === "loading" && <span className="item-form__hint">Detecting…</span>}
               {unfurlStatus === "error" && (
@@ -358,17 +412,30 @@ export function ItemForm({
             </label>
           )}
           {state.video.provider === "file" && (
-            <label className="item-form__field" htmlFor={`${formId}-video-file`}>
-              Video file
-              <input
-                id={`${formId}-video-file`}
-                type="file"
-                accept="video/*"
-                onChange={(event) => void handleVideoFileChange(event.target.files?.[0])}
-              />
+            <div className="item-form__field">
+              <label htmlFor={`${formId}-video-file`}>Video file</label>
+              {/* A second label: clicking anywhere on the picker opens the file dialog. */}
+              <label className="file-picker" htmlFor={`${formId}-video-file`}>
+                <input
+                  id={`${formId}-video-file`}
+                  className="visually-hidden"
+                  type="file"
+                  accept="video/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setPickedFileName(file?.name ?? null);
+                    void handleVideoFileChange(file);
+                  }}
+                />
+                <span className="button button--secondary button--sm" aria-hidden="true">
+                  <Upload size={16} />
+                  Upload video
+                </span>
+                <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
+              </label>
               {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
               {uploadStatus === "error" && <span className="item-form__hint">Upload failed.</span>}
-            </label>
+            </div>
           )}
           <label className="item-form__field" htmlFor={`${formId}-video-thumbnail`}>
             Thumbnail URL
@@ -422,14 +489,17 @@ export function ItemForm({
                   }}
                 />
               </label>
-              <button type="button" onClick={() => removePaletteColor(index)}>
-                Remove color
-              </button>
+              <IconButton
+                icon={X}
+                label="Remove color"
+                tooltipAlign="end"
+                onClick={() => removePaletteColor(index)}
+              />
             </div>
           ))}
-          <button type="button" onClick={addPaletteColor}>
+          <Button size="sm" icon={Plus} onClick={addPaletteColor}>
             Add color
-          </button>
+          </Button>
           {state.palette.colors.length > 0 && (
             <p className="item-form__hint item-form__palette-total">
               {`Total: ${state.palette.colors.reduce((sum, c) => sum + (c.weight ?? 0), 0)}%`}
@@ -538,12 +608,17 @@ export function ItemForm({
       )}
 
       <div className="item-form__actions">
-        <button type="button" onClick={onCancel} disabled={submitting}>
+        <Button onClick={onCancel} disabled={submitting}>
           Cancel
-        </button>
-        <button type="submit" disabled={submitting}>
+        </Button>
+        <Button
+          type="submit"
+          variant="accent"
+          icon={mode === "create" ? Plus : Check}
+          disabled={submitting}
+        >
           {mode === "create" ? "Add item" : "Save changes"}
-        </button>
+        </Button>
       </div>
     </form>
   );

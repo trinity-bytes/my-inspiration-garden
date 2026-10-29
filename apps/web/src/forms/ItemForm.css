@@ -5,19 +5,11 @@
   color: var(--color-text);
 }
 
-.item-form__error {
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--color-accent-soft);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-}
-
+/* Field v2 layout (styles/field.css) on the existing wrapping labels. */
 .item-form__field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 6px;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-label);
 }
@@ -25,14 +17,25 @@
 .item-form__field input,
 .item-form__field select,
 .item-form__field textarea {
-  font: inherit;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background-color: var(
-    --color-surface-raised
-  ); /* not the shorthand: keeps the select chevron (styles/controls.css) */
-  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-body);
+}
+
+/* Fieldsets (Categories, palette Colors) read as fields, not framed boxes. */
+fieldset.item-form__field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+fieldset.item-form__field > .filter-panel__category-tree {
+  padding-left: 0;
+}
+
+fieldset.item-form__field > legend {
+  margin-bottom: 6px;
+  padding: 0;
 }
 
 .item-form__field textarea {
@@ -40,21 +43,47 @@
   resize: vertical;
 }
 
-.item-form__field input:focus-visible,
-.item-form__field select:focus-visible,
-.item-form__field textarea:focus-visible,
-.item-form button:focus-visible {
-  outline: var(--focus-ring-width) solid var(--color-focus-ring);
-  outline-offset: var(--focus-ring-offset);
-}
-
 .item-form__url-row {
   display: flex;
   gap: var(--space-2);
 }
 
-.item-form__url-row input {
+.item-form__url-row > .control-with-icon {
   flex: 1;
+  min-width: 0;
+}
+
+/* Styled file picker (Figma "Add item · Image"): the native input stays
+   focusable but hidden; an Upload button and the file name stand in for it. */
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.file-picker:hover .button {
+  background-color: var(--color-accent-soft);
+}
+
+.file-picker:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.file-picker[data-invalid] {
+  border-color: var(--color-danger);
+}
+
+.file-picker__name {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-form__hint {
@@ -70,12 +99,6 @@
   object-fit: cover;
 }
 
-.item-form__palette {
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
 .item-form__palette legend {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-heading);
@@ -86,8 +109,9 @@
 }
 
 .item-form__palette-row {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 0.9fr) auto;
+  align-items: end;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
 }
@@ -96,29 +120,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
   font-size: var(--font-size-xs);
+}
+
+.item-form__palette-row input {
+  width: 100%;
+  min-width: 0;
+}
+
+.item-form__palette > .button {
+  align-self: flex-start;
 }
 
 .item-form__actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin-top: var(--space-2);
-}
-
-.item-form__actions button,
-.item-form button[type="button"] {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-weight: var(--font-weight-label);
-  cursor: pointer;
-}
-
-.item-form__actions button[type="submit"] {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-  border-color: transparent;
 }

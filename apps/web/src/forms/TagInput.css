@@ -2,47 +2,50 @@
   position: relative;
 }
 
+/* Tags field (Figma "Add item"): tag icon, removable chips, then the input. */
+.tag-input__icon {
+  position: absolute;
+  top: 15px;
+  left: var(--space-3);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
 .tag-input__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 6px;
   align-items: center;
+  min-height: 46px;
   margin: 0;
-  padding: var(--space-2);
+  padding: 6px var(--space-2) 6px calc(var(--space-3) + 22px);
   list-style: none;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-raised);
+  transition: border-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-.tag-input__chip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
+.tag-input__chips:hover {
+  border-color: var(--color-border-strong);
 }
 
-.tag-input__chip-remove {
-  border: none;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 0 0 2px;
+.tag-input__chips:focus-within {
+  border-color: var(--color-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--color-focus-ring);
 }
 
 .tag-input__field {
   flex: 1 1 120px;
 }
 
-.tag-input__field input {
+.tag-input__field input,
+.tag-input__field input:focus-visible {
   width: 100%;
+  padding: 0;
   border: none;
   outline: none;
+  box-shadow: none;
   background: transparent;
   color: var(--color-text);
   font: inherit;
@@ -62,7 +65,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-popover);
-  box-shadow: var(--surface-shadow-sm);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
 }
 
 .tag-input__suggestion {

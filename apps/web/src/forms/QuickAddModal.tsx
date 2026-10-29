@@ -2,6 +2,7 @@ import type { Category } from "@garden/shared";
 import { useRef, useState } from "react";
 import { createItem as createItemDefault } from "../api/endpoints";
 import { ApiError } from "../api/errors";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import { ItemForm } from "./ItemForm";
 import "./FormModal.css";
@@ -59,9 +60,7 @@ export function QuickAddModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
-        <h2 id={titleId} className="form-modal__title">
-          Add item
-        </h2>
+        <DialogHeader titleId={titleId} title="Add item" onClose={onClose} />
         <ItemForm
           mode="create"
           initialState={createEmptyFormState("text")}
