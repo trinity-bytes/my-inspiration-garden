@@ -1,12 +1,28 @@
 import type { Category, CreateCategoryInput, UpdateCategoryInput } from "@garden/shared";
-import { type FormEvent, useId, useRef, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  CircleAlert,
+  Folder,
+  FolderInput,
+  FolderTree,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import {
   createCategory as createCategoryDefault,
   deleteCategory as deleteCategoryDefault,
   updateCategory as updateCategoryDefault,
 } from "../api/endpoints";
+import { Button } from "../components/Button/Button";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
+import { IconButton } from "../components/IconButton/IconButton";
 import { buildCategoryTree, type CategoryTreeNode } from "../filters/filter-state";
 import { invalidateCategories } from "./categories-store";
 import "../forms/FormModal.css";
@@ -99,17 +115,23 @@ export function CategoryManagerModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={deletingId === null ? handleTabKey : undefined}
       >
-        <h2 id={titleId} className="form-modal__title">
-          Categories
-        </h2>
+        <DialogHeader titleId={titleId} title="Categories" onClose={onClose} />
 
         {error && (
-          <p className="item-form__error" role="alert">
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
             {error}
           </p>
         )}
 
-        {tree.length === 0 && <p>No categories yet.</p>}
+        {tree.length === 0 && (
+          <div className="dialog-empty">
+            <span className="dialog-empty__icon">
+              <FolderTree size={20} aria-hidden="true" />
+            </span>
+            <p>No categories yet.</p>
+          </div>
+        )}
         {tree.length > 0 && (
           <ul className="category-manager__tree">
             {tree.map((node) => (
@@ -127,21 +149,24 @@ export function CategoryManagerModal({
         )}
 
         <form className="category-manager__new-root" onSubmit={handleCreateTopLevel}>
-          <label htmlFor={newTopLevelInputId}>New top-level category</label>
-          <input
-            id={newTopLevelInputId}
-            value={newTopLevelName}
-            onChange={(event) => setNewTopLevelName(event.target.value)}
-            placeholder="Category name"
-          />
-          <button type="submit">Add top-level category</button>
+          <div className="field category-manager__grow">
+            <label className="field__label" htmlFor={newTopLevelInputId}>
+              New top-level category
+            </label>
+            <span className="control-with-icon">
+              <Folder size={16} aria-hidden="true" />
+              <input
+                id={newTopLevelInputId}
+                value={newTopLevelName}
+                onChange={(event) => setNewTopLevelName(event.target.value)}
+                placeholder="Category name"
+              />
+            </span>
+          </div>
+          <Button type="submit" icon={Plus} aria-label="Add top-level category">
+            Add category
+          </Button>
         </form>
-
-        <div className="item-form__actions">
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
 
       {deletingCategory && (
@@ -186,6 +211,13 @@ function CategoryManagerNode({
   const [renameValue, setRenameValue] = useState(category.name);
   const [isAddingChild, setIsAddingChild] = useState(false);
   const [childName, setChildName] = useState("");
+  const [isExpanded, setIsExpanded] = useState(true);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // The rename field replaces the focused Rename button, so focus moves into it.
+  useEffect(() => {
+    if (isRenaming) renameInputRef.current?.focus();
+  }, [isRenaming]);
 
   const excludedIds = selfAndDescendantIds(node);
   const moveTargets = categories.filter((candidate) => !excludedIds.has(candidate.id));
@@ -221,87 +253,135 @@ function CategoryManagerNode({
     void runMutation(() => updateCategory(category.id, { parentId }));
   }
 
+  const hasChildren = children.length > 0;
+
   return (
     <li className="category-manager__node">
       <div className="category-manager__row">
+        {hasChildren ? (
+          <button
+            type="button"
+            className="category-manager__toggle"
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${category.name}`}
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            {isExpanded ? (
+              <ChevronDown size={16} aria-hidden="true" />
+            ) : (
+              <ChevronRight size={16} aria-hidden="true" />
+            )}
+          </button>
+        ) : (
+          <span className="category-manager__toggle" aria-hidden="true" />
+        )}
+        <Folder className="category-manager__folder" size={16} aria-hidden="true" />
         {isRenaming ? (
-          <form className="category-manager__rename-form" onSubmit={handleRenameSubmit}>
-            <label htmlFor={renameInputId}>Rename {category.name}</label>
+          <form className="category-manager__inline-form" onSubmit={handleRenameSubmit}>
+            <label className="visually-hidden" htmlFor={renameInputId}>
+              Rename {category.name}
+            </label>
             <input
               id={renameInputId}
+              className="category-manager__grow"
               value={renameValue}
               onChange={(event) => setRenameValue(event.target.value)}
+              ref={renameInputRef}
             />
-            <button type="submit">Save</button>
-            <button
-              type="button"
+            <Button type="submit" variant="accent" size="sm" icon={Check}>
+              Save
+            </Button>
+            <IconButton
+              icon={X}
+              label="Cancel"
+              tooltipAlign="end"
               onClick={() => {
                 setIsRenaming(false);
                 setRenameValue(category.name);
               }}
-            >
-              Cancel
-            </button>
+            />
           </form>
         ) : (
           <>
             <span className="category-manager__name">{category.name}</span>
-            <button
-              type="button"
-              aria-label={`Rename ${category.name}`}
-              onClick={() => setIsRenaming(true)}
-            >
-              Rename
-            </button>
-            <button
-              type="button"
-              aria-label={`Add child of ${category.name}`}
-              onClick={() => setIsAddingChild((current) => !current)}
-            >
-              Add child
-            </button>
-            <label className="category-manager__move">
-              Move to
-              <select
-                aria-label={`Move ${category.name}`}
-                value={category.parentId ?? ""}
-                onChange={handleMove}
-              >
-                <option value="">Top level</option>
-                {moveTargets.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              aria-label={`Delete ${category.name}`}
-              onClick={() => onDeleteRequest(category.id)}
-            >
-              Delete
-            </button>
+            <span className="category-manager__actions">
+              <IconButton
+                icon={Pencil}
+                label={`Rename ${category.name}`}
+                onClick={() => setIsRenaming(true)}
+              />
+              <IconButton
+                icon={Plus}
+                label={`Add child of ${category.name}`}
+                onClick={() => {
+                  setIsAddingChild((current) => !current);
+                  setIsExpanded(true);
+                }}
+              />
+              {/* A native select dressed as an icon button: keeps the platform
+                  picker (and its keyboard/touch behavior) for "Move to…". */}
+              <span className="has-tooltip category-manager__move">
+                <span className="icon-button icon-button--neutral" aria-hidden="true">
+                  <FolderInput size={20} />
+                </span>
+                <select
+                  aria-label={`Move ${category.name}`}
+                  value={category.parentId ?? ""}
+                  onChange={handleMove}
+                >
+                  <option value="">Top level</option>
+                  {moveTargets.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="tooltip" aria-hidden="true">
+                  Move to…
+                </span>
+              </span>
+              <IconButton
+                icon={Trash2}
+                label={`Delete ${category.name}`}
+                tone="danger"
+                tooltipAlign="end"
+                onClick={() => onDeleteRequest(category.id)}
+              />
+            </span>
           </>
         )}
       </div>
 
       {isAddingChild && (
-        <form className="category-manager__add-child-form" onSubmit={handleAddChildSubmit}>
-          <label htmlFor={addChildInputId}>New subcategory of {category.name}</label>
-          <input
-            id={addChildInputId}
-            value={childName}
-            onChange={(event) => setChildName(event.target.value)}
+        <form
+          className="category-manager__inline-form category-manager__add-child-form"
+          onSubmit={handleAddChildSubmit}
+        >
+          <label className="visually-hidden" htmlFor={addChildInputId}>
+            New subcategory of {category.name}
+          </label>
+          <span className="control-with-icon category-manager__grow">
+            <Plus size={16} aria-hidden="true" />
+            <input
+              id={addChildInputId}
+              value={childName}
+              onChange={(event) => setChildName(event.target.value)}
+              placeholder={`New subcategory of ${category.name}`}
+            />
+          </span>
+          <Button type="submit" variant="accent" size="sm" icon={Plus}>
+            Add
+          </Button>
+          <IconButton
+            icon={X}
+            label="Cancel"
+            tooltipAlign="end"
+            onClick={() => setIsAddingChild(false)}
           />
-          <button type="submit">Add</button>
-          <button type="button" onClick={() => setIsAddingChild(false)}>
-            Cancel
-          </button>
         </form>
       )}
 
-      {children.length > 0 && (
+      {hasChildren && isExpanded && (
         <ul className="category-manager__tree">
           {children.map((child) => (
             <CategoryManagerNode

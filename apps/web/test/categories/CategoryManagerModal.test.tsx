@@ -34,6 +34,36 @@ describe("CategoryManagerModal (T11b B6)", () => {
     expect(screen.getByText("Other", { selector: ".category-manager__name" })).toBeInTheDocument();
   });
 
+  it("collapses and expands a parent with its chevron; leaves have no chevron", () => {
+    render(
+      <CategoryManagerModal
+        categories={baseCategories()}
+        onClose={vi.fn()}
+        createCategory={vi.fn()}
+        updateCategory={vi.fn()}
+        deleteCategory={vi.fn()}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", { name: "Collapse Root" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.queryByRole("button", { name: /(Collapse|Expand) Child/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(
+      screen.queryByText("Child", { selector: ".category-manager__name" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Expand Root" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand Root" }));
+    expect(screen.getByText("Child", { selector: ".category-manager__name" })).toBeInTheDocument();
+  });
+
   it("renames a category via the inline rename form", async () => {
     const updateCategory = vi.fn().mockResolvedValue(baseCategories()[0]);
     render(
