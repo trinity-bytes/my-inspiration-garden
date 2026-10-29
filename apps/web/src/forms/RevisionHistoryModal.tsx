@@ -1,13 +1,15 @@
 import type { Item } from "@garden/shared";
+import { CircleAlert, History, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   type ItemRevision,
   listItemRevisions as listItemRevisionsDefault,
   restoreItemRevision as restoreItemRevisionDefault,
 } from "../api/endpoints";
+import { Button } from "../components/Button/Button";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import "./FormModal.css";
-import "./RevisionHistoryModal.css";
 
 export interface RevisionHistoryModalProps {
   item: Item;
@@ -20,7 +22,7 @@ export interface RevisionHistoryModalProps {
 
 function formatTimestamp(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   } catch {
     return iso;
   }
@@ -84,48 +86,55 @@ export function RevisionHistoryModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
-        <h2 id={titleId} className="form-modal__title">
-          Revision history
-        </h2>
+        <DialogHeader titleId={titleId} title="Revision history" onClose={onClose} />
 
         {error && (
-          <p className="item-form__error" role="alert">
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
             {error}
           </p>
         )}
 
-        {status === "loading" && <p>Loading revisions…</p>}
-        {status === "error" && <p role="alert">Could not load revision history.</p>}
-        {status === "ready" && revisions.length === 0 && <p>No revisions yet.</p>}
+        {status === "loading" && <p className="dialog-empty__hint">Loading revisions…</p>}
+        {status === "error" && (
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
+            Could not load revision history.
+          </p>
+        )}
+        {status === "ready" && revisions.length === 0 && (
+          <div className="dialog-empty">
+            <span className="dialog-empty__icon">
+              <History size={20} aria-hidden="true" />
+            </span>
+            <p>No revisions yet.</p>
+          </div>
+        )}
         {status === "ready" && revisions.length > 0 && (
-          <ul className="revision-history__list">
+          <ul className="dialog-list">
             {revisions.map((revision) => (
-              <li key={revision.id} className="revision-history__item">
-                <div className="revision-history__meta">
-                  <span className="revision-history__title">
+              <li key={revision.id} className="dialog-row">
+                <History size={20} aria-hidden="true" />
+                <span className="dialog-row__meta">
+                  <span className="dialog-row__title">
                     {revision.snapshot.title?.trim() || revision.snapshot.kind}
                   </span>
-                  <span className="revision-history__timestamp">
+                  <span className="dialog-row__sub">
                     {formatTimestamp(revision.createdAt)} — {revision.actor}
                   </span>
-                </div>
-                <button
-                  type="button"
+                </span>
+                <Button
+                  size="sm"
+                  icon={RotateCcw}
                   onClick={() => handleRestore(revision.id)}
                   disabled={restoringId !== null}
                 >
                   Restore
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
         )}
-
-        <div className="item-form__actions">
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );

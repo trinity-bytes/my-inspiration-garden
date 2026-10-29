@@ -1,4 +1,6 @@
+import { type LucideIcon, Trash2 } from "lucide-react";
 import { useRef } from "react";
+import { Button } from "../Button/Button";
 import { useDialogFocusTrap } from "./useDialogFocusTrap";
 import "../../forms/FormModal.css";
 import "./ConfirmDialog.css";
@@ -10,12 +12,16 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Styles the confirm button as a destructive action (e.g. move to trash). */
   destructive?: boolean;
+  /** Icon shown in the danger tile and on the confirm button of a destructive dialog. */
+  icon?: LucideIcon;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 /**
- * Small reusable confirmation dialog (T11b B2), used before an owner-only
+ * Small reusable confirmation dialog (T11b B2; Modals v2 "Confirm ·
+ * destructive", Figma `33:1185`: a danger icon tile shows the risk before
+ * the text is read), used before an owner-only
  * destructive action such as "Move to trash". Reuses the shared modal
  * pattern (`form-modal-backdrop`/`form-modal-dialog` + `useDialogFocusTrap`)
  * so it gets the same Escape-to-cancel, Tab trap, and focus-return behavior
@@ -29,6 +35,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive = false,
+  icon: Icon = Trash2,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -49,25 +56,24 @@ export function ConfirmDialog({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
+        {destructive && (
+          <span className="confirm-dialog__icon">
+            <Icon size={20} aria-hidden="true" />
+          </span>
+        )}
         <h2 id={titleId} className="form-modal__title">
           {title}
         </h2>
         <p className="confirm-dialog__message">{message}</p>
-        <div className="item-form__actions">
-          <button type="button" onClick={onCancel}>
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className={
-              destructive
-                ? "confirm-dialog__confirm confirm-dialog__confirm--destructive"
-                : "confirm-dialog__confirm"
-            }
+        <div className="confirm-dialog__actions">
+          <Button onClick={onCancel}>{cancelLabel}</Button>
+          <Button
+            variant={destructive ? "danger" : "accent"}
+            icon={destructive ? Icon : undefined}
             onClick={onConfirm}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

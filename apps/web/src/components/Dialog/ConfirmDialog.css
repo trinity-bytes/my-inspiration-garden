@@ -2,17 +2,29 @@
   width: min(420px, 100%);
 }
 
+/* Danger icon tile: danger at 16% so the red icon keeps its contrast. */
+.confirm-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: color-mix(in srgb, var(--color-danger) 16%, transparent);
+  color: var(--color-danger-text);
+}
+
+.confirm-dialog .form-modal__title {
+  margin-bottom: var(--space-3);
+}
+
 .confirm-dialog__message {
   margin: 0 0 var(--space-4);
   color: var(--color-text-muted);
 }
 
-.confirm-dialog__confirm--destructive {
-  background: var(--color-danger);
-  border-color: var(--color-danger-strong);
-  color: var(--garden-white);
-}
-
-.confirm-dialog__confirm--destructive:hover {
-  background: var(--color-danger-strong);
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

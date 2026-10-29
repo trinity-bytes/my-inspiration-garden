@@ -1,9 +1,12 @@
 import type { Item } from "@garden/shared";
+import { CircleAlert, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { listItems as listItemsDefault, restoreItem as restoreItemDefault } from "../api/endpoints";
+import { Button } from "../components/Button/Button";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
+import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
 import "../forms/FormModal.css";
-import "./TrashModal.css";
 
 export interface TrashModalProps {
   onClose: () => void;
@@ -71,41 +74,59 @@ export function TrashModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
-        <h2 id={titleId} className="form-modal__title">
-          Trash
-        </h2>
+        <DialogHeader titleId={titleId} title="Trash" onClose={onClose} />
 
         {error && (
-          <p className="item-form__error" role="alert">
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
             {error}
           </p>
         )}
 
-        {status === "loading" && <p>Loading trash…</p>}
-        {status === "error" && <p role="alert">Could not load trash.</p>}
-        {status === "ready" && items.length === 0 && <p>The trash is empty.</p>}
+        {status === "loading" && <p className="dialog-empty__hint">Loading trash…</p>}
+        {status === "error" && (
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
+            Could not load trash.
+          </p>
+        )}
+        {status === "ready" && items.length === 0 && (
+          <div className="dialog-empty">
+            <span className="dialog-empty__icon">
+              <Trash2 size={20} aria-hidden="true" />
+            </span>
+            <p>The trash is empty.</p>
+            <p className="dialog-empty__hint">Items you move to the trash show up here.</p>
+          </div>
+        )}
         {status === "ready" && items.length > 0 && (
-          <ul className="trash__list">
-            {items.map((item) => (
-              <li key={item.id} className="trash__item">
-                <span className="trash__title">{item.title?.trim() || item.kind}</span>
-                <button
-                  type="button"
-                  onClick={() => handleRestore(item.id)}
-                  disabled={restoringId !== null}
-                >
-                  Restore
-                </button>
-              </li>
-            ))}
+          <ul className="dialog-list">
+            {items.map((item) => {
+              const KindIcon = KIND_ICONS[item.kind];
+              return (
+                <li key={item.id} className="dialog-row">
+                  <span className="dialog-row__tile">
+                    <KindIcon size={16} aria-hidden="true" />
+                  </span>
+                  <span className="dialog-row__meta">
+                    <span className="dialog-row__title">
+                      {item.title?.trim() || KIND_LABELS[item.kind]}
+                    </span>
+                    <span className="dialog-row__sub">{KIND_LABELS[item.kind]}</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    icon={RotateCcw}
+                    onClick={() => handleRestore(item.id)}
+                    disabled={restoringId !== null}
+                  >
+                    Restore
+                  </Button>
+                </li>
+              );
+            })}
           </ul>
         )}
-
-        <div className="item-form__actions">
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -105,9 +105,24 @@ describe("ConfirmDialog", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Confirm" })).toHaveClass(
-      "confirm-dialog__confirm--destructive",
+    const confirm = screen.getByRole("button", { name: "Confirm" });
+    expect(confirm).toHaveClass("button--danger");
+    expect(confirm.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(document.querySelector(".confirm-dialog__icon svg")).not.toBeNull();
+  });
+
+  it("uses the accent button and no danger icon when not destructive", () => {
+    render(
+      <ConfirmDialog
+        title="Are you sure?"
+        message="Confirm this."
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
     );
+
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveClass("button--accent");
+    expect(document.querySelector(".confirm-dialog__icon")).toBeNull();
   });
 
   it("starts focus on the Cancel button", () => {

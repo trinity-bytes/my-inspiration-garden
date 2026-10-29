@@ -10,8 +10,8 @@ export interface UseDialogFocusTrapResult {
 }
 
 /**
- * Shared dialog accessibility behavior (T11): focuses the first focusable
- * element on mount, restores focus to whatever was focused before on
+ * Shared dialog accessibility behavior (T11): focuses the element marked
+ * `data-autofocus` (else the first focusable element) on mount, restores focus to whatever was focused before on
  * unmount, closes on Escape, and traps Tab/Shift+Tab within the dialog.
  * Extracted from `ItemDetailModal` (T9) so the T11 quick-add/edit/history/
  * trash dialogs don't each re-implement it; `ItemDetailModal` itself is left
@@ -28,7 +28,10 @@ export function useDialogFocusTrap(
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
     const focusTarget =
-      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? dialog ?? undefined;
+      dialog?.querySelector<HTMLElement>("[data-autofocus]") ??
+      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
+      dialog ??
+      undefined;
     focusTarget?.focus();
 
     return () => {
