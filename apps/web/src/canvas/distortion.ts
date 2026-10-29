@@ -9,6 +9,18 @@ import type { Vec2 } from "./types";
  */
 export const DEFAULT_BARREL_K = 0.045;
 
+/**
+ * Per-axis factor from plain NDC to lens space, whose unit is half the
+ * viewport's SHORTER side (owner feedback, 2026-10-29: on portrait phones
+ * the lens, measured in heights, barely reached the side edges). Landscape
+ * keeps the height as the unit, so desktop is unchanged; portrait now
+ * bends its side edges like a desktop's top edge.
+ */
+export function lensScale(viewport: { width: number; height: number }): Vec2 {
+  const aspect = viewport.width / Math.max(viewport.height, 1);
+  return { x: Math.max(aspect, 1), y: Math.max(1 / aspect, 1) };
+}
+
 /** Forward barrel distortion in normalized device-ish space (centered at 0). */
 export function barrelForward(p: Vec2, k: number): Vec2 {
   const r2 = p.x * p.x + p.y * p.y;

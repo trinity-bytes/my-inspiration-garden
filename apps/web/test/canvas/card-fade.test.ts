@@ -8,6 +8,7 @@ import {
   entryScaledWorldRect,
   entryScaleForCard,
   MIN_ENTRY_SCALE,
+  PHONE_ENTRY_BAND_PX,
 } from "../../src/canvas/card-fade";
 
 describe("cardScreenRect", () => {
@@ -67,7 +68,7 @@ describe("cardEntryProgress", () => {
 });
 
 describe("cardEntryProgress default inset per axis (narrow phone axis)", () => {
-  // Phone portrait: two 189px columns + a 12px gutter fill the 390px width exactly.
+  // Phone portrait: 189px cards on a 390px-wide screen.
   const phoneWidth = 390;
   const phoneHeight = 844;
   const card = (x: number, y: number) =>
@@ -77,18 +78,19 @@ describe("cardEntryProgress default inset per axis (narrow phone axis)", () => {
     expect(cardEntryProgress(card(195 - 94.5, 0), phoneWidth, phoneHeight)).toBe(1);
   });
 
-  it("still ramps while the card pokes past the edge of a narrow axis", () => {
-    expect(cardEntryProgress(card(195, 0), phoneWidth, phoneHeight)).toBeCloseTo(0.5, 5);
+  it("ramps only across the last PHONE_ENTRY_BAND_PX of a card poking past a narrow axis", () => {
+    expect(cardEntryProgress(card(195, 0), phoneWidth, phoneHeight)).toBe(1);
+    expect(cardEntryProgress(card(195 + 94.5 - 20, 0), phoneWidth, phoneHeight)).toBeCloseTo(
+      0.5,
+      5,
+    );
     expect(cardEntryProgress(card(195 + 94.5, 0), phoneWidth, phoneHeight)).toBe(0);
   });
 
-  it("keeps the default inset on a wider axis", () => {
+  it("caps the taller phone axis to the same band, and keeps the default inset on desktop", () => {
     const inset = DEFAULT_FADE_INSET_PX;
     const flushVertically = card(0, 422 - 94.5);
-    expect(cardEntryProgress(flushVertically, phoneWidth, phoneHeight)).toBeCloseTo(
-      189 / (189 + inset),
-      5,
-    );
+    expect(cardEntryProgress(flushVertically, phoneWidth, phoneHeight)).toBe(1);
     const desktopFlush = cardScreenRect(
       { x: 450, y: 0, width: 100, height: 100 },
       { x: 0, y: 0 },
@@ -252,5 +254,47 @@ describe("cardEntryProgress with a degenerate zero-size rect (guard against NaN/
     const progress = cardEntryProgress(rect, viewportWidth, viewportHeight, 0);
     expect(Number.isNaN(progress)).toBe(false);
     expect(Number.isFinite(progress)).toBe(true);
+  });
+});
+
+describe("card entry on phones (short fade, no grow/shrink)", () => {
+  const phone = { width: 390, height: 844 };
+  // A tall card in a phone layout with `visible` px of it showing below the top edge.
+  const tallCardAt = (visible: number) => ({
+    x: 0,
+    y: -phone.height / 2 + visible - 150,
+    width: 180,
+    height: 300,
+  });
+  const tallCardShowing = (visible: number) =>
+    cardScreenRect(tallCardAt(visible), { x: 0, y: 0 }, 1);
+
+  it("is fully opaque once PHONE_ENTRY_BAND_PX of the card is visible", () => {
+    expect(PHONE_ENTRY_BAND_PX).toBe(40);
+    expect(cardEntryProgress(tallCardShowing(40), phone.width, phone.height)).toBe(1);
+  });
+
+  it("ramps linearly across that band and is 0 while the card is entirely outside", () => {
+    expect(cardEntryProgress(tallCardShowing(20), phone.width, phone.height)).toBeCloseTo(0.5, 10);
+    expect(cardEntryProgress(tallCardShowing(0), phone.width, phone.height)).toBe(0);
+  });
+
+  it("never shrinks a card at the edge, so it is cut by the screen edge instead", () => {
+    for (const visible of [0, 10, 20, 40]) {
+      expect(entryScaleForCard(tallCardAt(visible), { x: 0, y: 0 }, phone, false)).toBe(1);
+      expect(entryScaledWorldRect(tallCardAt(visible), { x: 0, y: 0 }, phone, false)).toEqual(
+        tallCardAt(visible),
+      );
+    }
+  });
+
+  it("keeps the desktop ramp (card extent + fade inset) unchanged", () => {
+    const desktop = { width: 1440, height: 900 };
+    const rect = cardScreenRect(
+      { x: 0, y: -desktop.height / 2 + 120 - 150, width: 180, height: 300 },
+      { x: 0, y: 0 },
+      1,
+    );
+    expect(cardEntryProgress(rect, desktop.width, desktop.height)).toBeCloseTo(120 / 380, 10);
   });
 });

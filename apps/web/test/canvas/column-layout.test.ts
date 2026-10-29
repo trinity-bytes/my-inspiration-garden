@@ -5,6 +5,7 @@ import {
   MAX_COLUMN_WIDTH_PX,
   MIN_COLUMN_WIDTH_PX,
   MOBILE_COLUMN_GUTTER_PX,
+  PHONE_VISIBLE_COLUMNS,
 } from "../../src/canvas/column-layout";
 
 describe("COLUMN_GUTTER_PX", () => {
@@ -34,12 +35,16 @@ describe("columnLayoutFor gutter", () => {
     }
   });
 
-  it("tiles 2 columns exactly across a 390px phone with the mobile gutter", () => {
+  it("fits 2 full columns plus a peek of the next one on a 390px phone", () => {
     const layout = columnLayoutFor(390);
+    expect(layout.columns).toBe(PHONE_VISIBLE_COLUMNS);
     expect(layout.columns * layout.columnWidth + (layout.columns - 1) * layout.gutter).toBeCloseTo(
       390,
       6,
     );
+    const visibleColumns = 390 / layout.columnStride;
+    expect(visibleColumns).toBeGreaterThan(2.2);
+    expect(visibleColumns).toBeLessThan(2.5);
   });
 });
 

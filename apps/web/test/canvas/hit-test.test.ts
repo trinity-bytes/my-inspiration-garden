@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_BARREL_K } from "../../src/canvas/distortion";
+import { DEFAULT_BARREL_K, lensScale } from "../../src/canvas/distortion";
 import { hitTestCard, pointerToWorld, worldToPointer } from "../../src/canvas/hit-test";
 
 const viewport = { width: 1440, height: 900 };
@@ -91,5 +91,23 @@ describe("hitTestCard", () => {
       { id: "panned-target", worldRect: { x: -400, y: 250, width: 150, height: 150 } },
     ];
     expect(hitTestCard(pointer, viewport, panned, k, cards)).toBe("panned-target");
+  });
+});
+
+describe("barrel lens on portrait viewports", () => {
+  const phone = { width: 390, height: 844 };
+
+  it("bends the side edges of a phone as much as the top edge of a desktop", () => {
+    // How far (as a fraction of the half-extent) the content under an edge midpoint is pulled inward.
+    const desktopTopPull =
+      1 - Math.abs(pointerToWorld({ x: 720, y: 0 }, viewport, { x: 0, y: 0 }, k).y) / 450;
+    const phoneSidePull =
+      1 - Math.abs(pointerToWorld({ x: 0, y: 422 }, phone, { x: 0, y: 0 }, k).x) / 195;
+    expect(phoneSidePull).toBeCloseTo(desktopTopPull, 6);
+  });
+
+  it("leaves landscape viewports unchanged (unit = viewport height)", () => {
+    expect(lensScale(viewport)).toEqual({ x: 1440 / 900, y: 1 });
+    expect(lensScale(phone)).toEqual({ x: 1, y: 844 / 390 });
   });
 });

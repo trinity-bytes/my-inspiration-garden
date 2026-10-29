@@ -13,7 +13,7 @@ const [EDGE_R, EDGE_G, EDGE_B] = canvasBackgroundRgb01().map((c) => c.toFixed(3)
 export const BARREL_FRAGMENT_GLSL = /* glsl */ `
 uniform sampler2D u_scene;
 uniform float u_k;
-uniform float u_aspect;
+uniform vec2 u_lensScale; // lensScale() in ../distortion.ts
 varying vec2 vUv;
 
 const vec3 EDGE_TINT = vec3(${EDGE_R}, ${EDGE_G}, ${EDGE_B}); // canvas background
@@ -34,10 +34,7 @@ vec2 barrelInverse(vec2 p, float k) {
 
 void main() {
   vec2 ndc = vUv * 2.0 - 1.0;
-  vec2 aspectCorrected = vec2(ndc.x * u_aspect, ndc.y);
-
-  vec2 worldNdc = barrelInverse(aspectCorrected, u_k);
-  worldNdc.x /= u_aspect;
+  vec2 worldNdc = barrelInverse(ndc * u_lensScale, u_k) / u_lensScale;
 
   vec2 sampleUv = worldNdc * 0.5 + 0.5;
 

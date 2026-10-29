@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { lensScale } from "../distortion";
 import { BARREL_FRAGMENT_GLSL } from "../shaders/barrel";
 import { FULLSCREEN_VERTEX_GLSL } from "../shaders/fullscreen-vertex";
 
@@ -12,7 +13,7 @@ import { FULLSCREEN_VERTEX_GLSL } from "../shaders/fullscreen-vertex";
 interface BarrelUniforms {
   u_scene: { value: THREE.Texture };
   u_k: { value: number };
-  u_aspect: { value: number };
+  u_lensScale: { value: THREE.Vector2 };
   [key: string]: THREE.IUniform;
 }
 
@@ -25,7 +26,7 @@ export class BarrelPass {
     this.uniforms = {
       u_scene: { value: sceneTexture },
       u_k: { value: k },
-      u_aspect: { value: 1 },
+      u_lensScale: { value: new THREE.Vector2(1, 1) },
     };
     this.material = new THREE.ShaderMaterial({
       vertexShader: FULLSCREEN_VERTEX_GLSL,
@@ -38,8 +39,9 @@ export class BarrelPass {
     this.mesh.frustumCulled = false;
   }
 
-  setAspect(aspect: number): void {
-    this.uniforms.u_aspect.value = aspect;
+  setViewport(viewport: { width: number; height: number }): void {
+    const scale = lensScale(viewport);
+    this.uniforms.u_lensScale.value.set(scale.x, scale.y);
   }
 
   setK(k: number): void {

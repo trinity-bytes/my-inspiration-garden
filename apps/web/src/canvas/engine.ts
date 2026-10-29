@@ -343,7 +343,7 @@ export class CanvasEngine {
     } else {
       this.renderTarget.setSize(rtWidth, rtHeight);
     }
-    this.barrelPass?.setAspect(width / Math.max(height, 1));
+    this.barrelPass?.setViewport({ width, height });
   }
 
   private readonly handleVisibilityChange = (): void => {

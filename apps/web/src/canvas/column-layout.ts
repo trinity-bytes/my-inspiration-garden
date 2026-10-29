@@ -31,12 +31,13 @@ import { clamp } from "./deadzone";
 export const COLUMN_GUTTER_PX = 28;
 
 /**
- * Gutter below `MOBILE_GUTTER_MAX_WIDTH_PX` (F7, owner feedback 2026-10-29:
+ * Gutter below `PHONE_MAX_WIDTH_PX` (F7, owner feedback 2026-10-29:
  * on phones the cards looked too far apart). Same rule as the desktop
  * gutter: one constant for both axes, per viewport.
  */
 export const MOBILE_COLUMN_GUTTER_PX = 12;
-const MOBILE_GUTTER_MAX_WIDTH_PX = 480;
+/** Viewports narrower than this (CSS px) get the phone-specific canvas tuning (gutter, edge entry band). */
+export const PHONE_MAX_WIDTH_PX = 480;
 
 /** Column width is clamped into this range regardless of viewport size, so extreme viewports never produce a degenerate (near-zero or absurdly wide) column. */
 export const MIN_COLUMN_WIDTH_PX = 140;
@@ -47,12 +48,19 @@ export const MAX_COLUMN_WIDTH_PX = 420;
  * count), checked in ascending order; a width at or above every listed
  * `maxWidth` falls through to `DEFAULT_COLUMN_COUNT`. Chosen so 1440px
  * (desktop) lands on 5 columns (within the requested 4-6) and 390px
- * (mobile) lands on 2 (the requested ~2), each an exact tiling of the
+ * (mobile) lands on `PHONE_VISIBLE_COLUMNS`, each an exact tiling of the
  * viewport width (`columns * columnWidth + (columns - 1) * COLUMN_GUTTER_PX
  * === width`) before the min/max width clamp.
  */
+/**
+ * Phones fit 2 full columns plus a peek of a third (owner feedback,
+ * 2026-10-29): two columns tiling the width exactly left nothing cut at the
+ * sides, so the canvas no longer read as continuing sideways.
+ */
+export const PHONE_VISIBLE_COLUMNS = 2.4;
+
 const COLUMN_COUNT_BREAKPOINTS: ReadonlyArray<{ maxWidth: number; columns: number }> = [
-  { maxWidth: 480, columns: 2 },
+  { maxWidth: PHONE_MAX_WIDTH_PX, columns: PHONE_VISIBLE_COLUMNS },
   { maxWidth: 900, columns: 3 },
   { maxWidth: 1200, columns: 4 },
   { maxWidth: 1680, columns: 5 },
@@ -83,7 +91,7 @@ export interface ColumnLayout {
 export function columnLayoutFor(viewportCssWidth: number): ColumnLayout {
   const width = Math.max(viewportCssWidth, 1);
   const columns = columnCountForWidth(width);
-  const gutter = width < MOBILE_GUTTER_MAX_WIDTH_PX ? MOBILE_COLUMN_GUTTER_PX : COLUMN_GUTTER_PX;
+  const gutter = width < PHONE_MAX_WIDTH_PX ? MOBILE_COLUMN_GUTTER_PX : COLUMN_GUTTER_PX;
   const rawColumnWidth = (width - (columns - 1) * gutter) / columns;
   const columnWidth = clamp(rawColumnWidth, MIN_COLUMN_WIDTH_PX, MAX_COLUMN_WIDTH_PX);
   return { columns, columnWidth, gutter, columnStride: columnWidth + gutter };

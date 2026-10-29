@@ -1,5 +1,5 @@
 import { screenToWorld, worldToScreen } from "./coords";
-import { barrelForward, barrelInverse } from "./distortion";
+import { barrelForward, barrelInverse, lensScale } from "./distortion";
 import type { Vec2 } from "./types";
 
 /**
@@ -16,17 +16,14 @@ import type { Vec2 } from "./types";
  * Derivation, matching `post/barrel.ts` + `shaders/barrel.ts` step by step:
  * 1. Browser pointer px (origin top-left, y down) → plain NDC (origin
  *    center, y up, matching WebGL clip space: `ndcY = 1 - 2*py/height`).
- * 2. Aspect-correct exactly like the shader (`u_aspect = width/height`,
- *    only the x axis is scaled) before applying the (inverse) barrel.
- * 3. Undo the aspect correction, then map plain NDC back to CSS px
+ * 2. Scale into lens space exactly like the shader (`u_lensScale =
+ *    lensScale(viewport)`, unit = half the shorter side) before applying
+ *    the (inverse) barrel.
+ * 3. Undo the lens scaling, then map plain NDC back to CSS px
  *    relative to the viewport center (the world camera's own frustum is
  *    `[-width/2, width/2] x [-height/2, height/2]`, no aspect correction of
  *    its own — see `engine.ts`'s `handleResize`).
  */
-
-function viewportAspect(viewport: { width: number; height: number }): number {
-  return viewport.width / Math.max(viewport.height, 1);
-}
 
 /** Pointer CSS px (relative to the canvas, origin top-left) → world position, through the inverse barrel distortion. */
 export function pointerToWorld(
@@ -38,14 +35,13 @@ export function pointerToWorld(
 ): Vec2 {
   const ndcX = (pointerCss.x / viewport.width) * 2 - 1;
   const ndcY = 1 - (pointerCss.y / viewport.height) * 2;
-  const aspect = viewportAspect(viewport);
+  const scale = lensScale(viewport);
 
-  const worldNdc = barrelInverse({ x: ndcX * aspect, y: ndcY }, distortionK);
-  const plainNdcX = worldNdc.x / aspect;
+  const lens = barrelInverse({ x: ndcX * scale.x, y: ndcY * scale.y }, distortionK);
 
   const screen: Vec2 = {
-    x: plainNdcX * (viewport.width / 2),
-    y: -(worldNdc.y * (viewport.height / 2)),
+    x: (lens.x / scale.x) * (viewport.width / 2),
+    y: -((lens.y / scale.y) * (viewport.height / 2)),
   };
   return screenToWorld(screen, worldOffset, cardParallax);
 }
@@ -59,14 +55,14 @@ export function worldToPointer(
   cardParallax = 1,
 ): Vec2 {
   const screen = worldToScreen(world, worldOffset, cardParallax);
-  const aspect = viewportAspect(viewport);
+  const scale = lensScale(viewport);
 
   const plainNdcX = screen.x / (viewport.width / 2);
   const plainNdcY = -screen.y / (viewport.height / 2);
 
-  const distorted = barrelForward({ x: plainNdcX * aspect, y: plainNdcY }, distortionK);
-  const ndcX = distorted.x / aspect;
-  const ndcY = distorted.y;
+  const distorted = barrelForward({ x: plainNdcX * scale.x, y: plainNdcY * scale.y }, distortionK);
+  const ndcX = distorted.x / scale.x;
+  const ndcY = distorted.y / scale.y;
 
   return {
     x: ((ndcX + 1) / 2) * viewport.width,

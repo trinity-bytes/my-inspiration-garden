@@ -1,3 +1,4 @@
+import { PHONE_MAX_WIDTH_PX } from "./column-layout";
 import { worldToScreen } from "./coords";
 import type { CardWorldRect } from "./item-layout";
 import { clamp01, smoothstep } from "./navigation";
@@ -37,8 +38,8 @@ export const DEFAULT_FADE_INSET_PX = 80;
 
 /**
  * An axis at most this wide (the phone breakpoint `column-layout.ts` also
- * uses) gets no inset: its columns fill it exactly, so any inset would keep
- * the outer cards shrunk and translucent even at rest. The ramp then runs
+ * uses) gets no inset: its columns fill it edge to edge, so any inset
+ * would keep the outer cards translucent even at rest. The ramp then runs
  * only while a card pokes past the edge.
  */
 export const NARROW_AXIS_MAX_PX = 480;
@@ -48,10 +49,27 @@ function defaultFadeInsetFor(viewportAxisSize: number): number {
 }
 
 /**
+ * On phones the ramp is capped to this many visible px and cards never
+ * grow/shrink (owner feedback, 2026-10-29): with only ~2 columns on screen,
+ * a shrinking, fading frame read as "the canvas ends here". A short fade
+ * lets cards be cut by the screen edge, which reads as "it keeps going".
+ */
+export const PHONE_ENTRY_BAND_PX = 40;
+
+function isPhoneWidth(viewportWidth: number): boolean {
+  return viewportWidth < PHONE_MAX_WIDTH_PX;
+}
+
+function entryBandCapFor(viewportWidth: number): number {
+  return isPhoneWidth(viewportWidth) ? PHONE_ENTRY_BAND_PX : Number.POSITIVE_INFINITY;
+}
+
+/**
  * Per axis, in [0, 1]: 0 when the card lies entirely past the viewport
  * edge, 1 once its outer edge is `fadeInsetPx` inside, ramping linearly in
  * between (so a card flush with the edge, or half past it, is visibly
- * translucent). The most-faded axis wins. Without an explicit
+ * translucent). On phones the ramp spans at most `PHONE_ENTRY_BAND_PX`
+ * visible px. The most-faded axis wins. Without an explicit
  * `fadeInsetPx`, each axis picks its own (see `NARROW_AXIS_MAX_PX`).
  */
 export function cardEntryProgress(
@@ -62,8 +80,15 @@ export function cardEntryProgress(
 ): number {
   const insetX = fadeInsetPx ?? defaultFadeInsetFor(viewportWidth);
   const insetY = fadeInsetPx ?? defaultFadeInsetFor(viewportHeight);
-  const progressX = axisProgress(rect.center.x, rect.halfWidth, viewportWidth / 2, insetX);
-  const progressY = axisProgress(rect.center.y, rect.halfHeight, viewportHeight / 2, insetY);
+  const bandCap = entryBandCapFor(viewportWidth);
+  const progressX = axisProgress(rect.center.x, rect.halfWidth, viewportWidth / 2, insetX, bandCap);
+  const progressY = axisProgress(
+    rect.center.y,
+    rect.halfHeight,
+    viewportHeight / 2,
+    insetY,
+    bandCap,
+  );
   return Math.min(progressX, progressY);
 }
 
@@ -72,11 +97,12 @@ function axisProgress(
   halfSize: number,
   halfViewport: number,
   inset: number,
+  bandCap: number,
 ): number {
   // Distance from the card's outer edge to the viewport edge; negative once it pokes out.
   const insideDepth = halfViewport - Math.abs(center) - halfSize;
   const extent = halfSize * 2;
-  const denominator = extent + Math.max(inset, 0);
+  const denominator = Math.min(extent + Math.max(inset, 0), bandCap);
   if (denominator <= 0) {
     // Degenerate: a zero-size rect (extent === 0) combined with a
     // non-positive fade inset leaves nothing to ramp over — the raw
@@ -135,6 +161,9 @@ export function entryScaleForCard(
   viewport: { width: number; height: number },
   reducedMotion: boolean,
 ): number {
+  if (isPhoneWidth(viewport.width)) {
+    return 1;
+  }
   const progress = cardEntryProgress(
     cardScreenRect(worldRect, worldOffset, 1),
     viewport.width,
