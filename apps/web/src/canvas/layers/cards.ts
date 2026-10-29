@@ -2,10 +2,14 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { cardEntryProgress, cardOpacity, cardScreenRect, entryScaleForCard } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
-import { paintItemCardCanvas } from "../card-painters";
+import { paintItemCardCanvas, paintPhotoCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
-import { createPlaceholderTexture, paintPlaceholderCanvas } from "../placeholder-texture";
+import {
+  createCardCanvasTexture,
+  createPlaceholderTexture,
+  paintPlaceholderCanvas,
+} from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
 import { TextureRegistry } from "../texture-registry";
 import { thumbnailUrlForItem } from "../thumbnail-source";
@@ -53,7 +57,6 @@ export class CardLayer {
   private readonly options: CardLayerOptions;
   private readonly pool: PoolEntry[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
-  private readonly loader = new THREE.TextureLoader();
 
   constructor(options: CardLayerOptions) {
     this.options = options;
@@ -152,13 +155,8 @@ export class CardLayer {
           resolve(createPlaceholderTexture(item, widthPx, heightPx));
           return;
         }
-        this.loader.load(
-          thumbnailUrl,
-          (texture) => {
-            texture.colorSpace = THREE.NoColorSpace;
-            resolve(texture);
-          },
-          undefined,
+        paintPhotoCanvas(thumbnailUrl, widthPx, heightPx).then(
+          (canvas) => (canvas ? resolve(createCardCanvasTexture(canvas)) : reject()),
           reject,
         );
       },
@@ -222,19 +220,10 @@ export class CardLayer {
       cacheKey,
       (resolve) => {
         paintItemCardCanvas(item, widthPx, heightPx)
-          .then((canvas) => {
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.colorSpace = THREE.NoColorSpace;
-            texture.needsUpdate = true;
-            resolve(texture);
-          })
-          .catch(() => {
-            const canvas = paintPlaceholderCanvas(item, widthPx, heightPx);
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.colorSpace = THREE.NoColorSpace;
-            texture.needsUpdate = true;
-            resolve(texture);
-          });
+          .then((canvas) => resolve(createCardCanvasTexture(canvas)))
+          .catch(() =>
+            resolve(createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx))),
+          );
       },
       (texture) => {
         if (!isStaleLoadCallback(entry.loadToken, token)) {

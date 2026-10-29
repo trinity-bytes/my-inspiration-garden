@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createDeviceCanvas, MAX_TEXTURE_EDGE_PX } from "../../src/canvas/placeholder-texture";
+import * as THREE from "three";
+import {
+  createCardCanvasTexture,
+  createDeviceCanvas,
+  MAX_TEXTURE_EDGE_PX,
+} from "../../src/canvas/placeholder-texture";
 
 describe("createDeviceCanvas", () => {
   it("paints one texel per device pixel on a 1x screen", () => {
@@ -21,5 +26,14 @@ describe("createDeviceCanvas", () => {
     const canvas = createDeviceCanvas(400, 1000, 2);
     expect(canvas.height).toBe(MAX_TEXTURE_EDGE_PX);
     expect(canvas.width).toBe(Math.round(400 * (MAX_TEXTURE_EDGE_PX / 1000)));
+  });
+});
+
+describe("createCardCanvasTexture", () => {
+  it("skips mipmaps so uploading a card that scrolls into view stays cheap", () => {
+    const texture = createCardCanvasTexture(document.createElement("canvas"));
+    expect(texture.generateMipmaps).toBe(false);
+    expect(texture.minFilter).toBe(THREE.LinearFilter);
+    expect(texture.colorSpace).toBe(THREE.NoColorSpace);
   });
 });

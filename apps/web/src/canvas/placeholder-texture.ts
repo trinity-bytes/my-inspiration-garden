@@ -96,12 +96,23 @@ export function createPlaceholderTexture(
   widthPx: number,
   heightPx: number,
 ): THREE.Texture {
-  const canvas = paintPlaceholderCanvas(item, widthPx, heightPx);
+  return createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx));
+}
+
+/**
+ * Wraps a card canvas (`createDeviceCanvas`-sized, so drawn at ~1 texel per device px) as a
+ * texture. Mipmaps are skipped: a card is never drawn much smaller than its texture, and
+ * generating them made every card upload cost more while cards stream in during fast panning
+ * (owner feedback, 2026-10-29: stutter growing with pan speed).
+ */
+export function createCardCanvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);
   // NoColorSpace throughout the canvas engine (see engine.ts):
   // the card shader composites in raw sRGB-encoded byte space, no per-texture
   // conversion.
   texture.colorSpace = THREE.NoColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
   return texture;
 }

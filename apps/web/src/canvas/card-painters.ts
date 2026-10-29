@@ -77,7 +77,12 @@ function drawCoverImage(
   ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-/** Loads an `<img>`; resolves `null` (never rejects) on error or timeout, so a broken/slow preview always falls back to the typographic layout instead of leaving the card stuck. */
+/**
+ * Loads an `<img>` and decodes it off the main thread (`decode()`) before resolving, so the later
+ * `drawImage` does not decode synchronously mid-frame. Resolves `null` (never rejects) on error or
+ * timeout, so a broken/slow preview always falls back to the typographic layout instead of
+ * leaving the card stuck.
+ */
 function loadImage(url: string, timeoutMs: number): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     let settled = false;
@@ -91,7 +96,11 @@ function loadImage(url: string, timeoutMs: number): Promise<HTMLImageElement | n
     image.crossOrigin = "anonymous";
     image.onload = () => {
       clearTimeout(timer);
-      finish(image);
+      // A failed decode() still leaves a loaded image drawImage can decode itself.
+      image.decode().then(
+        () => finish(image),
+        () => finish(image),
+      );
     };
     image.onerror = () => {
       clearTimeout(timer);
@@ -99,6 +108,31 @@ function loadImage(url: string, timeoutMs: number): Promise<HTMLImageElement | n
     };
     image.src = url;
   });
+}
+
+const PHOTO_LOAD_TIMEOUT_MS = 20_000;
+
+/**
+ * Paints an `image` item's photo, `object-fit: cover`, onto a device-resolution canvas. The
+ * original upload can be several thousand px wide: uploading it to the GPU as-is stalled a frame
+ * for every photo card entering the viewport. Resolves `null` when the photo cannot load.
+ */
+export async function paintPhotoCanvas(
+  url: string,
+  widthPx: number,
+  heightPx: number,
+): Promise<HTMLCanvasElement | null> {
+  const image = await loadImage(url, PHOTO_LOAD_TIMEOUT_MS);
+  if (!image) {
+    return null;
+  }
+  const canvas = createDeviceCanvas(widthPx, heightPx);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+  drawCoverImage(ctx, image, canvas.width, canvas.height);
+  return canvas;
 }
 
 /** Darkens the bottom of a photo card so overlaid title/domain text stays legible on any underlying image — a deliberate compositing choice for text legibility, distinct from (and not a violation of) the "never darken a texture" color-pipeline convention, which is about not accidentally mis-decoding sRGB bytes. */
