@@ -5,7 +5,6 @@ import { cardHoverStyle } from "../card-hover";
 import { paintItemCardCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
-import { clampSpriteCssSize } from "../max-sprite-size";
 import { createPlaceholderTexture, paintPlaceholderCanvas } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
 import { TextureRegistry } from "../texture-registry";
@@ -156,9 +155,6 @@ export class CardLayer {
         this.loader.load(
           thumbnailUrl,
           (texture) => {
-            // Respect the T8a device-px clamp convention: don't upscale
-            // beyond the loaded image's own resolution (see
-            // `max-sprite-size.ts`).
             texture.colorSpace = THREE.NoColorSpace;
             resolve(texture);
           },
@@ -253,15 +249,16 @@ export class CardLayer {
    * `instances` is the current visible-card set (`item-layout.ts`'s
    * `visibleCardInstances`, already computed by the caller — this class
    * does not do virtualization math itself). `worldOffset`/`viewport` drive
-   * the fade-in opacity (`card-fade.ts`); `dpr` clamps loaded-thumbnail
-   * sprite size to the texture's own resolution.
+   * the fade-in opacity (`card-fade.ts`). A card always fills its column
+   * slot: shrinking it to its texture's resolution broke the even gutter on
+   * high-DPR screens, so composed textures are painted at device resolution
+   * instead (`placeholder-texture.ts`'s `createDeviceCanvas`).
    */
   update(
     instances: readonly CardInstance[],
     worldOffset: Vec2,
     viewportWidth: number,
     viewportHeight: number,
-    dpr: number,
     reducedMotion: boolean,
     hoveredKey: string | null,
   ): void {
@@ -288,12 +285,6 @@ export class CardLayer {
       }
 
       const hover = cardHoverStyle(hoveredKey === instance.key);
-      const textureImage = entry.uniforms.u_map.value?.image as { width: number } | undefined;
-      const clampedWidth = clampSpriteCssSize(
-        instance.worldRect.width,
-        textureImage?.width ?? instance.worldRect.width,
-        dpr,
-      );
       const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
       const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
       // Same function `entryScaledWorldRect` feeds hit-testing (engine.ts) —
@@ -304,7 +295,7 @@ export class CardLayer {
         { width: viewportWidth, height: viewportHeight },
         reducedMotion,
       );
-      const scaleFactor = (clampedWidth / instance.worldRect.width) * entryScale * hover.scale;
+      const scaleFactor = entryScale * hover.scale;
       const width = instance.worldRect.width * scaleFactor;
       const height = instance.worldRect.height * scaleFactor;
 

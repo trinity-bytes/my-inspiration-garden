@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { canvasBackgroundRgb01 } from "./background";
 import { entryScaledWorldRect } from "./card-fade";
+import { visibleHoverKey } from "./card-hover";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
 import { selectDomMirrorCards } from "./dom-mirror";
@@ -99,6 +100,8 @@ export class CanvasEngine {
   private lastColumnWidth = -1;
   private lastGutter = -1;
   private hoveredCardKey: string | null = null;
+  /** The hover key actually rendered last frame (`visibleHoverKey`: `hoveredCardKey`, hidden while panning fast) — the canvas cursor follows it. */
+  private renderedHoverKey: string | null = null;
   /** Click-vs-drag / hover / pointer-capture-safe click wiring (see `pointer-interaction.ts`). */
   private pointerInteraction: PointerInteractionController | null = null;
 
@@ -108,7 +111,6 @@ export class CanvasEngine {
   private rafHandle: number | null = null;
   private lastFrameTime: number | null = null;
   private readonly distortionK = DEFAULT_BARREL_K;
-  private dpr = 1;
 
   private disposed = false;
   private readyFired = false;
@@ -313,7 +315,6 @@ export class CanvasEngine {
     const width = Math.max(1, Math.round(rawWidth));
     const height = Math.max(1, Math.round(rawHeight));
     const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
-    this.dpr = dpr;
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(width, height, false);
@@ -387,9 +388,6 @@ export class CanvasEngine {
       return;
     }
     this.hoveredCardKey = key;
-    if (this.canvas) {
-      this.canvas.style.cursor = key ? "pointer" : "";
-    }
   }
 
   private fireReady(): void {
@@ -446,14 +444,23 @@ export class CanvasEngine {
 
     this.cards.group.position.x = world.x;
     this.cards.group.position.y = -world.y;
+    const hoverKey = visibleHoverKey(
+      this.hoveredCardKey,
+      this.navigation?.getVelocity() ?? { x: 0, y: 0 },
+    );
+    if (hoverKey !== this.renderedHoverKey) {
+      this.renderedHoverKey = hoverKey;
+      if (this.canvas) {
+        this.canvas.style.cursor = hoverKey ? "pointer" : "";
+      }
+    }
     this.cards.update(
       this.lastCardInstances,
       world,
       viewport.width,
       viewport.height,
-      this.dpr,
       this.reducedMotion,
-      this.hoveredCardKey,
+      hoverKey,
     );
 
     const domCards = selectDomMirrorCards(this.lastCardInstances);

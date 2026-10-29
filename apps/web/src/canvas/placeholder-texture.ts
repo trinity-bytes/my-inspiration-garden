@@ -13,13 +13,30 @@ import { wrapText } from "./wrap-text";
  * glue in this directory. Also the fallback for every per-kind painter
  * (`card-painters.ts`, T9) when its own content can't be painted.
  */
-export const DEVICE_PIXEL_SIZE = 512;
+/**
+ * Upper bound for a card texture's longer edge, in device px. Bounds GPU memory for the texture
+ * cache (`engine.ts`'s `CARD_TEXTURE_CACHE_SIZE`) on large cards and high-DPR screens.
+ */
+export const MAX_TEXTURE_EDGE_PX = 1024;
+/** Same cap as `engine.ts`'s `DPR_CAP`: beyond 2x the extra texels are not visible. */
+const MAX_TEXTURE_DPR = 2;
 const CORNER_RADIUS_FRACTION = 0.06;
 
-/** A `<canvas>` sized so its longer edge is `DEVICE_PIXEL_SIZE` device px, preserving `widthPx`/`heightPx`'s aspect ratio — the resolution budget every per-kind card texture (placeholder or rich) paints at, independent of the card's exact on-screen CSS size (which varies with viewport/column width). */
-export function createDeviceCanvas(widthPx: number, heightPx: number): HTMLCanvasElement {
+/**
+ * A `<canvas>` with one texel per device pixel of the card's on-screen CSS size (`widthPx` x
+ * `heightPx` at `dpr`), with its longer edge capped at `MAX_TEXTURE_EDGE_PX`. Painting at the
+ * screen's resolution keeps text sharp on Retina screens without shrinking the card below its
+ * column slot (owner feedback, 2026-10-29: on a 2x iMac the cards looked too far apart because a
+ * fixed 512px budget forced them smaller than their columns).
+ */
+export function createDeviceCanvas(
+  widthPx: number,
+  heightPx: number,
+  dpr: number = window.devicePixelRatio || 1,
+): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  const scale = DEVICE_PIXEL_SIZE / Math.max(widthPx, heightPx, 1);
+  const longEdge = Math.max(widthPx, heightPx, 1);
+  const scale = Math.min(Math.max(dpr, 1), MAX_TEXTURE_DPR, MAX_TEXTURE_EDGE_PX / longEdge);
   canvas.width = Math.max(1, Math.round(widthPx * scale));
   canvas.height = Math.max(1, Math.round(heightPx * scale));
   return canvas;
