@@ -195,7 +195,6 @@ export class CanvasEngine {
       textureCacheSize: CARD_TEXTURE_CACHE_SIZE,
       apiBaseUrl: resolveApiBaseUrl(),
       renderOrder: CARD_RENDER_ORDER,
-      uploadTexture: (texture) => this.renderer?.initTexture(texture),
     });
     this.scene.add(this.cards.group);
 

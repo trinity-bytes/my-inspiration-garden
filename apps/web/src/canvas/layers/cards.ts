@@ -4,9 +4,12 @@ import { cardEntryProgress, cardOpacity, cardScreenRect, entryScaleForCard } fro
 import { cardHoverStyle } from "../card-hover";
 import { paintItemCardCanvas, paintPhotoCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
-import { FrameJobQueue } from "../frame-job-queue";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
-import { createCardCanvasTexture, paintPlaceholderCanvas } from "../placeholder-texture";
+import {
+  createCardCanvasTexture,
+  createPlaceholderTexture,
+  paintPlaceholderCanvas,
+} from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
 import { TextureRegistry } from "../texture-registry";
 import { thumbnailUrlForItem } from "../thumbnail-source";
@@ -18,13 +21,9 @@ export interface CardLayerOptions {
   textureCacheSize: number;
   apiBaseUrl: string;
   renderOrder: number;
-  /** Uploads a texture to the GPU now (`WebGLRenderer.initTexture`), so its upload runs inside the per-frame job budget instead of during the next render. */
-  uploadTexture: (texture: THREE.Texture) => void;
 }
 
 const CORNER_RADIUS_FRACTION = 0.08;
-/** Main-thread time per frame spent painting and uploading card textures (see `frame-job-queue.ts`). */
-const TEXTURE_WORK_BUDGET_MS = 4;
 
 interface CardUniforms {
   u_map: { value: THREE.Texture | null };
@@ -58,7 +57,6 @@ export class CardLayer {
   private readonly options: CardLayerOptions;
   private readonly pool: PoolEntry[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
-  private readonly textureJobs = new FrameJobQueue();
 
   constructor(options: CardLayerOptions) {
     this.options = options;
@@ -118,31 +116,6 @@ export class CardLayer {
     this.textures.pin(key);
   }
 
-  /**
-   * Paints a card canvas, then wraps and uploads it as a texture, each step as its own job in
-   * `textureJobs` so a burst of cards entering the viewport spreads over several frames. Feeds a
-   * `TextureRegistry.load` start callback: `paint` resolving `null` rejects.
-   */
-  private scheduleCanvasTexture(
-    paint: () => Promise<HTMLCanvasElement | null>,
-    resolve: (texture: THREE.Texture) => void,
-    reject: () => void,
-  ): void {
-    this.textureJobs.enqueue(() => {
-      paint().then((canvas) => {
-        if (!canvas) {
-          reject();
-          return;
-        }
-        this.textureJobs.enqueue(() => {
-          const texture = createCardCanvasTexture(canvas);
-          this.options.uploadTexture(texture);
-          resolve(texture);
-        });
-      }, reject);
-    });
-  }
-
   /** Dispatches to the raw full-bleed photo path (`image` — "no chrome", see `odd/tasks/garden-mvp.md`'s T9 scope) or the composed per-kind painted path (every other kind, `card-painters.ts`). */
   private assignTexture(entry: PoolEntry, item: Item, widthPx: number, heightPx: number): void {
     if (item.kind === "image") {
@@ -177,15 +150,16 @@ export class CardLayer {
 
     this.textures.load(
       cacheKey,
-      (resolve, reject) =>
-        this.scheduleCanvasTexture(
-          async () =>
-            thumbnailUrl
-              ? paintPhotoCanvas(thumbnailUrl, widthPx, heightPx)
-              : paintPlaceholderCanvas(item, widthPx, heightPx),
-          resolve,
+      (resolve, reject) => {
+        if (!thumbnailUrl) {
+          resolve(createPlaceholderTexture(item, widthPx, heightPx));
+          return;
+        }
+        paintPhotoCanvas(thumbnailUrl, widthPx, heightPx).then(
+          (canvas) => (canvas ? resolve(createCardCanvasTexture(canvas)) : reject()),
           reject,
-        ),
+        );
+      },
       (texture) => {
         if (!isStaleLoadCallback(entry.loadToken, token)) {
           entry.uniforms.u_map.value = texture;
@@ -210,12 +184,7 @@ export class CardLayer {
         this.pinEntryTexture(entry, fallbackKey);
         this.textures.load(
           fallbackKey,
-          (resolveFallback, rejectFallback) =>
-            this.scheduleCanvasTexture(
-              async () => paintPlaceholderCanvas(item, widthPx, heightPx),
-              resolveFallback,
-              rejectFallback,
-            ),
+          (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
           (texture) => {
             if (!isStaleLoadCallback(entry.loadToken, token)) {
               entry.uniforms.u_map.value = texture;
@@ -249,15 +218,13 @@ export class CardLayer {
 
     this.textures.load(
       cacheKey,
-      (resolve, reject) =>
-        this.scheduleCanvasTexture(
-          () =>
-            paintItemCardCanvas(item, widthPx, heightPx).catch(() =>
-              paintPlaceholderCanvas(item, widthPx, heightPx),
-            ),
-          resolve,
-          reject,
-        ),
+      (resolve) => {
+        paintItemCardCanvas(item, widthPx, heightPx)
+          .then((canvas) => resolve(createCardCanvasTexture(canvas)))
+          .catch(() =>
+            resolve(createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx))),
+          );
+      },
       (texture) => {
         if (!isStaleLoadCallback(entry.loadToken, token)) {
           entry.uniforms.u_map.value = texture;
@@ -284,8 +251,6 @@ export class CardLayer {
     reducedMotion: boolean,
     hoveredKey: string | null,
   ): void {
-    this.textureJobs.run(TEXTURE_WORK_BUDGET_MS);
-
     const wanted = Math.min(instances.length, this.options.maxPoolSize);
     this.ensurePoolSize(wanted);
 
@@ -349,7 +314,6 @@ export class CardLayer {
       entry.material.dispose();
     }
     this.pool.length = 0;
-    this.textureJobs.clear();
     this.textures.clear();
   }
 }

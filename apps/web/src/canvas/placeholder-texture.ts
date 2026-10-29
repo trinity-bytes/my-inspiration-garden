@@ -91,6 +91,14 @@ export function paintPlaceholderCanvas(
   return canvas;
 }
 
+export function createPlaceholderTexture(
+  item: Item,
+  widthPx: number,
+  heightPx: number,
+): THREE.Texture {
+  return createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx));
+}
+
 /**
  * Wraps a card canvas (`createDeviceCanvas`-sized, so drawn at ~1 texel per device px) as a
  * texture. Mipmaps are skipped: a card is never drawn much smaller than its texture, and
