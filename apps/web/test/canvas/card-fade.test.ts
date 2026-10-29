@@ -4,6 +4,7 @@ import {
   cardEntryScale,
   cardOpacity,
   cardScreenRect,
+  DEFAULT_FADE_INSET_PX,
   entryScaledWorldRect,
   entryScaleForCard,
   MIN_ENTRY_SCALE,
@@ -62,6 +63,38 @@ describe("cardEntryProgress", () => {
       50 / 180,
       5,
     );
+  });
+});
+
+describe("cardEntryProgress default inset per axis (narrow phone axis)", () => {
+  // Phone portrait: two 189px columns + a 12px gutter fill the 390px width exactly.
+  const phoneWidth = 390;
+  const phoneHeight = 844;
+  const card = (x: number, y: number) =>
+    cardScreenRect({ x, y, width: 189, height: 189 }, { x: 0, y: 0 }, 1);
+
+  it("is fully entered once a card is flush with the edge of a narrow axis", () => {
+    expect(cardEntryProgress(card(195 - 94.5, 0), phoneWidth, phoneHeight)).toBe(1);
+  });
+
+  it("still ramps while the card pokes past the edge of a narrow axis", () => {
+    expect(cardEntryProgress(card(195, 0), phoneWidth, phoneHeight)).toBeCloseTo(0.5, 5);
+    expect(cardEntryProgress(card(195 + 94.5, 0), phoneWidth, phoneHeight)).toBe(0);
+  });
+
+  it("keeps the default inset on a wider axis", () => {
+    const inset = DEFAULT_FADE_INSET_PX;
+    const flushVertically = card(0, 422 - 94.5);
+    expect(cardEntryProgress(flushVertically, phoneWidth, phoneHeight)).toBeCloseTo(
+      189 / (189 + inset),
+      5,
+    );
+    const desktopFlush = cardScreenRect(
+      { x: 450, y: 0, width: 100, height: 100 },
+      { x: 0, y: 0 },
+      1,
+    );
+    expect(cardEntryProgress(desktopFlush, 1000, 800)).toBeCloseTo(100 / (100 + inset), 5);
   });
 });
 

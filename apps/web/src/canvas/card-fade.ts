@@ -36,19 +36,34 @@ export function cardScreenRect(
 export const DEFAULT_FADE_INSET_PX = 80;
 
 /**
+ * An axis at most this wide (the phone breakpoint `column-layout.ts` also
+ * uses) gets no inset: its columns fill it exactly, so any inset would keep
+ * the outer cards shrunk and translucent even at rest. The ramp then runs
+ * only while a card pokes past the edge.
+ */
+export const NARROW_AXIS_MAX_PX = 480;
+
+function defaultFadeInsetFor(viewportAxisSize: number): number {
+  return viewportAxisSize <= NARROW_AXIS_MAX_PX ? 0 : DEFAULT_FADE_INSET_PX;
+}
+
+/**
  * Per axis, in [0, 1]: 0 when the card lies entirely past the viewport
  * edge, 1 once its outer edge is `fadeInsetPx` inside, ramping linearly in
  * between (so a card flush with the edge, or half past it, is visibly
- * translucent). The most-faded axis wins.
+ * translucent). The most-faded axis wins. Without an explicit
+ * `fadeInsetPx`, each axis picks its own (see `NARROW_AXIS_MAX_PX`).
  */
 export function cardEntryProgress(
   rect: CardScreenRect,
   viewportWidth: number,
   viewportHeight: number,
-  fadeInsetPx: number = DEFAULT_FADE_INSET_PX,
+  fadeInsetPx?: number,
 ): number {
-  const progressX = axisProgress(rect.center.x, rect.halfWidth, viewportWidth / 2, fadeInsetPx);
-  const progressY = axisProgress(rect.center.y, rect.halfHeight, viewportHeight / 2, fadeInsetPx);
+  const insetX = fadeInsetPx ?? defaultFadeInsetFor(viewportWidth);
+  const insetY = fadeInsetPx ?? defaultFadeInsetFor(viewportHeight);
+  const progressX = axisProgress(rect.center.x, rect.halfWidth, viewportWidth / 2, insetX);
+  const progressY = axisProgress(rect.center.y, rect.halfHeight, viewportHeight / 2, insetY);
   return Math.min(progressX, progressY);
 }
 
