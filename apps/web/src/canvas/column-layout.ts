@@ -30,6 +30,14 @@ import { clamp } from "./deadzone";
  */
 export const COLUMN_GUTTER_PX = 28;
 
+/**
+ * Gutter below `MOBILE_GUTTER_MAX_WIDTH_PX` (F7, owner feedback 2026-10-29:
+ * on phones the cards looked too far apart). Same rule as the desktop
+ * gutter: one constant for both axes, per viewport.
+ */
+export const MOBILE_COLUMN_GUTTER_PX = 12;
+const MOBILE_GUTTER_MAX_WIDTH_PX = 480;
+
 /** Column width is clamped into this range regardless of viewport size, so extreme viewports never produce a degenerate (near-zero or absurdly wide) column. */
 export const MIN_COLUMN_WIDTH_PX = 140;
 export const MAX_COLUMN_WIDTH_PX = 420;
@@ -65,7 +73,9 @@ export interface ColumnLayout {
   columns: number;
   /** World-px width of every column (equal-width, no jitter, no random size scaling — see `item-layout.ts`). */
   columnWidth: number;
-  /** `columnWidth + COLUMN_GUTTER_PX` — the periodic horizontal distance from one column's left edge to the next. */
+  /** Gap between columns and between stacked cards: `COLUMN_GUTTER_PX`, or `MOBILE_COLUMN_GUTTER_PX` on phones. */
+  gutter: number;
+  /** `columnWidth + gutter` — the periodic horizontal distance from one column's left edge to the next. */
   columnStride: number;
 }
 
@@ -73,7 +83,8 @@ export interface ColumnLayout {
 export function columnLayoutFor(viewportCssWidth: number): ColumnLayout {
   const width = Math.max(viewportCssWidth, 1);
   const columns = columnCountForWidth(width);
-  const rawColumnWidth = (width - (columns - 1) * COLUMN_GUTTER_PX) / columns;
+  const gutter = width < MOBILE_GUTTER_MAX_WIDTH_PX ? MOBILE_COLUMN_GUTTER_PX : COLUMN_GUTTER_PX;
+  const rawColumnWidth = (width - (columns - 1) * gutter) / columns;
   const columnWidth = clamp(rawColumnWidth, MIN_COLUMN_WIDTH_PX, MAX_COLUMN_WIDTH_PX);
-  return { columns, columnWidth, columnStride: columnWidth + COLUMN_GUTTER_PX };
+  return { columns, columnWidth, gutter, columnStride: columnWidth + gutter };
 }

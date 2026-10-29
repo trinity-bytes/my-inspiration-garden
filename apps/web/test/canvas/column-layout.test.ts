@@ -4,11 +4,42 @@ import {
   columnLayoutFor,
   MAX_COLUMN_WIDTH_PX,
   MIN_COLUMN_WIDTH_PX,
+  MOBILE_COLUMN_GUTTER_PX,
 } from "../../src/canvas/column-layout";
 
 describe("COLUMN_GUTTER_PX", () => {
   it("is halved to 28 once the background became solid (owner feedback 2026-10-04: cards still too far apart)", () => {
     expect(COLUMN_GUTTER_PX).toBe(28);
+  });
+});
+
+describe("MOBILE_COLUMN_GUTTER_PX", () => {
+  it("is 12 (F7, owner feedback 2026-10-29: on phones the cards looked too far apart)", () => {
+    expect(MOBILE_COLUMN_GUTTER_PX).toBe(12);
+  });
+});
+
+describe("columnLayoutFor gutter", () => {
+  it("uses the mobile gutter below a 480px viewport, for the column stride", () => {
+    for (const width of [320, 390, 479]) {
+      const layout = columnLayoutFor(width);
+      expect(layout.gutter).toBe(MOBILE_COLUMN_GUTTER_PX);
+      expect(layout.columnStride).toBeCloseTo(layout.columnWidth + MOBILE_COLUMN_GUTTER_PX, 6);
+    }
+  });
+
+  it("keeps the desktop gutter from 480px up", () => {
+    for (const width of [480, 768, 1440]) {
+      expect(columnLayoutFor(width).gutter).toBe(COLUMN_GUTTER_PX);
+    }
+  });
+
+  it("tiles 2 columns exactly across a 390px phone with the mobile gutter", () => {
+    const layout = columnLayoutFor(390);
+    expect(layout.columns * layout.columnWidth + (layout.columns - 1) * layout.gutter).toBeCloseTo(
+      390,
+      6,
+    );
   });
 });
 

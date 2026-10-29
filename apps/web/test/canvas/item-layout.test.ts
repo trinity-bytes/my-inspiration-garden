@@ -462,6 +462,50 @@ describe("visibleCardInstances", () => {
     }
   });
 
+  it("applies a given (mobile) gutter to both the horizontal and the vertical gap", () => {
+    const gutter = 12;
+    const instances = visibleCardInstances(
+      seedItems(),
+      { x: 0, y: 0 },
+      390,
+      844,
+      columnWidth,
+      0,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      gutter,
+    );
+    const byColumn = new Map<number, typeof instances>();
+    for (const instance of instances) {
+      byColumn.set(instance.columnIndex, [...(byColumn.get(instance.columnIndex) ?? []), instance]);
+    }
+
+    const leftmost = Math.min(...byColumn.keys());
+    expect(byColumn.has(leftmost + 1)).toBe(true);
+    const first = byColumn.get(leftmost)?.[0];
+    const second = byColumn.get(leftmost + 1)?.[0];
+    expect((second?.worldRect.x as number) - (first?.worldRect.x as number)).toBeCloseTo(
+      columnWidth + gutter,
+      5,
+    );
+
+    const column = [...(byColumn.get(leftmost) ?? [])].sort(
+      (a, b) => a.worldRect.y - b.worldRect.y,
+    );
+    expect(column.length).toBeGreaterThan(1);
+    for (let i = 1; i < column.length; i++) {
+      const prev = column[i - 1] as (typeof instances)[number];
+      const curr = column[i] as (typeof instances)[number];
+      const gap =
+        curr.worldRect.y -
+        curr.worldRect.height / 2 -
+        (prev.worldRect.y + prev.worldRect.height / 2);
+      expect(gap).toBeCloseTo(gutter, 3);
+    }
+  });
+
   it("uses the SAME constant gutter for the horizontal gap between columns and the vertical gap between stacked cards", () => {
     const instances = visibleCardInstances(seedItems(), { x: 0, y: 0 }, 1440, 900, columnWidth, 0);
     const byColumn = new Map<number, typeof instances>();

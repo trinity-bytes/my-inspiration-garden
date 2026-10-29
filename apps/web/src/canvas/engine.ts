@@ -97,6 +97,7 @@ export class CanvasEngine {
   private lastDomMirrorSignature = "";
   /** The column width `visibleCardInstances` was last called with — a resize changes it, which invalidates every cached `CardInstance` (their `worldRect.width`/`x` are only valid for the column width they were computed with). */
   private lastColumnWidth = -1;
+  private lastGutter = -1;
   private hoveredCardKey: string | null = null;
   /** Click-vs-drag / hover / pointer-capture-safe click wiring (see `pointer-interaction.ts`). */
   private pointerInteraction: PointerInteractionController | null = null;
@@ -412,13 +413,14 @@ export class CanvasEngine {
       return;
     }
 
-    const { columnWidth } = columnLayoutFor(viewport.width);
-    if (columnWidth !== this.lastColumnWidth) {
+    const { columnWidth, gutter } = columnLayoutFor(viewport.width);
+    if (columnWidth !== this.lastColumnWidth || gutter !== this.lastGutter) {
       // A resize changes column geometry, so every previously cached
       // CardInstance's worldRect (computed for the OLD column width) is
       // stale — clear rather than let it silently keep rendering at the
       // wrong size/position until it scrolls out of the render margin.
       this.lastColumnWidth = columnWidth;
+      this.lastGutter = gutter;
       this.cardInstanceCache.clear();
       // Not strictly necessary for correctness (columnPeriodCache's key
       // already includes columnWidth, so a stale-width entry is simply
@@ -439,6 +441,7 @@ export class CanvasEngine {
       this.cardInstanceCache,
       this.lastCardInstances,
       this.columnPeriodCache,
+      gutter,
     );
 
     this.cards.group.position.x = world.x;

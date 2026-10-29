@@ -253,8 +253,13 @@ export interface ColumnPeriodCache {
 }
 
 /** The cache key `columnPeriod` memoizes under: T9 carried follow-up — a column's period depends on all three of `columnIndex`, `columnWidth` (a resize changes card heights) and `itemCount` (a shorter/longer items array changes the whole permutation), so all three must be part of the key. */
-function columnPeriodCacheKey(columnIndex: number, columnWidth: number, itemCount: number): string {
-  return `${columnIndex},${columnWidth},${itemCount}`;
+function columnPeriodCacheKey(
+  columnIndex: number,
+  columnWidth: number,
+  itemCount: number,
+  gutter: number,
+): string {
+  return `${columnIndex},${columnWidth},${itemCount},${gutter}`;
 }
 
 /**
@@ -272,13 +277,14 @@ export function columnPeriod(
   columnWidth: number,
   columnIndex: number,
   cache?: ColumnPeriodCache,
+  gutter: number = COLUMN_GUTTER_PX,
 ): ItemPeriod {
   const itemCount = items.length;
   if (itemCount === 0) {
     return { itemCount: 0, order: [], heights: [], tops: [], periodHeight: 0 };
   }
 
-  const cacheKey = columnPeriodCacheKey(columnIndex, columnWidth, itemCount);
+  const cacheKey = columnPeriodCacheKey(columnIndex, columnWidth, itemCount, gutter);
   const cached = cache?.get(cacheKey);
   if (cached) {
     return cached;
@@ -297,7 +303,7 @@ export function columnPeriod(
     order[k] = itemIndex;
     heights[k] = height;
     tops[k] = cursor;
-    cursor += height + COLUMN_GUTTER_PX;
+    cursor += height + gutter;
   }
   const period: ItemPeriod = { itemCount, order, heights, tops, periodHeight: cursor };
   cache?.set(cacheKey, period);
@@ -411,13 +417,14 @@ export function visibleCardInstances(
   cache?: CardInstanceCache,
   out: CardInstance[] = [],
   periodCache?: ColumnPeriodCache,
+  gutter: number = COLUMN_GUTTER_PX,
 ): CardInstance[] {
   out.length = 0;
   if (items.length === 0 || columnWidth <= 0) {
     return out;
   }
 
-  const columnStride = columnWidth + COLUMN_GUTTER_PX;
+  const columnStride = columnWidth + gutter;
   const xMin = viewportCenterWorld.x - viewportWidth / 2 - marginPx;
   const xMax = viewportCenterWorld.x + viewportWidth / 2 + marginPx;
   const yMin = viewportCenterWorld.y - viewportHeight / 2 - marginPx;
@@ -433,7 +440,7 @@ export function visibleCardInstances(
       continue;
     }
 
-    const period = columnPeriod(items, columnWidth, columnIndex, periodCache);
+    const period = columnPeriod(items, columnWidth, columnIndex, periodCache, gutter);
     if (period.itemCount === 0) {
       continue;
     }
