@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   cardEntryProgress,
-  cardEntryScale,
   cardOpacity,
   cardScreenRect,
   DEFAULT_FADE_INSET_PX,
-  entryScaledWorldRect,
-  entryScaleForCard,
-  MIN_ENTRY_SCALE,
   PHONE_ENTRY_BAND_PX,
 } from "../../src/canvas/card-fade";
 
@@ -114,103 +110,6 @@ describe("cardOpacity", () => {
   });
 });
 
-describe("cardEntryScale (watch-face style grow/shrink at the edges)", () => {
-  it("is full size once the card is fully entered", () => {
-    expect(cardEntryScale(1, false)).toBe(1);
-  });
-
-  it("shrinks to MIN_ENTRY_SCALE for a card that has not entered yet", () => {
-    expect(MIN_ENTRY_SCALE).toBeGreaterThan(0.4);
-    expect(MIN_ENTRY_SCALE).toBeLessThan(0.8);
-    expect(cardEntryScale(0, false)).toBeCloseTo(MIN_ENTRY_SCALE, 10);
-  });
-
-  it("grows monotonically with the same eased ramp as the opacity", () => {
-    const mid = cardEntryScale(0.5, false);
-    expect(mid).toBeCloseTo(MIN_ENTRY_SCALE + (1 - MIN_ENTRY_SCALE) * cardOpacity(0.5, false), 10);
-    expect(cardEntryScale(0.25, false)).toBeLessThan(mid);
-    expect(cardEntryScale(0.75, false)).toBeGreaterThan(mid);
-  });
-
-  it("never scales under reduced motion", () => {
-    expect(cardEntryScale(0, true)).toBe(1);
-    expect(cardEntryScale(0.3, true)).toBe(1);
-  });
-});
-
-describe("entryScaledWorldRect", () => {
-  const viewport = { width: 1000, height: 800 };
-  const origin = { x: 0, y: 0 };
-
-  it("keeps a fully entered card unchanged", () => {
-    const rect = { x: 0, y: 0, width: 100, height: 100 };
-    expect(entryScaledWorldRect(rect, origin, viewport, false)).toEqual(rect);
-  });
-
-  it("shrinks an edge card around its own center, matching what is rendered", () => {
-    const rect = { x: 450, y: 0, width: 100, height: 100 };
-    const progress = cardEntryProgress(
-      cardScreenRect(rect, origin, 1),
-      viewport.width,
-      viewport.height,
-    );
-    const scale = cardEntryScale(progress, false);
-    const scaled = entryScaledWorldRect(rect, origin, viewport, false);
-    expect(scale).toBeLessThan(1);
-    expect(scaled.x).toBe(450);
-    expect(scaled.y).toBe(0);
-    expect(scaled.width).toBeCloseTo(100 * scale, 10);
-    expect(scaled.height).toBeCloseTo(100 * scale, 10);
-  });
-
-  it("does not shrink under reduced motion", () => {
-    const rect = { x: 450, y: 0, width: 100, height: 100 };
-    expect(entryScaledWorldRect(rect, origin, viewport, true)).toEqual(rect);
-  });
-});
-
-// T9 carried follow-up (T8b): render (layers/cards.ts) and hit-testing
-// (engine.ts's hitTestableCards -> entryScaledWorldRect) must always agree
-// on a card's entry scale. Both now call this one function — this is the
-// "engine-level" seam that proves they can't silently diverge.
-describe("entryScaleForCard (single source of truth for render + hit-test)", () => {
-  const viewport = { width: 1000, height: 800 };
-  const origin = { x: 0, y: 0 };
-
-  it("matches the scale implied by entryScaledWorldRect for the same inputs", () => {
-    const rect = { x: 450, y: 0, width: 100, height: 100 };
-    const scale = entryScaleForCard(rect, origin, viewport, false);
-    const scaledRect = entryScaledWorldRect(rect, origin, viewport, false);
-    expect(scaledRect.width).toBeCloseTo(rect.width * scale, 10);
-    expect(scaledRect.height).toBeCloseTo(rect.height * scale, 10);
-  });
-
-  it("matches the manual progress -> cardEntryScale computation layers/cards.ts performs", () => {
-    const rect = { x: 470, y: 30, width: 120, height: 80 };
-    const manualProgress = cardEntryProgress(
-      cardScreenRect(rect, origin, 1),
-      viewport.width,
-      viewport.height,
-    );
-    const manualScale = cardEntryScale(manualProgress, false);
-    expect(entryScaleForCard(rect, origin, viewport, false)).toBeCloseTo(manualScale, 10);
-  });
-
-  it("is 1 for a fully-entered card and MIN_ENTRY_SCALE for one that hasn't entered", () => {
-    expect(entryScaleForCard({ x: 0, y: 0, width: 50, height: 50 }, origin, viewport, false)).toBe(
-      1,
-    );
-    expect(
-      entryScaleForCard({ x: 5000, y: 0, width: 50, height: 50 }, origin, viewport, false),
-    ).toBeCloseTo(MIN_ENTRY_SCALE, 10);
-  });
-
-  it("never scales under reduced motion", () => {
-    const rect = { x: 470, y: 0, width: 100, height: 100 };
-    expect(entryScaleForCard(rect, origin, viewport, true)).toBe(1);
-  });
-});
-
 // T9 carried follow-up (T8b): axisProgress must not divide by zero for a
 // degenerate zero-size rect combined with a non-positive fade inset.
 describe("cardEntryProgress with a degenerate zero-size rect (guard against NaN/Infinity)", () => {
@@ -277,15 +176,6 @@ describe("card entry on phones (short fade, no grow/shrink)", () => {
   it("ramps linearly across that band and is 0 while the card is entirely outside", () => {
     expect(cardEntryProgress(tallCardShowing(20), phone.width, phone.height)).toBeCloseTo(0.5, 10);
     expect(cardEntryProgress(tallCardShowing(0), phone.width, phone.height)).toBe(0);
-  });
-
-  it("never shrinks a card at the edge, so it is cut by the screen edge instead", () => {
-    for (const visible of [0, 10, 20, 40]) {
-      expect(entryScaleForCard(tallCardAt(visible), { x: 0, y: 0 }, phone, false)).toBe(1);
-      expect(entryScaledWorldRect(tallCardAt(visible), { x: 0, y: 0 }, phone, false)).toEqual(
-        tallCardAt(visible),
-      );
-    }
   });
 
   it("keeps the desktop ramp (card extent + fade inset) unchanged", () => {

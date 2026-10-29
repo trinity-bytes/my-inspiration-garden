@@ -2,7 +2,6 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { canvasBackgroundRgb01 } from "./background";
-import { entryScaledWorldRect } from "./card-fade";
 import { visibleHoverKey } from "./card-hover";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
@@ -370,12 +369,9 @@ export class CanvasEngine {
 
   /** Cards, keyed by their layout cell (`CardInstance.key`), for `hit-test.ts` — matches what `layers/cards.ts` renders this frame. */
   private hitTestableCards(): { id: string; worldRect: CardInstance["worldRect"] }[] {
-    const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
-    const viewport = this.getViewportSize();
     return this.lastCardInstances.map((instance) => ({
       id: instance.key,
-      // Shrunk edge cards are only clickable where they are drawn.
-      worldRect: entryScaledWorldRect(instance.worldRect, world, viewport, this.reducedMotion),
+      worldRect: instance.worldRect,
     }));
   }
 

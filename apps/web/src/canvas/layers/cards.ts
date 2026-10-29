@@ -1,6 +1,6 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
-import { cardEntryProgress, cardOpacity, cardScreenRect, entryScaleForCard } from "../card-fade";
+import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
 import { cardHoverStyle } from "../card-hover";
 import { paintItemCardCanvas, paintPhotoCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
@@ -276,17 +276,8 @@ export class CardLayer {
       const hover = cardHoverStyle(hoveredKey === instance.key);
       const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
       const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
-      // Same function `entryScaledWorldRect` feeds hit-testing (engine.ts) —
-      // see card-fade.ts's `entryScaleForCard` doc.
-      const entryScale = entryScaleForCard(
-        instance.worldRect,
-        worldOffset,
-        { width: viewportWidth, height: viewportHeight },
-        reducedMotion,
-      );
-      const scaleFactor = entryScale * hover.scale;
-      const width = instance.worldRect.width * scaleFactor;
-      const height = instance.worldRect.height * scaleFactor;
+      const width = instance.worldRect.width * hover.scale;
+      const height = instance.worldRect.height * hover.scale;
 
       // Y negated: mesh position is scene space (y-up); worldRect is this
       // engine's y-down world convention (coords.ts), same as every other layer.

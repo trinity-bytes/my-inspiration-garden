@@ -49,19 +49,15 @@ function defaultFadeInsetFor(viewportAxisSize: number): number {
 }
 
 /**
- * On phones the ramp is capped to this many visible px and cards never
- * grow/shrink (owner feedback, 2026-10-29): with only ~2 columns on screen,
+ * On phones the ramp is capped to this many visible px (owner feedback,
+ * 2026-10-29): with only ~2 columns on screen,
  * a shrinking, fading frame read as "the canvas ends here". A short fade
  * lets cards be cut by the screen edge, which reads as "it keeps going".
  */
 export const PHONE_ENTRY_BAND_PX = 40;
 
-function isPhoneWidth(viewportWidth: number): boolean {
-  return viewportWidth < PHONE_MAX_WIDTH_PX;
-}
-
 function entryBandCapFor(viewportWidth: number): number {
-  return isPhoneWidth(viewportWidth) ? PHONE_ENTRY_BAND_PX : Number.POSITIVE_INFINITY;
+  return viewportWidth < PHONE_MAX_WIDTH_PX ? PHONE_ENTRY_BAND_PX : Number.POSITIVE_INFINITY;
 }
 
 /**
@@ -126,66 +122,4 @@ export function cardOpacity(progress: number, reducedMotion: boolean): number {
     return progress > 0 ? 1 : 0;
   }
   return smoothstep(progress);
-}
-
-/**
- * Smallest scale a card shrinks to at the viewport edge — the smartwatch
- * app-grid feel: cards grow to full size as they enter and shrink as they
- * leave, on the same ramp as the opacity.
- */
-export const MIN_ENTRY_SCALE = 0.6;
-
-/** Size multiplier for `progress` (see `cardEntryProgress`); reduced motion keeps cards at full size. */
-export function cardEntryScale(progress: number, reducedMotion: boolean): number {
-  if (reducedMotion) {
-    return 1;
-  }
-  return MIN_ENTRY_SCALE + (1 - MIN_ENTRY_SCALE) * smoothstep(progress);
-}
-
-/**
- * The entry scale for a card at `worldRect` right now (see `cardEntryScale`)
- * — the single function BOTH rendering (`layers/cards.ts`) and hit-testing
- * (`entryScaledWorldRect`, used by `engine.ts`'s `hitTestableCards`) call,
- * so a shrunk edge card is always clickable exactly where it is drawn. T9
- * carried follow-up (T8b): previously each site independently chained
- * `cardScreenRect` -> `cardEntryProgress` -> `cardEntryScale` with the same
- * arguments — mathematically equal, but a future edit to one call site
- * could silently diverge from the other. Extracting this one function (and
- * having `entryScaledWorldRect` below call it, and `layers/cards.ts` call
- * it directly) makes that divergence structurally impossible.
- */
-export function entryScaleForCard(
-  worldRect: CardWorldRect,
-  worldOffset: Vec2,
-  viewport: { width: number; height: number },
-  reducedMotion: boolean,
-): number {
-  if (isPhoneWidth(viewport.width)) {
-    return 1;
-  }
-  const progress = cardEntryProgress(
-    cardScreenRect(worldRect, worldOffset, 1),
-    viewport.width,
-    viewport.height,
-  );
-  return cardEntryScale(progress, reducedMotion);
-}
-
-/**
- * The card's world rect shrunk around its own center by its entry scale —
- * the single source of truth shared by rendering (`layers/cards.ts`) and
- * hit-testing, so a shrunk edge card is only clickable where it is drawn.
- */
-export function entryScaledWorldRect(
-  worldRect: CardWorldRect,
-  worldOffset: Vec2,
-  viewport: { width: number; height: number },
-  reducedMotion: boolean,
-): CardWorldRect {
-  const scale = entryScaleForCard(worldRect, worldOffset, viewport, reducedMotion);
-  if (scale === 1) {
-    return worldRect;
-  }
-  return { ...worldRect, width: worldRect.width * scale, height: worldRect.height * scale };
 }
