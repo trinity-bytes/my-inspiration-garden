@@ -36,6 +36,12 @@
   transform: translate(-50%, 2px);
 }
 
+.tooltip--end {
+  left: auto;
+  right: 0;
+  transform: translateY(-2px);
+}
+
 /* Show after a short hover delay so sweeping the pointer across a row of
    buttons doesn't flash every label; keyboard focus shows it at once. */
 .has-tooltip:hover > .tooltip {
@@ -47,6 +53,10 @@
 .has-tooltip:has(:focus-visible) > .tooltip {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.has-tooltip:is(:hover, :has(:focus-visible)) > .tooltip--end {
+  transform: none;
 }
 
 /* Touch screens have no hover: a tap would leave the label stuck on. */

@@ -1,10 +1,13 @@
 import type { Item } from "@garden/shared";
 import { normalizePalette } from "@garden/shared";
+import { ExternalLink, History, Pencil, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveMediaRef } from "../api/media-ref";
 import { contrastTextColor } from "../color-contrast";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
+import { IconButton } from "../components/IconButton/IconButton";
 import { useLoadedFontFamily } from "./useLoadedFontFamily";
+import "../components/Button/Button.css";
 import "./ItemDetailModal.css";
 
 export interface ItemDetailModalProps {
@@ -141,6 +144,29 @@ function FontSpecimen({ item }: { item: Extract<Item, { kind: "font" }> }) {
   );
 }
 
+/**
+ * A preview image that opens the item's URL, marked by an "Open" badge so it
+ * reads as clickable. Kept out of the tab order: the "Open link" button right
+ * below is the same link for keyboard users.
+ */
+function PreviewLink({ href, src }: { href: string; src: string }) {
+  return (
+    <a
+      className="item-detail__preview-link"
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      tabIndex={-1}
+    >
+      <img className="item-detail__link-preview" src={src} alt="" />
+      <span className="item-detail__open-badge">
+        <ExternalLink size={14} aria-hidden="true" />
+        Open
+      </span>
+    </a>
+  );
+}
+
 function ItemDetailBody({ item }: { item: Item }) {
   switch (item.kind) {
     case "image":
@@ -156,19 +182,14 @@ function ItemDetailBody({ item }: { item: Item }) {
       return (
         <div className="item-detail__link">
           {item.data.previewImage && (
-            <img
-              className="item-detail__link-preview"
-              src={resolveMediaRef(item.data.previewImage)}
-              alt=""
-              aria-hidden="true"
-            />
+            <PreviewLink href={item.url} src={resolveMediaRef(item.data.previewImage)} />
           )}
           {item.data.description && (
             <p className="item-detail__description">{item.data.description}</p>
           )}
           <p className="item-detail__domain">{new URL(item.url).hostname.replace(/^www\./, "")}</p>
           <a
-            className="item-detail__open-link"
+            className="button button--accent item-detail__open-link"
             href={item.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -189,17 +210,15 @@ function ItemDetailBody({ item }: { item: Item }) {
         </div>
       ) : (
         <div className="item-detail__link">
-          {item.data.thumbnail && (
-            <img
-              className="item-detail__link-preview"
-              src={item.data.thumbnail}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
+          {item.data.thumbnail &&
+            (item.url ? (
+              <PreviewLink href={item.url} src={item.data.thumbnail} />
+            ) : (
+              <img className="item-detail__link-preview" src={item.data.thumbnail} alt="" />
+            ))}
           {item.url && (
             <a
-              className="item-detail__open-link"
+              className="button button--accent item-detail__open-link"
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -245,8 +264,13 @@ export function ItemDetailModal({
   useEffect(() => {
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const dialog = dialogRef.current;
+    // Close first, not the first header button: landing on Edit or Move to
+    // trash would make an accidental Enter destructive.
     const focusTarget =
-      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ?? dialog ?? undefined;
+      dialog?.querySelector<HTMLElement>(".item-detail__close") ??
+      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
+      dialog ??
+      undefined;
     focusTarget?.focus();
 
     return () => {
@@ -327,29 +351,29 @@ export function ItemDetailModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleTabKey}
       >
-        <button type="button" className="item-detail__close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-
-        {isOwner && (onEdit || onOpenHistory || onDelete) && (
-          <div className="item-detail__owner-actions">
-            {onEdit && (
-              <button type="button" onClick={onEdit}>
-                Edit
-              </button>
-            )}
-            {onOpenHistory && (
-              <button type="button" onClick={onOpenHistory}>
-                History
-              </button>
-            )}
-            {onDelete && (
-              <button type="button" onClick={() => setConfirmingDelete(true)}>
-                Move to trash
-              </button>
-            )}
-          </div>
-        )}
+        <div className="item-detail__header">
+          {isOwner && onEdit && <IconButton icon={Pencil} label="Edit" onClick={onEdit} />}
+          {isOwner && onOpenHistory && (
+            <IconButton icon={History} label="History" onClick={onOpenHistory} />
+          )}
+          <span className="item-detail__header-push" />
+          {isOwner && onDelete && (
+            <IconButton
+              icon={Trash2}
+              label="Move to trash"
+              tone="danger"
+              tooltipAlign="end"
+              onClick={() => setConfirmingDelete(true)}
+            />
+          )}
+          <IconButton
+            icon={X}
+            label="Close"
+            className="item-detail__close"
+            tooltipAlign="end"
+            onClick={onClose}
+          />
+        </div>
 
         {confirmingDelete && onDelete && (
           <ConfirmDialog
@@ -377,7 +401,10 @@ export function ItemDetailModal({
         {item.tags.length > 0 && (
           <ul className="item-detail__tags" aria-label="Tags">
             {item.tags.map((tag) => (
-              <li key={tag}>{tag}</li>
+              <li key={tag} className="chip chip--static">
+                <span aria-hidden="true">#</span>
+                {tag}
+              </li>
             ))}
           </ul>
         )}
@@ -385,7 +412,9 @@ export function ItemDetailModal({
         {categoryLabels.length > 0 && (
           <ul className="item-detail__categories" aria-label="Categories">
             {categoryLabels.map((label) => (
-              <li key={label}>{label}</li>
+              <li key={label} className="chip chip--static">
+                {label}
+              </li>
             ))}
           </ul>
         )}

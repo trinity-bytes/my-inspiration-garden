@@ -15,7 +15,7 @@
   width: min(640px, 100%);
   max-height: min(88vh, 900px);
   overflow-y: auto;
-  padding: var(--space-6) var(--space-5) var(--space-5);
+  padding: var(--space-5);
   border-radius: var(--radius-lg);
 }
 
@@ -34,46 +34,17 @@
   }
 }
 
-.item-detail__close {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  border: none;
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-size: var(--font-size-lg);
-  line-height: 1;
-  cursor: pointer;
-}
-
-.item-detail__close:hover,
-.item-detail__close:focus-visible {
-  background: var(--color-accent-soft);
-}
-
-/* T11 owner-only action row */
-.item-detail__owner-actions {
+/* Header (Figma Proposals `16:645`): Edit and History on the left; Move to
+   trash (danger) beside Close on the right, apart from the rest. */
+.item-detail__header {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-  margin: 0 var(--space-6) var(--space-3) 0;
+  padding-bottom: var(--space-3);
 }
 
-.item-detail__owner-actions button {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-}
-
-.item-detail__owner-actions button:focus-visible {
-  outline: var(--focus-ring-width) solid var(--color-focus-ring);
-  outline-offset: var(--focus-ring-offset);
+.item-detail__header-push {
+  flex: 1;
 }
 
 .item-detail__kind-label {
@@ -86,7 +57,7 @@
 }
 
 .item-detail__title {
-  margin: var(--space-1) 0 var(--space-4);
+  margin: 0 0 var(--space-4);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-heading-strong);
 }
@@ -122,6 +93,35 @@
   margin-bottom: var(--space-3);
 }
 
+.item-detail__preview-link {
+  position: relative;
+  display: block;
+}
+
+.item-detail__preview-link .item-detail__link-preview {
+  transition: filter var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.item-detail__preview-link:hover .item-detail__link-preview {
+  filter: brightness(1.06);
+}
+
+.item-detail__open-badge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: rgb(28 24 48 / 0.75);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-label);
+}
+
 .item-detail__description {
   margin: 0 0 var(--space-2);
 }
@@ -133,12 +133,6 @@
 }
 
 .item-detail__open-link {
-  display: inline-block;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-  font-weight: var(--font-weight-label);
   text-decoration: none;
 }
 
@@ -229,13 +223,9 @@
   padding: 0;
 }
 
-.item-detail__tags li,
-.item-detail__categories li {
+.item-detail__tags .chip--static,
+.item-detail__categories .chip--static {
   padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
-  font-size: var(--font-size-xs);
 }
 
 .item-detail__meta {

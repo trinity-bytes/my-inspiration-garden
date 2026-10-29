@@ -65,6 +65,49 @@ describe("ItemDetailModal", () => {
     expect(openButton).toHaveFocus();
   });
 
+  it("opens focused on Close and keeps owner actions as named icon buttons, trash in the danger tone", () => {
+    const item = makeItem("i9", "text", {}, { title: "Note" });
+    render(
+      <ItemDetailModal
+        item={item}
+        onClose={() => {}}
+        categoryNames={{}}
+        isOwner
+        onEdit={() => {}}
+        onOpenHistory={() => {}}
+        onDelete={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Edit" })).toHaveClass("icon-button--neutral");
+    expect(screen.getByRole("button", { name: "History" })).toHaveClass("icon-button--neutral");
+    expect(screen.getByRole("button", { name: "Move to trash" })).toHaveClass(
+      "icon-button--danger",
+    );
+  });
+
+  it("shows tags as static chips with a # prefix and makes the preview image open the link", () => {
+    const item = makeItem(
+      "i10",
+      "link",
+      { previewImage: "https://example.com/p.png" },
+      { title: "A link", url: "https://example.com/a", tags: ["moodboard"] },
+    );
+    render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+
+    const tag = within(screen.getByRole("list", { name: "Tags" })).getByRole("listitem");
+    expect(tag).toHaveClass("chip--static");
+    expect(tag).toHaveTextContent("#moodboard");
+
+    const preview = document.querySelector(".item-detail__preview-link");
+    expect(preview).toHaveAttribute("href", "https://example.com/a");
+    expect(preview).toHaveAttribute("tabindex", "-1");
+    expect(preview).toHaveTextContent("Open");
+    // Only the "Open link" button is in the tab order.
+    expect(screen.getByRole("link", { name: /open link/i })).not.toHaveAttribute("tabindex");
+  });
+
   it("traps Tab focus within the dialog", () => {
     const item = makeItem("i5", "link", {}, { title: "A link", url: "https://example.com/a" });
     render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);

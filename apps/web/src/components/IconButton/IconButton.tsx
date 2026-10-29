@@ -15,6 +15,8 @@ export interface IconButtonProps
   /** Shows `label` as a tooltip on hover/focus. Set `false` when visible text already names it. */
   tooltip?: boolean;
   tooltipPlacement?: "bottom" | "top";
+  /** `end` right-aligns the tooltip so it stays inside a clipping container near its right edge. */
+  tooltipAlign?: "center" | "end";
 }
 
 /**
@@ -27,6 +29,7 @@ export function IconButton({
   tone = "neutral",
   tooltip = true,
   tooltipPlacement = "bottom",
+  tooltipAlign = "center",
   className,
   type = "button",
   ...buttonProps
@@ -48,7 +51,13 @@ export function IconButton({
     <span className="icon-button-wrap has-tooltip">
       {button}
       <span
-        className={tooltipPlacement === "top" ? "tooltip tooltip--top" : "tooltip"}
+        className={[
+          "tooltip",
+          tooltipPlacement === "top" && "tooltip--top",
+          tooltipAlign === "end" && "tooltip--end",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         aria-hidden="true"
       >
         {label}
