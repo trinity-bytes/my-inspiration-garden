@@ -146,14 +146,16 @@ describe("CategoryManagerModal (T11b B6)", () => {
       />,
     );
 
-    const rootMoveSelect = screen.getByLabelText("Move Root") as HTMLSelectElement;
-    const optionLabels = Array.from(rootMoveSelect.options).map((option) => option.textContent);
+    fireEvent.click(screen.getByRole("combobox", { name: "Move Root" }));
+    const optionLabels = screen.getAllByRole("option").map((option) => option.textContent);
     expect(optionLabels).toContain("Top level");
     expect(optionLabels).toContain("Other");
     expect(optionLabels).not.toContain("Root");
     expect(optionLabels).not.toContain("Child");
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Move Root" }), { key: "Escape" });
 
-    fireEvent.change(screen.getByLabelText("Move Other"), { target: { value: "root" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Move Other" }));
+    fireEvent.click(screen.getByRole("option", { name: "Root" }));
 
     await waitFor(() => expect(updateCategory).toHaveBeenCalledWith("other", { parentId: "root" }));
   });
@@ -170,7 +172,8 @@ describe("CategoryManagerModal (T11b B6)", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Move Child"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Move Child" }));
+    fireEvent.click(screen.getByRole("option", { name: "Top level" }));
 
     await waitFor(() => expect(updateCategory).toHaveBeenCalledWith("child", { parentId: null }));
   });
@@ -213,7 +216,8 @@ describe("CategoryManagerModal (T11b B6)", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Move Other"), { target: { value: "root" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Move Other" }));
+    fireEvent.click(screen.getByRole("option", { name: "Root" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/try again/i);
   });

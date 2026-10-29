@@ -23,6 +23,7 @@ import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
 import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import { IconButton } from "../components/IconButton/IconButton";
+import { Select } from "../components/Select/Select";
 import { buildCategoryTree, type CategoryTreeNode } from "../filters/filter-state";
 import { invalidateCategories } from "./categories-store";
 import "../forms/FormModal.css";
@@ -251,8 +252,8 @@ function CategoryManagerNode({
     });
   }
 
-  function handleMove(event: React.ChangeEvent<HTMLSelectElement>): void {
-    const parentId = event.target.value === "" ? null : event.target.value;
+  function handleMove(value: string): void {
+    const parentId = value === "" ? null : value;
     if (parentId === category.parentId) return;
     void runMutation(() => updateCategory(category.id, { parentId }));
   }
@@ -322,24 +323,21 @@ function CategoryManagerNode({
                   setIsExpanded(true);
                 }}
               />
-              {/* A native select dressed as an icon button: keeps the platform
-                  picker (and its keyboard/touch behavior) for "Move to…". */}
               <span className="has-tooltip category-manager__move">
-                <span className="icon-button icon-button--neutral" aria-hidden="true">
-                  <FolderInput size={20} />
-                </span>
-                <select
+                <Select
+                  variant="icon"
+                  icon={FolderInput}
                   aria-label={`Move ${category.name}`}
                   value={category.parentId ?? ""}
+                  options={[
+                    { value: "", label: "Top level" },
+                    ...moveTargets.map((candidate) => ({
+                      value: candidate.id,
+                      label: candidate.name,
+                    })),
+                  ]}
                   onChange={handleMove}
-                >
-                  <option value="">Top level</option>
-                  {moveTargets.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>
-                      {candidate.name}
-                    </option>
-                  ))}
-                </select>
+                />
                 <span className="tooltip" aria-hidden="true">
                   Move to…
                 </span>

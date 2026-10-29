@@ -13,8 +13,14 @@ import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
 import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import { IconButton } from "../components/IconButton/IconButton";
+import { Select, type SelectOption } from "../components/Select/Select";
 import "../forms/FormModal.css";
 import "./TokensModal.css";
+
+const SCOPE_OPTIONS: SelectOption<TokenScope>[] = [
+  { value: "read", label: "Read" },
+  { value: "write", label: "Read + write" },
+];
 
 export interface TokensModalProps {
   onClose: () => void;
@@ -258,15 +264,13 @@ export function TokensModal({
             <label className="field__label" htmlFor={scopeSelectId}>
               Scope
             </label>
-            <select
+            <Select
               id={scopeSelectId}
               value={scope}
-              onChange={(event) => setScope(event.target.value as TokenScope)}
+              options={SCOPE_OPTIONS}
+              onChange={setScope}
               disabled={creating}
-            >
-              <option value="read">Read</option>
-              <option value="write">Read + write</option>
-            </select>
+            />
           </div>
           <Button
             type="submit"

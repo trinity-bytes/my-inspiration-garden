@@ -53,7 +53,8 @@ describe("ItemForm — common fields and kind switching", () => {
     );
 
     expect(screen.getByLabelText("Body")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "font" } });
+    fireEvent.click(screen.getByLabelText("Kind"));
+    fireEvent.click(screen.getByRole("option", { name: "Font" }));
     expect(screen.queryByLabelText("Body")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Font family")).toBeInTheDocument();
   });
@@ -254,7 +255,8 @@ describe("ItemForm — video kind", () => {
 
     expect(screen.getByLabelText("Embed URL")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "file" } });
+    fireEvent.click(screen.getByLabelText("Provider"));
+    fireEvent.click(screen.getByRole("option", { name: "Uploaded file" }));
     expect(screen.queryByLabelText("Embed URL")).not.toBeInTheDocument();
 
     const file = new File(["abc"], "clip.mp4", { type: "video/mp4" });
@@ -528,7 +530,8 @@ describe("ItemForm — font kind", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "font" } });
+    fireEvent.click(screen.getByLabelText("Kind"));
+    fireEvent.click(screen.getByRole("option", { name: "Font" }));
     fireEvent.change(screen.getByLabelText("Font family"), { target: { value: "Geist Variable" } });
 
     fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));

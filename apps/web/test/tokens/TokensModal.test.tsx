@@ -83,7 +83,8 @@ describe("TokensModal (T12)", () => {
     await screen.findByText(/no tokens yet/i);
 
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "agent-two" } });
-    fireEvent.change(screen.getByLabelText("Scope"), { target: { value: "write" } });
+    fireEvent.click(screen.getByLabelText("Scope"));
+    fireEvent.click(screen.getByRole("option", { name: "Read + write" }));
     fireEvent.click(screen.getByRole("button", { name: "Create token" }));
 
     await waitFor(() =>

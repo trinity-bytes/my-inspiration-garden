@@ -10,9 +10,10 @@ import {
 import { resolveMediaRef } from "../api/media-ref";
 import { Button } from "../components/Button/Button";
 import { IconButton } from "../components/IconButton/IconButton";
+import { Select, type SelectOption } from "../components/Select/Select";
 import { CategoryTree } from "../filters/CategoryTree";
 import { buildCategoryTree } from "../filters/filter-state";
-import { KIND_ICONS } from "../items/kind-icons";
+import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
 import {
   buildCreateItemInput,
   buildUpdateItemInput,
@@ -24,13 +25,29 @@ import { type ImageUploadResult, uploadImageFile } from "./media-upload";
 import { TagInput } from "./TagInput";
 import { deriveVideoEmbed } from "./video-url";
 
-const KIND_OPTIONS: { value: ItemKind; label: string }[] = [
-  { value: "image", label: "Image" },
-  { value: "link", label: "Link" },
-  { value: "text", label: "Text" },
-  { value: "video", label: "Video" },
-  { value: "palette", label: "Palette" },
-  { value: "font", label: "Font" },
+const KIND_OPTIONS: SelectOption<ItemKind>[] = (
+  ["image", "link", "text", "video", "palette", "font"] as const
+).map((kind) => ({ value: kind, label: KIND_LABELS[kind], icon: KIND_ICONS[kind] }));
+
+const VIDEO_PROVIDER_OPTIONS: SelectOption<ItemFormState["video"]["provider"]>[] = [
+  { value: "youtube", label: "YouTube" },
+  { value: "vimeo", label: "Vimeo" },
+  { value: "file", label: "Uploaded file" },
+];
+
+const FONT_PROVIDER_OPTIONS: SelectOption<NonNullable<ItemFormState["font"]["provider"]> | "">[] = [
+  { value: "", label: "—" },
+  { value: "google", label: "Google Fonts" },
+  { value: "fontshare", label: "Fontshare" },
+  { value: "foundry", label: "Foundry" },
+  { value: "other", label: "Other" },
+];
+
+const FONT_LICENSE_OPTIONS: SelectOption<NonNullable<ItemFormState["font"]["license"]> | "">[] = [
+  { value: "", label: "—" },
+  { value: "free", label: "Free" },
+  { value: "commercial", label: "Commercial" },
+  { value: "unknown", label: "Unknown" },
 ];
 
 export interface ItemFormProps {
@@ -186,7 +203,6 @@ export function ItemForm({
   }
 
   const error = validationError ?? submitError;
-  const KindIcon = KIND_ICONS[state.kind];
   // The banner says what's wrong; the image field itself also carries it.
   const imageMissing = state.kind === "image" && validationError !== null && !state.image.r2Key;
 
@@ -202,21 +218,13 @@ export function ItemForm({
       {mode === "create" && (
         <label className="item-form__field" htmlFor={`${formId}-kind`}>
           Kind
-          <span className="control-with-icon">
-            <KindIcon size={16} aria-hidden="true" />
-            <select
-              id={`${formId}-kind`}
-              value={state.kind}
-              onChange={(event) => update({ kind: event.target.value as ItemKind })}
-              data-autofocus
-            >
-              {KIND_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </span>
+          <Select
+            id={`${formId}-kind`}
+            value={state.kind}
+            options={KIND_OPTIONS}
+            onChange={(kind) => update({ kind })}
+            data-autofocus
+          />
         </label>
       )}
 
@@ -386,19 +394,12 @@ export function ItemForm({
           )}
           <label className="item-form__field" htmlFor={`${formId}-video-provider`}>
             Provider
-            <select
+            <Select
               id={`${formId}-video-provider`}
               value={state.video.provider}
-              onChange={(event) =>
-                updateKindData("video", {
-                  provider: event.target.value as ItemFormState["video"]["provider"],
-                })
-              }
-            >
-              <option value="youtube">YouTube</option>
-              <option value="vimeo">Vimeo</option>
-              <option value="file">Uploaded file</option>
-            </select>
+              options={VIDEO_PROVIDER_OPTIONS}
+              onChange={(provider) => updateKindData("video", { provider })}
+            />
           </label>
           {(state.video.provider === "youtube" || state.video.provider === "vimeo") && (
             <label className="item-form__field" htmlFor={`${formId}-video-embed`}>
@@ -531,38 +532,21 @@ export function ItemForm({
           </label>
           <label className="item-form__field" htmlFor={`${formId}-font-provider`}>
             Provider
-            <select
+            <Select
               id={`${formId}-font-provider`}
               value={state.font.provider ?? ""}
-              onChange={(event) =>
-                updateKindData("font", {
-                  provider: (event.target.value || undefined) as ItemFormState["font"]["provider"],
-                })
-              }
-            >
-              <option value="">—</option>
-              <option value="google">Google Fonts</option>
-              <option value="fontshare">Fontshare</option>
-              <option value="foundry">Foundry</option>
-              <option value="other">Other</option>
-            </select>
+              options={FONT_PROVIDER_OPTIONS}
+              onChange={(provider) => updateKindData("font", { provider: provider || undefined })}
+            />
           </label>
           <label className="item-form__field" htmlFor={`${formId}-font-license`}>
             License
-            <select
+            <Select
               id={`${formId}-font-license`}
               value={state.font.license ?? ""}
-              onChange={(event) =>
-                updateKindData("font", {
-                  license: (event.target.value || undefined) as ItemFormState["font"]["license"],
-                })
-              }
-            >
-              <option value="">—</option>
-              <option value="free">Free</option>
-              <option value="commercial">Commercial</option>
-              <option value="unknown">Unknown</option>
-            </select>
+              options={FONT_LICENSE_OPTIONS}
+              onChange={(license) => updateKindData("font", { license: license || undefined })}
+            />
           </label>
           <label className="item-form__field" htmlFor={`${formId}-font-preview-text`}>
             Preview text

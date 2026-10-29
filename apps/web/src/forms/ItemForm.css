@@ -15,7 +15,7 @@
 }
 
 .item-form__field input,
-.item-form__field select,
+.item-form__field .select__trigger,
 .item-form__field textarea {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-body);
