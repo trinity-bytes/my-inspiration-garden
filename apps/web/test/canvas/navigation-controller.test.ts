@@ -244,6 +244,41 @@ describe("NavigationController", () => {
     controller.dispose();
   });
 
+  it("keeps panning 1:1 from the drag origin through a long drag", () => {
+    const controller = new NavigationController({
+      container,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+    });
+    controller.mount();
+    container.setPointerCapture = () => {};
+    container.releasePointerCapture = () => {};
+
+    container.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 500,
+        clientY: 800,
+        pointerId: 1,
+        pointerType: "touch",
+        bubbles: true,
+      }),
+    );
+    // More moves than the release-velocity sample window keeps.
+    for (let step = 1; step <= 12; step += 1) {
+      container.dispatchEvent(
+        new PointerEvent("pointermove", {
+          clientX: 500,
+          clientY: 800 - step * 40,
+          pointerId: 1,
+          pointerType: "touch",
+          bubbles: true,
+        }),
+      );
+      expect(controller.getWorldOffset().y).toBeCloseTo(-step * 40, 5);
+    }
+
+    controller.dispose();
+  });
+
   it("keeps release velocity and decays it after a drag ends", () => {
     const controller = new NavigationController({
       container,

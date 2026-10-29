@@ -78,6 +78,8 @@ export class NavigationController {
 
   private dragPointerId: number | null = null;
   private dragStart: Vec2 = { x: 0, y: 0 };
+  /** Pointer position at pointerdown. Kept apart from `dragSamples`, whose window slides. */
+  private dragPointerStart: Vec2 = { x: 0, y: 0 };
   private dragSamples: DragSample[] = [];
 
   private readonly activeKeyDirections = new Set<KeyDirection>();
@@ -299,6 +301,7 @@ export class NavigationController {
     this.dragPointerId = event.pointerId;
     this.motionState = "dragging";
     this.dragStart = { x: this.worldOffset.x, y: this.worldOffset.y };
+    this.dragPointerStart = { x: event.clientX, y: event.clientY };
     this.dragSamples = [{ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 }];
     this.container.setPointerCapture?.(event.pointerId);
     this.container.focus();
@@ -309,12 +312,8 @@ export class NavigationController {
     if (this.motionState !== "dragging" || event.pointerId !== this.dragPointerId) {
       return;
     }
-    const firstSample = this.dragSamples[0];
-    if (!firstSample) {
-      return;
-    }
-    const dx = event.clientX - firstSample.x;
-    const dy = event.clientY - firstSample.y;
+    const dx = event.clientX - this.dragPointerStart.x;
+    const dy = event.clientY - this.dragPointerStart.y;
     this.worldOffset = { x: this.dragStart.x + dx, y: this.dragStart.y + dy };
     this.dragSamples.push({ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 });
     if (this.dragSamples.length > 5) {
