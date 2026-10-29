@@ -138,10 +138,14 @@ export function TokensModal({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse-only backdrop close, Escape is the keyboard equivalent (see ItemDetailModal precedent).
     // biome-ignore lint/a11y/useKeyWithClickEvents: see comment above.
-    <div className="form-modal-backdrop" data-testid="tokens-backdrop" onClick={onClose}>
+    <div
+      className="form-modal-backdrop sheet-backdrop"
+      data-testid="tokens-backdrop"
+      onClick={onClose}
+    >
       <div
         ref={dialogRef}
-        className="glass form-modal-dialog tokens-modal-dialog"
+        className="glass form-modal-dialog sheet--full tokens-modal-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

@@ -119,3 +119,34 @@
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
   outline-offset: var(--focus-ring-offset);
 }
+
+/* Phone (Figma Proposals `39:831`): a bottom sheet sized to its content.
+   No scrim, so the canvas keeps showing the results while filters apply
+   live (owner decision L7); the Filters button in the bar closes it. */
+@media (max-width: 480px) {
+  .filter-panel {
+    position: fixed;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 70dvh;
+    padding: var(--space-6) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    border-bottom: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: sheet-in var(--motion-duration-base) var(--motion-easing-decelerate);
+  }
+
+  .filter-panel::before {
+    content: "";
+    position: absolute;
+    top: var(--space-2);
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-border-strong);
+    translate: -50% 0;
+  }
+}

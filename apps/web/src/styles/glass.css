@@ -74,3 +74,52 @@
     animation: none;
   }
 }
+
+/**
+ * Phone sheets (Figma Proposals `39:831`): below 480px every dialog rises
+ * from the bottom edge with a grab handle over the scrim. Lists and confirms
+ * are sized to their content; `.sheet--full` dialogs (item detail, forms,
+ * Categories, API tokens) fill the screen below the navbar and scroll
+ * inside. Pair with a backdrop that has the `.sheet-backdrop` class.
+ */
+@media (max-width: 480px) {
+  /* Doubled class: beats each backdrop's own centered layout and padding. */
+  .sheet-backdrop.sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .sheet-backdrop > .glass {
+    position: relative;
+    width: 100%;
+    max-height: calc(100dvh - 56px);
+    padding: var(--space-6) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+    border-bottom: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: sheet-in var(--motion-duration-base) var(--motion-easing-decelerate);
+  }
+
+  .sheet-backdrop > .sheet--full {
+    height: calc(100dvh - 56px);
+  }
+
+  /* Grab handle. */
+  .sheet-backdrop > .glass::before {
+    content: "";
+    position: absolute;
+    top: var(--space-2);
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-border-strong);
+    translate: -50% 0;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}

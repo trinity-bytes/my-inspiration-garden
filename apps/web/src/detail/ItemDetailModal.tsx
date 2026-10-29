@@ -337,13 +337,13 @@ export function ItemDetailModal({
     // biome-ignore lint/a11y/noStaticElementInteractions: see comment above.
     // biome-ignore lint/a11y/useKeyWithClickEvents: see comment above.
     <div
-      className="item-detail-backdrop"
+      className="item-detail-backdrop sheet-backdrop"
       data-testid="detail-modal-backdrop"
       onClick={handleBackdropClick}
     >
       <div
         ref={dialogRef}
-        className="glass item-detail-dialog"
+        className="glass item-detail-dialog sheet--full"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
