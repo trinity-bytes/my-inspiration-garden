@@ -18,7 +18,7 @@ import { wrapText } from "./wrap-text";
  * cache (`engine.ts`'s `CARD_TEXTURE_CACHE_SIZE`) on large cards and high-DPR screens.
  */
 export const MAX_TEXTURE_EDGE_PX = 1024;
-/** Same cap as `engine.ts`'s `DPR_CAP`: beyond 2x the extra texels are not visible. */
+/** Same cap as `render-pixel-ratio.ts`'s `MAX_RENDER_DPR`: beyond 2x the extra texels are not visible. */
 const MAX_TEXTURE_DPR = 2;
 const CORNER_RADIUS_FRACTION = 0.06;
 

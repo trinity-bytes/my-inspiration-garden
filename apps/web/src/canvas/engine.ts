@@ -20,6 +20,7 @@ import { LruCache } from "./lru-cache";
 import { NavigationController } from "./navigation-controller";
 import { PointerInteractionController } from "./pointer-interaction";
 import { BarrelPass } from "./post/barrel";
+import { renderPixelRatio } from "./render-pixel-ratio";
 import type { Vec2 } from "./types";
 
 export interface CanvasEngineOptions {
@@ -42,8 +43,6 @@ export interface WorldState {
   viewportHeight: number;
   distortionK: number;
 }
-
-const DPR_CAP = 2;
 
 // Cards render above everything else in the scene (nothing else is drawn but
 // the solid clear color today; the headroom keeps room for future layers).
@@ -148,7 +147,10 @@ export class CanvasEngine {
       canvas = document.createElement("canvas");
       renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias: true,
+        // No MSAA: the scene renders into a non-multisampled render target, so the default
+        // framebuffer only ever holds the fullscreen barrel quad and a multisample resolve of it
+        // would cost a full-screen pass per frame for no visible gain.
+        antialias: false,
         alpha: false,
         powerPreference: "high-performance",
       });
@@ -314,7 +316,7 @@ export class CanvasEngine {
     const { width: rawWidth, height: rawHeight } = this.getViewportSize();
     const width = Math.max(1, Math.round(rawWidth));
     const height = Math.max(1, Math.round(rawHeight));
-    const dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    const dpr = renderPixelRatio(window.devicePixelRatio, width, height);
 
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(width, height, false);
