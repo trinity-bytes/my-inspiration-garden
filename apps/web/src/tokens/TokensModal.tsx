@@ -1,4 +1,5 @@
 import type { ApiTokenPublic, CreateApiTokenInput, TokenScope } from "@garden/shared";
+import { Ban, Check, CircleAlert, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import {
   type CreatedApiToken,
@@ -7,8 +8,11 @@ import {
   revokeToken as revokeTokenDefault,
   type TokensResult,
 } from "../api/endpoints";
+import { Button } from "../components/Button/Button";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
+import { DialogHeader } from "../components/Dialog/DialogHeader";
 import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
+import { IconButton } from "../components/IconButton/IconButton";
 import "../forms/FormModal.css";
 import "./TokensModal.css";
 
@@ -25,7 +29,7 @@ const REVOKE_ERROR = "Could not revoke this token. Please try again.";
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
   } catch {
     return iso;
   }
@@ -144,16 +148,15 @@ export function TokensModal({
         onClick={(event) => event.stopPropagation()}
         onKeyDown={revokingId === null ? handleTabKey : undefined}
       >
-        <h2 id={titleId} className="form-modal__title">
-          API tokens
-        </h2>
+        <DialogHeader titleId={titleId} title="API tokens" onClose={onClose} />
         <p className="tokens-modal__intro">
           Scoped bearer tokens for agents, the browser extension, and the PWA. A <code>write</code>{" "}
           scope always implies <code>read</code>.
         </p>
 
         {error && (
-          <p className="item-form__error" role="alert">
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
             {error}
           </p>
         )}
@@ -161,52 +164,70 @@ export function TokensModal({
         {createdSecret && (
           <div className="tokens-modal__secret" role="status">
             <p className="tokens-modal__secret-warning">
+              <CircleAlert size={16} aria-hidden="true" />
               Copy this token now — you won't see this again.
             </p>
             <div className="tokens-modal__secret-row">
               <code className="tokens-modal__secret-value">{createdSecret}</code>
-              <button type="button" onClick={handleCopy}>
-                Copy
-              </button>
-            </div>
-            {copied && <span className="tokens-modal__copied">Copied</span>}
-            <div className="item-form__actions">
-              <button
-                type="button"
+              <IconButton icon={copied ? Check : Copy} label="Copy" onClick={handleCopy} />
+              <Button
+                size="sm"
+                icon={Check}
                 onClick={() => {
                   setCreatedSecret(null);
                   setCopied(false);
                 }}
               >
                 Done
-              </button>
+              </Button>
             </div>
+            {copied && <span className="tokens-modal__copied">Copied</span>}
           </div>
         )}
 
-        {status === "loading" && <p>Loading tokens…</p>}
+        {status === "loading" && <p className="dialog-empty__hint">Loading tokens…</p>}
         {status === "error" && (
-          <p className="item-form__error" role="alert">
+          <p className="dialog-error" role="alert">
+            <CircleAlert size={16} aria-hidden="true" />
             {LOAD_ERROR}
           </p>
         )}
-        {status === "ready" && tokens.length === 0 && <p>No tokens yet.</p>}
+        {status === "ready" && tokens.length === 0 && (
+          <div className="dialog-empty">
+            <span className="dialog-empty__icon">
+              <KeyRound size={20} aria-hidden="true" />
+            </span>
+            <p>No tokens yet.</p>
+          </div>
+        )}
         {status === "ready" && tokens.length > 0 && (
-          <ul className="tokens-modal__list">
+          <ul className="dialog-list tokens-modal__list">
             {tokens.map((token) => (
-              <li key={token.id} className="tokens-modal__item">
-                <span className="tokens-modal__name">{token.name}</span>
-                <span className="tokens-modal__scope">{token.scope}</span>
-                <span className="tokens-modal__meta">Created {formatDate(token.createdAt)}</span>
-                <span className="tokens-modal__meta">
-                  {token.lastUsedAt ? `Last used ${formatDate(token.lastUsedAt)}` : "Never used"}
+              <li
+                key={token.id}
+                className={
+                  token.revokedAt ? "dialog-row tokens-modal__item--revoked" : "dialog-row"
+                }
+              >
+                <KeyRound size={20} aria-hidden="true" />
+                <span className="dialog-row__meta">
+                  <span className="dialog-row__title">{token.name}</span>
+                  <span className="dialog-row__sub">
+                    Created {formatDate(token.createdAt)} ·{" "}
+                    {token.lastUsedAt ? `Last used ${formatDate(token.lastUsedAt)}` : "Never used"}
+                  </span>
                 </span>
+                <span className="chip chip--static tokens-modal__scope">{token.scope}</span>
                 {token.revokedAt ? (
                   <span className="tokens-modal__revoked">Revoked</span>
                 ) : (
-                  <button type="button" onClick={() => setRevokingId(token.id)}>
-                    Revoke {token.name}
-                  </button>
+                  <IconButton
+                    icon={Trash2}
+                    label={`Revoke ${token.name}`}
+                    tone="danger"
+                    tooltipAlign="end"
+                    onClick={() => setRevokingId(token.id)}
+                  />
                 )}
               </li>
             ))}
@@ -214,18 +235,25 @@ export function TokensModal({
         )}
 
         <form className="tokens-modal__create" onSubmit={handleCreate}>
-          <div className="item-form__field">
-            <label htmlFor={nameInputId}>Name</label>
-            <input
-              id={nameInputId}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. research-agent"
-              disabled={creating}
-            />
+          <div className="field tokens-modal__name-field">
+            <label className="field__label" htmlFor={nameInputId}>
+              Name
+            </label>
+            <span className="control-with-icon">
+              <KeyRound size={16} aria-hidden="true" />
+              <input
+                id={nameInputId}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. research-agent"
+                disabled={creating}
+              />
+            </span>
           </div>
-          <div className="item-form__field">
-            <label htmlFor={scopeSelectId}>Scope</label>
+          <div className="field">
+            <label className="field__label" htmlFor={scopeSelectId}>
+              Scope
+            </label>
             <select
               id={scopeSelectId}
               value={scope}
@@ -236,16 +264,15 @@ export function TokensModal({
               <option value="write">Read + write</option>
             </select>
           </div>
-          <button type="submit" disabled={creating || name.trim().length === 0}>
+          <Button
+            type="submit"
+            variant="accent"
+            icon={Plus}
+            disabled={creating || name.trim().length === 0}
+          >
             Create token
-          </button>
+          </Button>
         </form>
-
-        <div className="item-form__actions">
-          <button type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
       </div>
 
       {revoking && (
@@ -254,6 +281,7 @@ export function TokensModal({
           message={`Revoke "${revoking.name}"? Anything using this token will immediately lose access.`}
           confirmLabel="Revoke"
           destructive
+          icon={Ban}
           onCancel={() => setRevokingId(null)}
           onConfirm={() => {
             void handleRevoke();
