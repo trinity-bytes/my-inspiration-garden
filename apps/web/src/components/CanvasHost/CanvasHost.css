@@ -13,6 +13,10 @@
   position: absolute;
   inset: 0;
   outline: none;
+  /* NavigationController owns every pan axis. Without this the browser
+     claims touch drags as native scroll, fires pointercancel after a few px
+     (pans stall) and turns a downward drag into pull-to-refresh. */
+  touch-action: none;
 }
 
 .canvas-host__webgl-target:focus-visible {

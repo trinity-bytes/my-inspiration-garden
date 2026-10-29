@@ -9,6 +9,9 @@
 html,
 body {
   height: 100%;
+  /* The app is a full-screen canvas, not a document: no pull-to-refresh or
+     page rubber-banding when a pan reaches past the top edge. */
+  overscroll-behavior: none;
 }
 
 body {
