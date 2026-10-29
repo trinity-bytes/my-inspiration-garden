@@ -1,6 +1,8 @@
 import { FolderTree, KeyRound, LogOut, Plus, Trash2 } from "lucide-react";
 import { type PointerEvent, useEffect, useRef } from "react";
+import { isClick } from "../../canvas/click-vs-drag";
 import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../canvas/navigation-controller";
+import type { Vec2 } from "../../canvas/types";
 import { FilterPanel } from "../../filters/FilterPanel";
 import {
   countActiveFilters,
@@ -65,7 +67,10 @@ export function Navbar({
   onTokensClick,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
+  const navbarRef = useRef<HTMLElement>(null);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const filtersDisclosure = useDisclosure();
+  const { isOpen: filtersOpen, close: closeFilters } = filtersDisclosure;
   const { categories, tags } = useFilterOptions();
 
   useKeyboardShortcut("k", () => {
@@ -75,6 +80,38 @@ export function Navbar({
   useEffect(() => {
     onFilterPanelOpenChange?.(filtersDisclosure.isOpen);
   }, [filtersDisclosure.isOpen, onFilterPanelOpenChange]);
+
+  // A tap outside the navbar (the panel lives inside it) or Escape closes the panel. A drag
+  // outside is the canvas panning behind it, which keeps the panel open so results stay in
+  // view. The Filters button is inside the navbar too, so it keeps toggling on its own.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    let outsideDown: Vec2 | null = null;
+    function onPointerDown(event: globalThis.PointerEvent) {
+      outsideDown = navbarRef.current?.contains(event.target as Node)
+        ? null
+        : { x: event.clientX, y: event.clientY };
+    }
+    function onPointerUp(event: globalThis.PointerEvent) {
+      if (outsideDown && isClick(outsideDown, { x: event.clientX, y: event.clientY })) {
+        closeFilters();
+      }
+      outsideDown = null;
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      closeFilters();
+      filtersButtonRef.current?.focus();
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [filtersOpen, closeFilters]);
 
   const signOutHref = "/cdn-cgi/access/logout";
   const manageActions = [
@@ -90,6 +127,7 @@ export function Navbar({
 
   return (
     <header
+      ref={navbarRef}
       className="glass navbar"
       onPointerMove={trackGlassHighlight}
       {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}
@@ -101,6 +139,7 @@ export function Navbar({
         onChange={(q) => onFiltersChange({ ...filters, q })}
         filtersOpen={filtersDisclosure.isOpen}
         onFiltersToggle={filtersDisclosure.toggle}
+        filtersButtonRef={filtersButtonRef}
         activeFilterCount={countActiveFilters(filters)}
       />
       {isOwner && (
@@ -136,6 +175,7 @@ export function Navbar({
         isOpen={filtersDisclosure.isOpen}
         filters={filters}
         onChange={onFiltersChange}
+        onClose={closeFilters}
         categories={categories}
         tags={tags}
       />

@@ -175,4 +175,59 @@ describe("FilterPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(onChange).toHaveBeenCalledWith(defaultFilterState());
   });
+
+  describe("grab handle", () => {
+    function renderOpen(onClose = vi.fn()) {
+      render(
+        <FilterPanel
+          isOpen
+          filters={defaultFilterState()}
+          onChange={vi.fn()}
+          onClose={onClose}
+          categories={categories}
+          tags={tags}
+        />,
+      );
+      return { onClose, handle: screen.getByRole("button", { name: "Close filters" }) };
+    }
+
+    /** Dispatches a down/move/up swipe; `durationMs` sets the timestamps the flick velocity reads. */
+    function drag(handle: HTMLElement, fromY: number, toY: number, durationMs = 400) {
+      const at = (type: string, clientY: number, timeStamp: number) => {
+        const event = new PointerEvent(type, { clientY, pointerId: 1, bubbles: true });
+        Object.defineProperty(event, "timeStamp", { value: timeStamp });
+        handle.dispatchEvent(event);
+      };
+      // Not 0: React swaps a zero timeStamp for Date.now().
+      at("pointerdown", fromY, 1000);
+      at("pointermove", toY, 1000 + durationMs);
+      at("pointerup", toY, 1000 + durationMs);
+    }
+
+    it("closes the panel when tapped", () => {
+      const { onClose, handle } = renderOpen();
+      fireEvent.click(handle);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes the panel when swiped down far enough", () => {
+      const { onClose, handle } = renderOpen();
+      drag(handle, 100, 220);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("closes the panel on a short but fast flick down", () => {
+      const { onClose, handle } = renderOpen();
+      drag(handle, 100, 130, 20);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("snaps back on a short swipe without closing, even if a click follows", () => {
+      const { onClose, handle } = renderOpen();
+      drag(handle, 100, 130);
+      fireEvent.click(handle);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole("region", { name: "Filters" }).style.translate).toBe("");
+    });
+  });
 });

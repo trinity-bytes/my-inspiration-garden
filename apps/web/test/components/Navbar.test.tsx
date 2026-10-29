@@ -107,6 +107,40 @@ describe("Navbar", () => {
     expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
   });
 
+  it("closes the filter panel on a tap outside the navbar but not inside the panel", () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    const panel = screen.getByRole("region", { name: "Filters" });
+
+    fireEvent.pointerDown(panel, { clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(panel, { clientX: 10, clientY: 10 });
+    expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
+
+    fireEvent.pointerDown(document.body, { clientX: 10, clientY: 400 });
+    fireEvent.pointerUp(document.body, { clientX: 12, clientY: 401 });
+    expect(screen.queryByRole("region", { name: "Filters" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the filter panel open while the canvas behind it is dragged", () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+
+    fireEvent.pointerDown(document.body, { clientX: 10, clientY: 400 });
+    expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
+    fireEvent.pointerUp(document.body, { clientX: 10, clientY: 250 });
+    expect(screen.getByRole("region", { name: "Filters" })).toBeInTheDocument();
+  });
+
+  it("closes the filter panel on Escape and returns focus to the Filters button", () => {
+    render(<Navbar />);
+    const filtersButton = screen.getByRole("button", { name: "Filters" });
+    fireEvent.click(filtersButton);
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Filters" })).not.toBeInTheDocument();
+    expect(filtersButton).toHaveFocus();
+  });
+
   it("reports filter-panel open/close through onFilterPanelOpenChange (T10 owner QA: canvas drift must pause while it's open)", () => {
     const onFilterPanelOpenChange = vi.fn();
     render(<Navbar onFilterPanelOpenChange={onFilterPanelOpenChange} />);

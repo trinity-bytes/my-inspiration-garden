@@ -3,6 +3,7 @@ import { Check, Plus, RotateCcw } from "lucide-react";
 import type { TagsResult } from "../api/endpoints";
 import { contrastTextColor } from "../color-contrast";
 import { Button } from "../components/Button/Button";
+import { useSwipeToDismiss } from "../hooks/useSwipeToDismiss";
 import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
 import { CategoryTree } from "./CategoryTree";
 import { buildCategoryTree, type FilterState, isFilterActive, toggleValue } from "./filter-state";
@@ -12,6 +13,8 @@ export interface FilterPanelProps {
   isOpen: boolean;
   filters: FilterState;
   onChange: (next: FilterState) => void;
+  /** Closes the panel from its phone grab handle (tap or swipe down). */
+  onClose?: () => void;
   categories: Category[];
   tags: TagsResult["tags"];
 }
@@ -34,7 +37,16 @@ const COLOR_PRESETS: { name: string; hex: string }[] = [
  * `kinds`/`categoryIds` facets, AND within `tags` (existing API decision,
  * T4/T5 — unrevisited here), AND across facets, single-select `color`.
  */
-export function FilterPanel({ isOpen, filters, onChange, categories, tags }: FilterPanelProps) {
+export function FilterPanel({
+  isOpen,
+  filters,
+  onChange,
+  onClose = () => {},
+  categories,
+  tags,
+}: FilterPanelProps) {
+  const { sheetRef, handleProps } = useSwipeToDismiss<HTMLElement>(onClose);
+
   if (!isOpen) return null;
 
   const categoryTree = buildCategoryTree(categories);
@@ -62,7 +74,13 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
   }
 
   return (
-    <section className="glass filter-panel" aria-label="Filters">
+    <section ref={sheetRef} className="glass filter-panel" aria-label="Filters">
+      <button
+        type="button"
+        className="filter-panel__handle"
+        aria-label="Close filters"
+        {...handleProps}
+      />
       <div className="filter-panel__header">
         <h2 className="filter-panel__title">Filters</h2>
         {isFilterActive(filters) && (

@@ -1,5 +1,5 @@
 import { Search, SlidersHorizontal } from "lucide-react";
-import { forwardRef } from "react";
+import { forwardRef, type Ref } from "react";
 
 export interface SearchBarProps {
   value: string;
@@ -8,6 +8,8 @@ export interface SearchBarProps {
   onFiltersToggle: () => void;
   /** Number of applied filters (search text excluded); shown as a badge when > 0. */
   activeFilterCount: number;
+  /** The Filters button, so closing the panel can hand focus back to it. */
+  filtersButtonRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -16,7 +18,7 @@ export interface SearchBarProps {
  * this search". The label is visually hidden but always announced.
  */
 export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
-  { value, onChange, filtersOpen, onFiltersToggle, activeFilterCount },
+  { value, onChange, filtersOpen, onFiltersToggle, activeFilterCount, filtersButtonRef },
   ref,
 ) {
   const filtersLabel = activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : "Filters";
@@ -40,6 +42,7 @@ export const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function S
       <span className="search-bar__divider" aria-hidden="true" />
       <span className="has-tooltip">
         <button
+          ref={filtersButtonRef}
           type="button"
           className="search-bar__filters"
           aria-label={filtersLabel}
