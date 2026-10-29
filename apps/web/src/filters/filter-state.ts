@@ -33,6 +33,16 @@ export function isFilterActive(filters: FilterState): boolean {
   );
 }
 
+/** Number of applied facet filters (each kind, tag, category, plus the color); search text excluded. */
+export function countActiveFilters(filters: FilterState): number {
+  return (
+    filters.kinds.length +
+    filters.tags.length +
+    filters.categoryIds.length +
+    (filters.color === undefined ? 0 : 1)
+  );
+}
+
 /** Adds `value` to `values` if absent, removes it if present. Does not mutate `values`. */
 export function toggleValue<T>(values: readonly T[], value: T): T[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];

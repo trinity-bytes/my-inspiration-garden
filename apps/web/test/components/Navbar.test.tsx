@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../src/canvas/navigation-controller";
 import { Navbar } from "../../src/components/Navbar/Navbar";
@@ -25,9 +25,23 @@ describe("Navbar", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the brand wordmark", () => {
+  it("keeps the page heading for assistive technology without a visible wordmark", () => {
     render(<Navbar />);
-    expect(screen.getByRole("heading", { name: "Inspiration Garden" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Inspiration Garden" })).toHaveClass(
+      "visually-hidden",
+    );
+  });
+
+  it("puts Filters inside the search bar and announces the applied-filter count", () => {
+    render(
+      <Navbar
+        filters={{ ...defaultFilterState(), kinds: ["image"], color: "#F29A6B", q: "sunset" }}
+      />,
+    );
+
+    const filtersButton = screen.getByRole("button", { name: "Filters, 2 active" });
+    expect(filtersButton.closest(".search-bar")).not.toBeNull();
+    expect(filtersButton).toHaveTextContent("2");
   });
 
   it("marks itself as a navigation blocker so hovering it stops cursor drift", () => {
@@ -158,5 +172,44 @@ describe("Navbar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "API tokens" }));
     expect(onTokensClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives the owner an account menu with the management actions and Sign out last", () => {
+    const onTrashClick = vi.fn();
+    render(<Navbar isOwner onTrashClick={onTrashClick} onCategoriesClick={() => {}} />);
+
+    const menuButton = screen.getByRole("button", { name: "Account menu" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(menuButton);
+
+    const menu = screen.getByRole("menu", { name: "Account" });
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent)).toEqual(["Trash", "Categories", "Sign out"]);
+    expect(items[0]).toHaveFocus();
+    expect(items[2]).toHaveAttribute("href", "/cdn-cgi/access/logout");
+
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(items[2]).toHaveFocus();
+
+    fireEvent.click(items[0] as HTMLElement);
+    expect(onTrashClick).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("closes the account menu on Escape and returns focus to its button", () => {
+    render(<Navbar isOwner onTrashClick={() => {}} />);
+    const menuButton = screen.getByRole("button", { name: "Account menu" });
+    fireEvent.click(menuButton);
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(menuButton).toHaveFocus();
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not render an account menu for a visitor", () => {
+    render(<Navbar />);
+    expect(screen.queryByRole("button", { name: "Account menu" })).not.toBeInTheDocument();
   });
 });

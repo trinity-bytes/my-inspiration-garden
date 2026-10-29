@@ -5,6 +5,7 @@ import "./styles/glass.css";
 import "./styles/controls.css";
 import "./styles/field.css";
 import "./styles/chip.css";
+import "./styles/dropdown-menu.css";
 import "./styles/tooltip.css";
 
 import { StrictMode } from "react";

@@ -2,6 +2,7 @@ import type { Category } from "@garden/shared";
 import { describe, expect, it } from "vitest";
 import {
   buildCategoryTree,
+  countActiveFilters,
   defaultFilterState,
   filtersToListParams,
   isFilterActive,
@@ -38,6 +39,21 @@ describe("defaultFilterState", () => {
       color: undefined,
       q: "",
     });
+  });
+});
+
+describe("countActiveFilters", () => {
+  it("counts each kind, tag and category plus the color, ignoring the search text", () => {
+    expect(countActiveFilters(defaultFilterState())).toBe(0);
+    expect(
+      countActiveFilters({
+        kinds: ["image", "link"],
+        tags: ["moodboard"],
+        categoryIds: ["c1"],
+        color: "#F29A6B",
+        q: "sunset",
+      }),
+    ).toBe(5);
   });
 });
 

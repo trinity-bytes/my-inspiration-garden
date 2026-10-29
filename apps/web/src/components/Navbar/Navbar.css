@@ -1,15 +1,17 @@
+/* Navbar v2 (Figma Proposals `26:163`): a centered pill as wide as its content. */
 .navbar {
   position: fixed;
   top: var(--space-4);
-  left: var(--space-4);
-  right: var(--space-4);
+  left: 50%;
+  translate: -50% 0;
   z-index: 30;
 
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
+  gap: var(--space-3);
+  max-width: calc(100vw - var(--space-4) * 2);
+  padding: 6px;
+  border-radius: var(--radius-full);
 
   /* The `.glass` surface, except the blur moves to `::before`: an element
      with `backdrop-filter` becomes a backdrop root, and the filter panel
@@ -52,109 +54,170 @@
   opacity: 1;
 }
 
-.navbar__brand {
-  flex: 0 0 auto;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-heading-strong);
-  white-space: nowrap;
+.navbar__divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background-color: var(--color-border);
 }
 
-.navbar__search {
+.navbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Desktop: management actions and Sign out sit in the bar; the account menu
+   only exists on phones. */
+.account-menu {
+  display: none;
   position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
 }
 
-.navbar__search-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-6) var(--space-2) var(--space-3);
-  border-radius: var(--radius-full);
+/* Search Bar (Figma Components `28:165`): grows from 280px to 360px on focus. */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 280px;
+  height: 36px;
+  padding: 0 var(--space-1) 0 var(--space-3);
   border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-raised);
+  transition:
+    width var(--motion-duration-base) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.search-bar:hover {
+  border-color: var(--color-border-strong);
+}
+
+.search-bar:focus-within {
+  width: 360px;
+  border-color: var(--color-focus-ring);
+}
+
+.search-bar__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.search-bar__input,
+.search-bar__input:focus-visible {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: none;
   color: var(--color-text);
   font-size: var(--font-size-sm);
 }
 
-.navbar__search-input::placeholder {
+/* The native clear (x) button duplicates nothing useful in a pill this small. */
+.search-bar__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-bar__input::placeholder {
   color: var(--color-text-muted);
 }
 
-.navbar__search-hint {
-  position: absolute;
-  right: var(--space-3);
-  top: 50%;
-  transform: translateY(-50%);
+.search-bar__hint {
+  flex: none;
   font-family: inherit;
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-  pointer-events: none;
 }
 
-.navbar__filters-button {
-  flex: 0 0 auto;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
+.search-bar__divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  background-color: var(--color-border);
+}
+
+.search-bar__filters {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 28px;
+  padding: var(--space-1) 6px;
   border: none;
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
-  font-weight: var(--font-weight-label);
-  letter-spacing: var(--tracking-label);
-}
-
-.navbar__filters-button[aria-expanded="true"] {
-  background: var(--color-accent-strong);
-}
-
-.navbar__add-button,
-.navbar__trash-button,
-.navbar__categories-button,
-.navbar__tokens-button {
-  flex: 0 0 auto;
-  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
+  background-color: var(--color-surface-raised);
   color: var(--color-text);
-  font-weight: var(--font-weight-label);
-  cursor: pointer;
+  transition: background-color var(--motion-duration-fast) var(--motion-easing-standard);
 }
 
-.navbar__add-button:hover,
-.navbar__trash-button:hover,
-.navbar__categories-button:hover,
-.navbar__tokens-button:hover,
-.navbar__add-button:focus-visible,
-.navbar__trash-button:focus-visible,
-.navbar__categories-button:focus-visible,
-.navbar__tokens-button:focus-visible {
-  background: var(--color-accent-soft);
+.search-bar__filters:hover,
+.search-bar__filters[aria-expanded="true"] {
+  background-color: var(--color-accent-soft);
 }
 
-.navbar__signout {
-  flex: 0 0 auto;
+.search-bar__filters:has(.search-bar__count) {
+  padding-right: var(--space-1);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.search-bar__count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-text-on-accent);
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  text-decoration: none;
-  white-space: nowrap;
+  font-weight: var(--font-weight-heading);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
-.navbar__signout:hover,
-.navbar__signout:focus-visible {
-  color: var(--color-text);
-  text-decoration: underline;
+/* Touch screens have no keyboard shortcut to hint at. */
+@media (hover: none) {
+  .search-bar__hint {
+    display: none;
+  }
 }
 
+/* Phone (Figma Proposals `26:567`): one 48px row. The search bar fills the
+   space; Add and the account menu follow. */
 @media (max-width: 480px) {
   .navbar {
-    flex-wrap: wrap;
-    top: var(--space-2);
     left: var(--space-2);
     right: var(--space-2);
-    padding: var(--space-2) var(--space-3);
+    translate: none;
+    max-width: none;
+    gap: var(--space-2);
   }
 
-  .navbar__search {
-    order: 3;
-    flex-basis: 100%;
+  .search-bar,
+  .search-bar:focus-within {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
+
+  .search-bar__hint,
+  .navbar__divider,
+  .navbar__manage,
+  .navbar__session {
+    display: none;
+  }
+
+  .account-menu {
+    display: block;
+  }
+}
+
+.account-menu__list {
+  position: absolute;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  z-index: 25;
+  width: 200px;
 }

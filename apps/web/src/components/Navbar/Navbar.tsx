@@ -1,13 +1,19 @@
+import { FolderTree, KeyRound, LogOut, Plus, Trash2 } from "lucide-react";
 import { type PointerEvent, useEffect, useRef } from "react";
 import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../canvas/navigation-controller";
 import { FilterPanel } from "../../filters/FilterPanel";
-import { defaultFilterState, type FilterState } from "../../filters/filter-state";
+import {
+  countActiveFilters,
+  defaultFilterState,
+  type FilterState,
+} from "../../filters/filter-state";
 import { useFilterOptions } from "../../filters/useFilterOptions";
 import { useDisclosure } from "../../hooks/useDisclosure";
 import { useKeyboardShortcut } from "../../hooks/useKeyboardShortcut";
+import { IconButton } from "../IconButton/IconButton";
+import { AccountMenu, type AccountMenuAction } from "./AccountMenu";
 import "./Navbar.css";
-import { FiltersButton } from "./FiltersButton";
-import { SearchInput } from "./SearchInput";
+import { SearchBar } from "./SearchBar";
 
 export interface NavbarProps {
   /** Shows a discreet "Sign out" link when true. No public sign-in button
@@ -40,10 +46,13 @@ function trackGlassHighlight(event: PointerEvent<HTMLElement>) {
 }
 
 /**
- * Liquid-glass top navbar: brand wordmark, search (⌘K/Ctrl+K focuses it,
- * drives `FilterState.q`), a Filters button that opens the filter panel
- * (category tree, tags, kinds, color — T10) and — for the owner only — a
- * sign-out link.
+ * Navbar v2 (Figma Proposals `26:163`, phone `26:567`): a centered glass pill
+ * only as wide as its content. Find: the search bar (⌘K/Ctrl+K focuses it,
+ * drives `FilterState.q`) with Filters inside it, opening the filter panel.
+ * For the owner: Add (the one accent action), the management icon buttons
+ * and Sign out, split by hairline dividers. On phones the management actions
+ * and Sign out move into the account menu. The page heading stays for
+ * assistive technology only.
  */
 export function Navbar({
   isOwner = false,
@@ -67,43 +76,61 @@ export function Navbar({
     onFilterPanelOpenChange?.(filtersDisclosure.isOpen);
   }, [filtersDisclosure.isOpen, onFilterPanelOpenChange]);
 
+  const signOutHref = "/cdn-cgi/access/logout";
+  const manageActions = [
+    isOwner && onTrashClick && { label: "Trash", icon: Trash2, onSelect: onTrashClick },
+    isOwner &&
+      onCategoriesClick && {
+        label: "Categories",
+        icon: FolderTree,
+        onSelect: onCategoriesClick,
+      },
+    isOwner && onTokensClick && { label: "API tokens", icon: KeyRound, onSelect: onTokensClick },
+  ].filter((action): action is AccountMenuAction => Boolean(action));
+
   return (
     <header
       className="glass navbar"
       onPointerMove={trackGlassHighlight}
       {...{ [NAVIGATION_BLOCKER_ATTRIBUTE]: "" }}
     >
-      <h1 className="navbar__brand">Inspiration Garden</h1>
-      <SearchInput
+      <h1 className="visually-hidden">Inspiration Garden</h1>
+      <SearchBar
         ref={searchRef}
         value={filters.q}
         onChange={(q) => onFiltersChange({ ...filters, q })}
+        filtersOpen={filtersDisclosure.isOpen}
+        onFiltersToggle={filtersDisclosure.toggle}
+        activeFilterCount={countActiveFilters(filters)}
       />
-      <FiltersButton isOpen={filtersDisclosure.isOpen} onToggle={filtersDisclosure.toggle} />
-      {isOwner && onAddClick && (
-        <button type="button" className="navbar__add-button" onClick={onAddClick}>
-          Add item
-        </button>
-      )}
-      {isOwner && onTrashClick && (
-        <button type="button" className="navbar__trash-button" onClick={onTrashClick}>
-          Trash
-        </button>
-      )}
-      {isOwner && onCategoriesClick && (
-        <button type="button" className="navbar__categories-button" onClick={onCategoriesClick}>
-          Categories
-        </button>
-      )}
-      {isOwner && onTokensClick && (
-        <button type="button" className="navbar__tokens-button" onClick={onTokensClick}>
-          API tokens
-        </button>
-      )}
       {isOwner && (
-        <a className="navbar__signout" href="/cdn-cgi/access/logout">
-          Sign out
-        </a>
+        <>
+          <span className="navbar__divider" aria-hidden="true" />
+          {onAddClick && (
+            <IconButton icon={Plus} label="Add item" tone="accent" onClick={onAddClick} />
+          )}
+          {manageActions.length > 0 && (
+            <div className="navbar__group navbar__manage">
+              {manageActions.map(({ label, icon, onSelect }) => (
+                <IconButton key={label} icon={icon} label={label} onClick={onSelect} />
+              ))}
+            </div>
+          )}
+          <span className="navbar__divider navbar__session-divider" aria-hidden="true" />
+          <span className="has-tooltip navbar__session">
+            <a
+              className="icon-button icon-button--neutral"
+              href={signOutHref}
+              aria-label="Sign out"
+            >
+              <LogOut size={20} aria-hidden="true" />
+            </a>
+            <span className="tooltip" aria-hidden="true">
+              Sign out
+            </span>
+          </span>
+          <AccountMenu actions={manageActions} signOutHref={signOutHref} signOutIcon={LogOut} />
+        </>
       )}
       <FilterPanel
         isOpen={filtersDisclosure.isOpen}
