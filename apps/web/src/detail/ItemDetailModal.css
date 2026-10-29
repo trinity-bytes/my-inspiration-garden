@@ -67,7 +67,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface-raised);
   color: var(--color-text);
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
   cursor: pointer;
 }
 
@@ -79,8 +79,8 @@
 .item-detail__kind-label {
   display: inline-block;
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-label);
-  letter-spacing: var(--tracking-label);
+  font-weight: var(--font-weight-heading);
+  letter-spacing: var(--tracking-overline);
   text-transform: uppercase;
   color: var(--color-text-muted);
 }

@@ -37,7 +37,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
 }
 
 .category-manager__rename-form,

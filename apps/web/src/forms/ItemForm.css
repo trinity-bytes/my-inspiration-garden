@@ -11,14 +11,14 @@
   border-radius: var(--radius-sm);
   background: var(--color-accent-soft);
   color: var(--color-text);
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
 
 .item-form__field {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  font-size: 0.85rem;
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-label);
 }
 
@@ -58,7 +58,7 @@
 }
 
 .item-form__hint {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: var(--font-weight-body);
 }
@@ -77,9 +77,10 @@
 }
 
 .item-form__palette legend {
-  font-size: 0.75rem;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-heading);
   text-transform: uppercase;
-  letter-spacing: var(--tracking-label);
+  letter-spacing: var(--tracking-overline);
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
 }
@@ -95,7 +96,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
 }
 
 .item-form__actions {

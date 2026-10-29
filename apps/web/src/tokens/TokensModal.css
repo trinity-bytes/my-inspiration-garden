@@ -5,7 +5,7 @@
 .tokens-modal__intro {
   margin: 0 0 var(--space-3);
   color: var(--color-ink-soft, var(--color-ink));
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm);
 }
 
 .tokens-modal__list {
@@ -34,19 +34,19 @@
 
 .tokens-modal__scope {
   text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--tracking-overline);
   color: var(--color-accent-text);
 }
 
 .tokens-modal__meta {
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
   color: var(--color-ink-soft, var(--color-ink));
   opacity: 0.75;
 }
 
 .tokens-modal__revoked {
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
   color: var(--color-danger, #b3261e);
   font-weight: var(--font-weight-heading);
 }
@@ -89,6 +89,6 @@
 .tokens-modal__copied {
   display: inline-block;
   margin-top: var(--space-1);
-  font-size: 0.8rem;
+  font-size: var(--font-size-xs);
   color: var(--color-accent-text);
 }

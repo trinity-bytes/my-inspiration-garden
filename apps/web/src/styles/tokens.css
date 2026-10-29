@@ -92,6 +92,7 @@
   --font-weight-heading: 600;
   --font-weight-heading-strong: 700;
   --tracking-label: 0.02em;
+  --tracking-overline: 0.04em; /* Figma "Overline" text style */
 
   /* Motion */
   --motion-duration-fast: 150ms;
