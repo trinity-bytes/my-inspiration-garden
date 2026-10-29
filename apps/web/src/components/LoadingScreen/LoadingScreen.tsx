@@ -20,7 +20,10 @@ export function LoadingScreen({ ready, message }: LoadingScreenProps) {
       data-testid="loading-screen"
       aria-hidden={ready ? "true" : undefined}
     >
-      <p className="loading-screen__message" role="status">
+      <p className="glass message-pill" role="status">
+        <svg className="message-pill__ring" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.5" />
+        </svg>
         {message}
       </p>
     </div>

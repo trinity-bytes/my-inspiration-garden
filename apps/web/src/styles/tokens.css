@@ -46,14 +46,6 @@
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
-  /* Solid cartoon surfaces: opaque light fill, thick dark border, hard
-     offset shadow (no blur). Ink on the fill is ~14:1 (WCAG AAA). */
-  --surface-solid: var(--garden-lavender-50);
-  --surface-border-width: 3px;
-  --surface-border-color: var(--garden-ink);
-  --surface-shadow: 4px 4px 0 var(--garden-ink);
-  --surface-shadow-sm: 2px 2px 0 var(--garden-ink);
-
   /* Liquid glass surfaces (`styles/glass.css`): navbar, filter panel, modals. */
   --glass-fill:
     linear-gradient(135deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02)), rgb(28 24 48 / 0.75);

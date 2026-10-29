@@ -1,4 +1,5 @@
 import type { Item } from "@garden/shared";
+import { CircleAlert, Image } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CanvasEngine } from "../../canvas/engine";
 import type { CardInstance } from "../../canvas/item-layout";
@@ -142,7 +143,16 @@ export function CanvasHost({
         aria-label="Inspiration garden canvas. Move the cursor, drag, or use arrow keys to look around."
       />
       {(showEmptyMessage || showErrorMessage) && (
-        <p className="canvas-host__message" role="status">
+        <p className="glass message-pill canvas-host__message" role="status">
+          {showEmptyMessage ? (
+            <Image className="message-pill__icon" size={16} aria-hidden="true" />
+          ) : (
+            <CircleAlert
+              className="message-pill__icon message-pill__icon--danger"
+              size={16}
+              aria-hidden="true"
+            />
+          )}
           {showEmptyMessage
             ? "The garden is empty for now — nothing to show yet."
             : "Couldn't load the garden's items right now."}

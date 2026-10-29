@@ -26,14 +26,6 @@
   left: 50%;
   bottom: var(--space-7);
   transform: translateX(-50%);
-  margin: 0;
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-full);
-  background: var(--surface-solid);
-  border: var(--surface-border-width) solid var(--surface-border-color);
-  box-shadow: var(--surface-shadow);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  text-align: center;
+  max-width: calc(100vw - var(--space-4) * 2);
   pointer-events: none;
 }

@@ -28,3 +28,49 @@
   -webkit-backdrop-filter: var(--glass-backdrop);
   backdrop-filter: var(--glass-backdrop);
 }
+
+/* Message pill (Figma Proposals `36:1560`): a small glass status line with
+   a leading icon — muted for empty, danger for errors, a ring for loading. */
+.message-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 11px var(--space-4) 11px 14px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.message-pill__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.message-pill__icon--danger {
+  color: var(--color-danger-text);
+}
+
+.message-pill__ring {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 28 41; /* about two thirds of the 6.5px radius circumference */
+  animation: message-pill-spin 900ms linear infinite;
+}
+
+@keyframes message-pill-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-pill__ring {
+    animation: none;
+  }
+}
