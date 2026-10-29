@@ -1,0 +1,57 @@
+/**
+ * Tooltip (Figma Components `25:193`): a small label that names an icon-only
+ * control on hover and keyboard focus. Place a `.tooltip` inside a
+ * `.has-tooltip` element; it is purely visual (`aria-hidden`), the control
+ * itself carries the accessible name.
+ */
+.has-tooltip {
+  position: relative;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  top: calc(100% + var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-popover);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-body);
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -2px);
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.tooltip--top {
+  top: auto;
+  bottom: calc(100% + var(--space-2));
+  transform: translate(-50%, 2px);
+}
+
+/* Show after a short hover delay so sweeping the pointer across a row of
+   buttons doesn't flash every label; keyboard focus shows it at once. */
+.has-tooltip:hover > .tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-delay: 400ms;
+}
+
+.has-tooltip:has(:focus-visible) > .tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Touch screens have no hover: a tap would leave the label stuck on. */
+@media (hover: none) {
+  .tooltip {
+    display: none;
+  }
+}

@@ -1,0 +1,62 @@
+/* Icon Button (Figma Components `25:184`): 36px circle, 20px icon. */
+.icon-button-wrap {
+  display: inline-flex;
+  flex: none;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-text-on-accent);
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard),
+    transform var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.icon-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-button--neutral {
+  border-color: var(--color-border);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.icon-button--neutral:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background-color: var(--color-accent-soft);
+}
+
+.icon-button--neutral[aria-expanded="true"],
+.icon-button--neutral[aria-pressed="true"] {
+  border-color: var(--color-border-strong);
+}
+
+.icon-button--accent {
+  background-color: var(--color-accent);
+}
+
+.icon-button--accent:hover:not(:disabled) {
+  background-color: var(--color-accent-strong);
+}
+
+.icon-button--danger {
+  background-color: var(--color-danger);
+}
+
+.icon-button--danger:hover:not(:disabled) {
+  background-color: var(--color-danger-strong);
+}

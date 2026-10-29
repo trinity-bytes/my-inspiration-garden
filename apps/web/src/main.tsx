@@ -3,6 +3,7 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/glass.css";
 import "./styles/controls.css";
+import "./styles/tooltip.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
