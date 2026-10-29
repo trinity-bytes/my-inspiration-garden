@@ -79,7 +79,7 @@
     // (e.g. "https://garden.example.com" — exact, no trailing slash) MUST be
     // listed or every owner write fails with `403 csrf check failed`.
     // Never widen this with a broad wildcard to silence a 403.
-    "CORS_ORIGINS": "https://garden-api.trinity-bytes.workers.dev,http://localhost:5173",
+    "CORS_ORIGINS": "https://inspo.jahattrinidad.com,https://garden-api.trinity-bytes.workers.dev,http://localhost:5173",
     // Max upload/import size in bytes per media kind (POST /api/media,
     // /api/media/import). Defaults in code: 15 MB images, 50 MB video.
     "MAX_IMAGE_BYTES": "15728640",
