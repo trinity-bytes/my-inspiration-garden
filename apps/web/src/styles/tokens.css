@@ -39,6 +39,7 @@
   --color-danger: #c94f4f;
   --color-danger-strong: #a83b3b;
   --color-danger-soft: #f6dcdc;
+  --color-danger-text: var(--color-danger-strong); /* danger-colored text (field errors) */
 
   /* Semantic: focus */
   --color-focus-ring: var(--garden-accent-strong);

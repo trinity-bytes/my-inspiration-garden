@@ -17,6 +17,7 @@
   --color-border-strong: rgb(255 255 255 / 0.36);
   --color-accent-soft: rgb(242 154 107 / 0.24);
   --color-accent-text: var(--garden-accent);
+  --color-danger-text: #f08a8a; /* base danger is too dark for small text on the glass */
 
   color-scheme: dark;
   scrollbar-color: rgb(255 255 255 / 0.25) transparent;

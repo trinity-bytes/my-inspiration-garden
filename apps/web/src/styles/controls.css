@@ -37,20 +37,62 @@
   resize: vertical;
 }
 
-/* Select: own chevron instead of the platform arrow. Components must set
-   `background-color`, not the `background` shorthand, or the chevron is lost. */
+/* Select v2 (Figma `31:191`): Lucide chevron-down instead of the platform
+   arrow. Components must set `background-color`, not the `background`
+   shorthand, or the chevron is lost. The chevron is a data URI, so its
+   stroke is fixed per surface (muted ink here, muted lavender in `.glass`). */
 :where(select) {
   appearance: none;
-  padding-right: calc(var(--space-3) + 20px);
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
-    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) 50%,
-    calc(100% - 13px) 50%;
-  background-size: 5px 5px;
+  padding-right: calc(var(--space-3) + 24px);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235e4c82' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: calc(100% - 10px) 50%;
+  background-size: 16px 16px;
   background-repeat: no-repeat;
   cursor: pointer;
+}
+
+:where(.glass select) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23e9e3f3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Focus (Figma Select/Field v2 "Focus"): a 2px focus-colored border instead
+   of the detached outline; the inset shadow adds the second pixel without
+   shifting layout. Invalid fields use the danger color the same way. */
+:is(
+  input:not([type="checkbox"], [type="radio"], [type="color"], [type="file"], [type="range"]),
+  select,
+  textarea
+):focus-visible {
+  outline: none;
+  border-color: var(--color-focus-ring);
+  box-shadow: inset 0 0 0 1px var(--color-focus-ring);
+}
+
+:where(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  box-shadow: inset 0 0 0 1px var(--color-danger);
+}
+
+/* A field with a leading icon (Select v2 kind icon, Field v2): wrap the
+   control in `.control-with-icon` and put the Lucide icon before it. */
+.control-with-icon {
+  position: relative;
+  display: flex;
+}
+
+.control-with-icon > svg {
+  position: absolute;
+  left: var(--space-3);
+  top: 50%;
+  translate: 0 -50%;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.control-with-icon > :is(input, select) {
+  flex: 1;
+  min-width: 0;
+  padding-left: calc(var(--space-3) + 24px);
 }
 
 /* Checkbox and radio */
@@ -100,6 +142,25 @@
 }
 
 :where(input[type="checkbox"], input[type="radio"]):checked::before {
+  transform: scale(1);
+}
+
+:where(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate):hover:not(
+  :disabled
+) {
+  background-color: var(--color-accent-strong);
+}
+
+/* Mixed (Figma Checkbox v2): a parent category with only some children on. */
+:where(input[type="checkbox"]):indeterminate {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent-strong);
+}
+
+:where(input[type="checkbox"]):indeterminate::before {
+  height: 2px;
+  clip-path: none;
+  border-radius: 1px;
   transform: scale(1);
 }
 

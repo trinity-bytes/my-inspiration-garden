@@ -1,0 +1,89 @@
+/**
+ * Chip v2 (Figma Components `31:322`).
+ * - `.chip--toggle`: a selectable filter (`<button aria-pressed>`), pill +
+ *   border, leading icon, check when on.
+ * - `.chip--removable`: a token inside an input, pill + remove (x) button.
+ * - `.chip--static`: read-only metadata, a soft 6px rectangle with no
+ *   border, so it never reads as clickable.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 100%;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-label);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.chip > svg {
+  flex: none;
+}
+
+.chip--toggle,
+.chip--removable {
+  padding: 5px var(--space-3) 5px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.chip--toggle {
+  cursor: pointer;
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-easing-standard),
+    border-color var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.chip--toggle:hover {
+  background-color: var(--color-accent-soft);
+}
+
+.chip--toggle[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.chip__count {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip--toggle[aria-pressed="true"] .chip__count {
+  color: inherit;
+}
+
+.chip--removable {
+  padding-right: 6px;
+}
+
+.chip__remove {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
+
+.chip__remove:hover {
+  background-color: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.chip--static {
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-body);
+}

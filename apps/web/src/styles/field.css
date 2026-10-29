@@ -1,0 +1,41 @@
+/**
+ * Field v2 (Figma Components `31:302`): label, control (optionally with a
+ * leading icon via `.control-with-icon`), then a helper or error message.
+ * Errors pair the danger border (`aria-invalid`) with an alert icon and
+ * text, never color alone.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-label);
+  color: var(--color-text);
+}
+
+.field__helper,
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-body);
+  line-height: 1.4;
+}
+
+.field__helper {
+  color: var(--color-text-muted);
+}
+
+.field__error {
+  color: var(--color-danger-text);
+}
+
+.field__error > svg {
+  flex: none;
+}
