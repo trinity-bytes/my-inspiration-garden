@@ -38,8 +38,9 @@ describe("FilterPanel", () => {
       />,
     );
 
-    const imageCheckbox = screen.getByRole("checkbox", { name: "image" });
-    fireEvent.click(imageCheckbox);
+    const imageChip = screen.getByRole("button", { name: "Image" });
+    expect(imageChip).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(imageChip);
 
     expect(onChange).toHaveBeenCalledWith({ ...defaultFilterState(), kinds: ["image"] });
   });
@@ -63,6 +64,27 @@ describe("FilterPanel", () => {
 
     fireEvent.click(parentCheckbox);
     expect(onChange).toHaveBeenCalledWith({ ...defaultFilterState(), categoryIds: ["c1"] });
+  });
+
+  it("shows a parent with only a selected child as mixed, without changing what clicking does", () => {
+    const onChange = vi.fn();
+    render(
+      <FilterPanel
+        isOpen
+        filters={{ ...defaultFilterState(), categoryIds: ["c2"] }}
+        onChange={onChange}
+        categories={categories}
+        tags={tags}
+      />,
+    );
+
+    const parentCheckbox = screen.getByRole("checkbox", { name: "Illustration" });
+    expect(parentCheckbox).toHaveAttribute("aria-checked", "mixed");
+    expect((parentCheckbox as HTMLInputElement).indeterminate).toBe(true);
+    expect(screen.getByRole("checkbox", { name: "Typography" })).toBeChecked();
+
+    fireEvent.click(parentCheckbox);
+    expect(onChange).toHaveBeenCalledWith({ ...defaultFilterState(), categoryIds: ["c2", "c1"] });
   });
 
   it("renders every tag with its count and toggles it", () => {

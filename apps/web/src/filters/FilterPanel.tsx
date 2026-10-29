@@ -1,5 +1,9 @@
 import type { Category, ItemKind } from "@garden/shared";
+import { Check, Plus, RotateCcw } from "lucide-react";
 import type { TagsResult } from "../api/endpoints";
+import { contrastTextColor } from "../color-contrast";
+import { Button } from "../components/Button/Button";
+import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
 import { CategoryTree } from "./CategoryTree";
 import { buildCategoryTree, type FilterState, isFilterActive, toggleValue } from "./filter-state";
 import "./FilterPanel.css";
@@ -34,6 +38,8 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
   if (!isOpen) return null;
 
   const categoryTree = buildCategoryTree(categories);
+  const isCustomColor =
+    filters.color !== undefined && !COLOR_PRESETS.some((preset) => preset.hex === filters.color);
 
   function toggleKind(kind: ItemKind): void {
     onChange({ ...filters, kinds: toggleValue(filters.kinds, kind) });
@@ -60,24 +66,32 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
       <div className="filter-panel__header">
         <h2 className="filter-panel__title">Filters</h2>
         {isFilterActive(filters) && (
-          <button type="button" className="filter-panel__clear" onClick={clearAll}>
-            Clear filters
-          </button>
+          <Button size="sm" icon={RotateCcw} aria-label="Clear filters" onClick={clearAll}>
+            Clear
+          </Button>
         )}
       </div>
 
       <fieldset className="filter-panel__group">
         <legend>Kind</legend>
-        {KINDS.map((kind) => (
-          <label className="filter-panel__option" key={kind}>
-            <input
-              type="checkbox"
-              checked={filters.kinds.includes(kind)}
-              onChange={() => toggleKind(kind)}
-            />
-            {kind}
-          </label>
-        ))}
+        <div className="filter-panel__chips">
+          {KINDS.map((kind) => {
+            const isSelected = filters.kinds.includes(kind);
+            const KindIcon = isSelected ? Check : KIND_ICONS[kind];
+            return (
+              <button
+                key={kind}
+                type="button"
+                className="chip chip--toggle"
+                aria-pressed={isSelected}
+                onClick={() => toggleKind(kind)}
+              >
+                <KindIcon size={14} aria-hidden="true" />
+                {KIND_LABELS[kind]}
+              </button>
+            );
+          })}
+        </div>
       </fieldset>
 
       {categoryTree.length > 0 && (
@@ -94,19 +108,24 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
       {tags.length > 0 && (
         <fieldset className="filter-panel__group">
           <legend>Tags</legend>
-          <div className="filter-panel__tags">
+          <div className="filter-panel__chips">
             {tags.map((tag) => {
               const isSelected = filters.tags.includes(tag.name);
               return (
                 <button
                   key={tag.id}
                   type="button"
-                  className="filter-panel__tag"
+                  className="chip chip--toggle"
                   aria-pressed={isSelected}
-                  data-selected={isSelected}
                   onClick={() => toggleTag(tag.name)}
                 >
-                  {tag.name} ({tag.count})
+                  {isSelected && <Check size={14} aria-hidden="true" />}
+                  {tag.name}{" "}
+                  <span className="chip__count">
+                    <span className="visually-hidden">(</span>
+                    {tag.count}
+                    <span className="visually-hidden">)</span>
+                  </span>
                 </button>
               );
             })}
@@ -117,20 +136,37 @@ export function FilterPanel({ isOpen, filters, onChange, categories, tags }: Fil
       <fieldset className="filter-panel__group">
         <legend>Color</legend>
         <div className="filter-panel__colors">
-          {COLOR_PRESETS.map((preset) => (
-            <button
-              key={preset.hex}
-              type="button"
-              className="filter-panel__swatch"
-              style={{ backgroundColor: preset.hex }}
-              aria-label={`Filter by color ${preset.name}`}
-              aria-pressed={filters.color === preset.hex}
-              data-selected={filters.color === preset.hex}
-              onClick={() => selectColor(preset.hex)}
-            />
-          ))}
-          <label className="filter-panel__custom-color">
+          {COLOR_PRESETS.map((preset) => {
+            const isSelected = filters.color === preset.hex;
+            return (
+              <button
+                key={preset.hex}
+                type="button"
+                className="filter-panel__swatch"
+                style={{ backgroundColor: preset.hex, color: contrastTextColor(preset.hex) }}
+                aria-label={`Filter by color ${preset.name}`}
+                aria-pressed={isSelected}
+                onClick={() => selectColor(preset.hex)}
+              >
+                {isSelected && <Check size={14} aria-hidden="true" />}
+              </button>
+            );
+          })}
+          <label
+            className="filter-panel__swatch filter-panel__custom-color"
+            data-active={isCustomColor || undefined}
+            style={
+              isCustomColor && filters.color
+                ? { backgroundColor: filters.color, color: contrastTextColor(filters.color) }
+                : undefined
+            }
+          >
             <span className="visually-hidden">Custom color</span>
+            {isCustomColor ? (
+              <Check size={14} aria-hidden="true" />
+            ) : (
+              <Plus size={14} aria-hidden="true" />
+            )}
             <input
               type="color"
               value={filters.color ?? "#000000"}
