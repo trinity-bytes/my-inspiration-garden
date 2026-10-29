@@ -1,7 +1,8 @@
-/* Navbar v2 (Figma Proposals `26:163`): a centered pill as wide as its content. */
+/* Navbar v2 (Figma Proposals `26:163`): a centered pill as wide as its content,
+   floating at the bottom edge where the pointer and thumb reach it easily. */
 .navbar {
   position: fixed;
-  top: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   left: 50%;
   translate: -50% 0;
   z-index: 30;
@@ -16,7 +17,7 @@
   /* The `.glass` surface, except the blur moves to `::before`: an element
      with `backdrop-filter` becomes a backdrop root, and the filter panel
      nested inside would then blur only the navbar instead of the canvas.
-     No `overflow: hidden` — the filter panel hangs below the navbar. */
+     No `overflow: hidden` — the filter panel rises above the navbar. */
   isolation: isolate;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -52,6 +53,13 @@
 
 .navbar:hover::after {
   opacity: 1;
+}
+
+/* Tooltips open upward, away from the bottom edge (same as `.tooltip--top`). */
+.navbar .tooltip {
+  top: auto;
+  bottom: calc(100% + var(--space-2));
+  transform: translate(-50%, 2px);
 }
 
 .navbar__divider {
@@ -216,7 +224,7 @@
 
 .account-menu__list {
   position: absolute;
-  top: calc(100% + var(--space-3));
+  bottom: calc(100% + var(--space-3));
   right: 0;
   z-index: 25;
   width: 200px;

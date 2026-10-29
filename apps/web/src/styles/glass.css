@@ -79,7 +79,7 @@
  * Phone sheets (Figma Proposals `39:831`): below 480px every dialog rises
  * from the bottom edge with a grab handle over the scrim. Lists and confirms
  * are sized to their content; `.sheet--full` dialogs (item detail, forms,
- * Categories, API tokens) fill the screen below the navbar and scroll
+ * Categories, API tokens) fill the screen but a 56px strip of scrim and scroll
  * inside. Pair with a backdrop that has the `.sheet-backdrop` class.
  */
 @media (max-width: 480px) {

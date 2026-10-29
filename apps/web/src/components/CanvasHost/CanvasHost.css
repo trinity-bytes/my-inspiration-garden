@@ -24,11 +24,12 @@
   outline-offset: calc(-1 * var(--focus-ring-width));
 }
 
-/* Empty/fetch-error state (T8b): the canvas still renders behind this. */
+/* Empty/fetch-error state (T8b): the canvas still renders behind this. Top
+   edge, clear of the bottom navbar. */
 .canvas-host__message {
   position: absolute;
   left: 50%;
-  bottom: var(--space-7);
+  top: calc(var(--space-7) + env(safe-area-inset-top));
   transform: translateX(-50%);
   max-width: calc(100vw - var(--space-4) * 2);
   pointer-events: none;

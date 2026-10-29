@@ -1,6 +1,6 @@
 .filter-panel {
   position: absolute;
-  top: calc(100% + var(--space-2));
+  bottom: calc(100% + var(--space-2));
   left: 0;
   z-index: 20;
   width: min(360px, calc(100vw - var(--space-4) * 2));
@@ -125,21 +125,19 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Phone (Figma Proposals `39:831`): a bottom sheet sized to its content.
-   No scrim, so the canvas keeps showing the results while filters apply
-   live (owner decision L7); the Filters button in the bar closes it. */
+/* Phone (Figma Proposals `39:831`): a sheet sized to its content, floating
+   just above the bottom navbar (48px row) so the bar stays visible. No
+   scrim, so the canvas keeps showing the results while filters apply live
+   (owner decision L7); the Filters button in the bar closes it. */
 @media (max-width: 480px) {
   .filter-panel {
     position: fixed;
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
+    left: var(--space-2);
+    right: var(--space-2);
+    bottom: calc(var(--space-4) + env(safe-area-inset-bottom) + 48px + var(--space-2));
+    width: auto;
     max-height: 70dvh;
-    padding: var(--space-6) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
-    border-bottom: none;
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-6) var(--space-4) var(--space-4);
     animation: sheet-in var(--motion-duration-base) var(--motion-easing-decelerate);
   }
 
