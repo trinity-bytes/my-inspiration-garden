@@ -163,6 +163,39 @@ describe("ItemDetailModal", () => {
   });
 
   describe("per-kind content", () => {
+    describe("note", () => {
+      it("shows the note to visitors on every kind, keeping its text whole", () => {
+        const text = makeItem(
+          "n1",
+          "text",
+          { body: "hello" },
+          { notes: "First line\nSecond line" },
+        );
+        const { unmount } = render(
+          <ItemDetailModal item={text} onClose={() => {}} categoryNames={{}} />,
+        );
+        expect(screen.getByRole("note", { name: "Note" }).textContent).toBe(
+          "First line\nSecond line",
+        );
+        unmount();
+
+        const image = makeItem(
+          "n2",
+          "image",
+          { r2Key: "media/x.png", width: 100, height: 50, mime: "image/png" },
+          { notes: "Hero reference" },
+        );
+        render(<ItemDetailModal item={image} onClose={() => {}} categoryNames={{}} />);
+        expect(screen.getByRole("note", { name: "Note" })).toHaveTextContent("Hero reference");
+      });
+
+      it("shows no note block when the item has no note", () => {
+        const item = makeItem("n3", "text", { body: "hello" });
+        render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+        expect(screen.queryByRole("note")).not.toBeInTheDocument();
+      });
+    });
+
     it("image: shows a contained <img>", () => {
       const item = makeItem(
         "img1",
@@ -173,6 +206,18 @@ describe("ItemDetailModal", () => {
       render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
       const image = screen.getByRole("img", { name: "A photo" });
       expect(image).toBeInTheDocument();
+    });
+
+    it("image: shows the description below the image", () => {
+      const item = makeItem("img2", "image", {
+        r2Key: "media/x.png",
+        width: 100,
+        height: 50,
+        mime: "image/png",
+        description: "A pier at dusk",
+      });
+      render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
+      expect(screen.getByText("A pier at dusk")).toBeInTheDocument();
     });
 
     it("link: shows title, description, domain and an Open link button with safe rel", () => {
