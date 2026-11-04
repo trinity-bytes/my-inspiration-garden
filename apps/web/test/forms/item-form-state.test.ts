@@ -95,6 +95,19 @@ describe("buildCreateItemInput", () => {
     }
   });
 
+  it("keeps an image description, trimmed, and drops a blank one", () => {
+    const state = createEmptyFormState("image");
+    const upload = { r2Key: "media/2026/09/a.png", width: 800, height: 600, mime: "image/png" };
+
+    state.image = { ...upload, description: "  A pier at dusk  " };
+    const described = buildCreateItemInput(state);
+    expect(described.ok && described.input.data).toMatchObject({ description: "A pier at dusk" });
+
+    state.image = { ...upload, description: "   " };
+    const blank = buildCreateItemInput(state);
+    expect(blank.ok && blank.input.data).not.toHaveProperty("description", expect.anything());
+  });
+
   it("rejects a video item with the youtube/vimeo provider and no embed url", () => {
     const state = createEmptyFormState("video");
     state.video.provider = "youtube";

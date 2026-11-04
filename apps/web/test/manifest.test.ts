@@ -5,6 +5,7 @@ import icon192 from "../public/icon-192.png?inline";
 import icon512 from "../public/icon-512.png?inline";
 import iconMaskable512 from "../public/icon-maskable-512.png?inline";
 import manifestRaw from "../public/manifest.webmanifest?raw";
+import tokensCss from "../src/styles/tokens.css?raw";
 
 /**
  * Installing this app on Android only produces a standalone app — no address
@@ -104,6 +105,20 @@ describe("web app manifest", () => {
     const content = meta?.[0].match(/content=["'](#[0-9a-f]{6})["']/i)?.[1];
 
     expect(content?.toLowerCase()).toBe(manifest.theme_color?.toLowerCase());
+  });
+
+  it("paints the phone's system bars and splash with the dark canvas color", () => {
+    const canvas = /--color-canvas:\s*(#[0-9a-f]{6})/i.exec(tokensCss)?.[1];
+
+    expect(canvas).toBeDefined();
+    expect(manifest.theme_color?.toLowerCase()).toBe(canvas?.toLowerCase());
+    expect(manifest.background_color?.toLowerCase()).toBe(canvas?.toLowerCase());
+  });
+
+  it("declares the page as dark, so the browser does not assume a light theme", () => {
+    const meta = /<meta\b[^>]*\bname=["']color-scheme["'][^>]*>/i.exec(indexHtml);
+
+    expect(meta?.[0]).toMatch(/content=["']dark["']/);
   });
 });
 

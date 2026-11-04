@@ -1,6 +1,6 @@
 import type { Item } from "@garden/shared";
 import { normalizePalette } from "@garden/shared";
-import { ExternalLink, History, Pencil, Trash2, X } from "lucide-react";
+import { ExternalLink, History, Pencil, StickyNote, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveMediaRef } from "../api/media-ref";
 import { contrastTextColor } from "../color-contrast";
@@ -171,12 +171,17 @@ function ItemDetailBody({ item }: { item: Item }) {
   switch (item.kind) {
     case "image":
       return (
-        <div className="item-detail__media item-detail__media--image">
-          <img
-            src={`/api/media/${item.data.r2Key}`}
-            alt={item.title?.trim() || item.data.alt || "Image"}
-          />
-        </div>
+        <>
+          <div className="item-detail__media item-detail__media--image">
+            <img
+              src={`/api/media/${item.data.r2Key}`}
+              alt={item.title?.trim() || item.data.alt || "Image"}
+            />
+          </div>
+          {item.data.description && (
+            <p className="item-detail__description">{item.data.description}</p>
+          )}
+        </>
       );
     case "link":
       return (
@@ -397,6 +402,13 @@ export function ItemDetailModal({
         <div className="item-detail__content">
           <ItemDetailBody item={item} />
         </div>
+
+        {item.notes && (
+          <div className="item-detail__note" role="note" aria-label="Note">
+            <StickyNote size={16} aria-hidden="true" />
+            <p>{item.notes}</p>
+          </div>
+        )}
 
         {item.tags.length > 0 && (
           <ul className="item-detail__tags" aria-label="Tags">

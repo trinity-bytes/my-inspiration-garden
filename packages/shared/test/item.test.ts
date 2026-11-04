@@ -59,6 +59,12 @@ describe("imageDataSchema", () => {
     });
     expect(result.exif).toEqual({ camera: "Fujifilm" });
   });
+
+  it("accepts a text description and rejects any other type", () => {
+    const base = { r2Key: "media/foo.png", width: 800, height: 600, mime: "image/png" };
+    expect(imageDataSchema.parse({ ...base, description: "A pier" }).description).toBe("A pier");
+    expect(imageDataSchema.safeParse({ ...base, description: 42 }).success).toBe(false);
+  });
 });
 
 describe("linkDataSchema", () => {

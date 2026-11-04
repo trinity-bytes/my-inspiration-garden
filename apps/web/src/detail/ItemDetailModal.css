@@ -126,6 +126,38 @@
   margin: 0 0 var(--space-2);
 }
 
+.item-detail__media + .item-detail__description {
+  margin: var(--space-3) 0 0;
+  white-space: pre-wrap;
+}
+
+.item-detail__content:has(+ .item-detail__note) {
+  margin-bottom: var(--space-3);
+}
+
+.item-detail__note {
+  display: flex;
+  gap: 10px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3);
+  border-radius: 8px;
+  background-color: var(--color-accent-soft);
+  font-size: var(--font-size-sm);
+}
+
+.item-detail__note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+
+.item-detail__note p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .item-detail__domain {
   margin: 0 0 var(--space-3);
   color: var(--color-text-muted);

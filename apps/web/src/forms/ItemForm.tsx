@@ -443,6 +443,21 @@ export function ItemForm({
         </div>
       )}
 
+      {state.kind === "image" && (
+        <div className="item-form__field">
+          <label htmlFor={`${formId}-image-description`}>Description</label>
+          <textarea
+            id={`${formId}-image-description`}
+            aria-describedby={`${formId}-image-description-hint`}
+            value={state.image.description ?? ""}
+            onChange={(event) => updateKindData("image", { description: event.target.value })}
+          />
+          <span id={`${formId}-image-description-hint`} className="item-form__hint">
+            What the image shows.
+          </span>
+        </div>
+      )}
+
       {state.kind === "video" && (
         <>
           {(state.video.provider === "youtube" || state.video.provider === "vimeo") && (
@@ -643,14 +658,18 @@ export function ItemForm({
         </>
       )}
 
-      <label className="item-form__field" htmlFor={`${formId}-notes`}>
-        Notes
+      <div className="item-form__field">
+        <label htmlFor={`${formId}-notes`}>Notes</label>
         <textarea
           id={`${formId}-notes`}
+          aria-describedby={`${formId}-notes-hint`}
           value={state.notes}
           onChange={(event) => update({ notes: event.target.value })}
         />
-      </label>
+        <span id={`${formId}-notes-hint`} className="item-form__hint">
+          Why you saved it, in your own words.
+        </span>
+      </div>
 
       <label className="item-form__field" htmlFor={`${formId}-tags`}>
         Tags

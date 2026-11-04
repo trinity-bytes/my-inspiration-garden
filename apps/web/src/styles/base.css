@@ -16,7 +16,7 @@ body {
 
 body {
   margin: 0;
-  background: var(--color-surface);
+  background: var(--color-canvas);
   color: var(--color-text);
   font-family: var(--font-family-base);
   font-weight: var(--font-weight-body);
