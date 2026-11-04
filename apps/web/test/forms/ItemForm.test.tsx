@@ -797,3 +797,70 @@ describe("ItemForm — link preview image", () => {
     expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 });
+
+describe("ItemForm — pasted image for image items", () => {
+  const pasted = new File(["abc"], "pasted.png", { type: "image/png" });
+
+  it("uploads a screenshot pasted anywhere in the image form and submits its r2Key", async () => {
+    const uploadImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/11/pasted.png",
+      mime: "image/png",
+      width: 800,
+      height: 600,
+    });
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("image")}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        uploadImage={uploadImage}
+      />,
+    );
+
+    expect(screen.getByText("Or paste a screenshot with Ctrl+V (⌘V on Mac).")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Shot" } });
+    fireEvent.paste(screen.getByLabelText("Title"), {
+      clipboardData: { files: [pasted], items: [] },
+    });
+
+    await waitFor(() => expect(uploadImage).toHaveBeenCalledWith(pasted));
+    expect(await screen.findByAltText("Uploaded")).toHaveAttribute(
+      "src",
+      "/api/media/media/2026/11/pasted.png",
+    );
+    expect(screen.getByText("pasted.png")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      kind: "image",
+      data: { r2Key: "media/2026/11/pasted.png" },
+    });
+  });
+
+  it("keeps ignoring a pasted image on kinds without an image field", () => {
+    const uploadImage = vi.fn();
+    const uploadPreviewImage = vi.fn();
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("text")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        uploadImage={uploadImage}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    fireEvent.paste(screen.getByLabelText("Title"), {
+      clipboardData: { files: [pasted], items: [] },
+    });
+
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(uploadPreviewImage).not.toHaveBeenCalled();
+  });
+});
