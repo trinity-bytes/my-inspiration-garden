@@ -235,6 +235,56 @@ describe("ItemForm — image kind", () => {
       data: { r2Key: "media/2026/09/a.png", width: 800, height: 600, mime: "image/png" },
     });
   });
+
+  it("submits the description, and keeps it when the image is replaced afterwards", async () => {
+    const uploadImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/09/a.png",
+      mime: "image/png",
+      width: 800,
+      height: 600,
+    });
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("image")}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        uploadImage={uploadImage}
+      />,
+    );
+
+    const description = screen.getByLabelText("Description");
+    expect(description).toHaveAccessibleDescription("What the image shows.");
+    fireEvent.change(description, { target: { value: "A pier at dusk" } });
+
+    const file = new File(["abc"], "photo.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Image file"), { target: { files: [file] } });
+    await screen.findByAltText(/uploaded/i);
+
+    fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      kind: "image",
+      data: { r2Key: "media/2026/09/a.png", description: "A pier at dusk" },
+    });
+  });
+
+  it("explains the notes field on every kind", () => {
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("text")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Notes")).toHaveAccessibleDescription(
+      "Why you saved it, in your own words.",
+    );
+  });
 });
 
 describe("ItemForm — video kind", () => {

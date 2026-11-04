@@ -29,6 +29,7 @@ export interface ImageFormData {
   height?: number;
   mime?: string;
   alt?: string;
+  description?: string;
   palette?: { hex: string; weight?: number }[];
 }
 
@@ -180,12 +181,17 @@ export function buildCreateItemInput(
     }
     case "image": {
       const { r2Key, width, height, mime, alt, palette } = state.image;
+      const description = state.image.description?.trim() || undefined;
       if (!r2Key || !width || !height || !mime) {
         return fail("Upload an image before saving.");
       }
       return {
         ok: true,
-        input: { ...common, kind: "image", data: { r2Key, width, height, mime, alt, palette } },
+        input: {
+          ...common,
+          kind: "image",
+          data: { r2Key, width, height, mime, alt, description, palette },
+        },
       };
     }
     case "video": {

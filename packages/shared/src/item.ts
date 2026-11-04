@@ -34,6 +34,7 @@ export const imageDataSchema = z.looseObject({
   height: z.number().int().positive(),
   mime: z.string().min(1),
   alt: z.string().optional(),
+  description: z.string().optional(),
   palette: z.array(paletteEntrySchema).optional(),
   dominantColor: hexColorSchema.optional(),
 });
