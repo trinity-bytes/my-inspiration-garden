@@ -1,6 +1,6 @@
 import type { Category, ItemKind } from "@garden/shared";
 import { Check, CircleAlert, Link, Plus, Sparkles, Upload, Video, X } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   type StoredMedia,
   type UnfurlMetadataResult,
@@ -14,6 +14,7 @@ import { Select, type SelectOption } from "../components/Select/Select";
 import { CategoryTree } from "../filters/CategoryTree";
 import { buildCategoryTree } from "../filters/filter-state";
 import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
+import { firstClipboardImage } from "./clipboard-image";
 import {
   buildCreateItemInput,
   buildUpdateItemInput,
@@ -61,6 +62,8 @@ export interface ItemFormProps {
   unfurl?: (url: string) => Promise<UnfurlMetadataResult>;
   uploadImage?: (file: File) => Promise<ImageUploadResult>;
   uploadVideoFile?: (file: File) => Promise<StoredMedia>;
+  /** Link preview image upload; defaults to the plain media upload (no palette extraction). */
+  uploadPreviewImage?: (file: File) => Promise<StoredMedia>;
 }
 
 /**
@@ -81,11 +84,14 @@ export function ItemForm({
   unfurl = unfurlLink,
   uploadImage = uploadImageFile,
   uploadVideoFile = uploadMedia,
+  uploadPreviewImage = uploadMedia,
 }: ItemFormProps) {
   const [state, setState] = useState<ItemFormState>(initialState);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [unfurlStatus, setUnfurlStatus] = useState<"idle" | "loading" | "error">("idle");
   const [uploadStatus, setUploadStatus] = useState<"idle" | "loading" | "error">("idle");
+  // An image the owner picked or pasted outranks whatever Fetch preview finds.
+  const previewImageChosen = useRef(false);
   const [pickedFileName, setPickedFileName] = useState<string | null>(null);
   const formId = useId();
   const categoryTree = buildCategoryTree(categories);
@@ -113,7 +119,9 @@ export function ItemForm({
         link: {
           ...current.link,
           siteName: metadata.siteName ?? current.link.siteName,
-          previewImage: metadata.previewImage ?? current.link.previewImage,
+          previewImage: previewImageChosen.current
+            ? current.link.previewImage
+            : (metadata.previewImage ?? current.link.previewImage),
           description: metadata.description ?? current.link.description,
         },
       }));
@@ -172,6 +180,39 @@ export function ItemForm({
     }
   }
 
+  async function handlePreviewImageFile(file: File | undefined): Promise<void> {
+    if (!file) return;
+    setUploadStatus("loading");
+    try {
+      const stored = await uploadPreviewImage(file);
+      previewImageChosen.current = true;
+      updateKindData("link", { previewImage: stored.r2Key });
+      setUploadStatus("idle");
+    } catch {
+      setUploadStatus("error");
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLFormElement>): void {
+    // Only link items carry a preview image; a text paste keeps its native
+    // behavior because `firstClipboardImage` ignores non-image payloads.
+    if (state.kind !== "link") return;
+    const file = firstClipboardImage(event.clipboardData);
+    if (!file) return;
+    event.preventDefault();
+    setPickedFileName(file.name || "Pasted image");
+    void handlePreviewImageFile(file);
+  }
+
+  function removePreviewImage(): void {
+    previewImageChosen.current = false;
+    setState((current) => {
+      const { previewImage: _removed, ...link } = current.link;
+      return { ...current, link };
+    });
+    setPickedFileName(null);
+  }
+
   function handleSubmit(event: React.FormEvent): void {
     event.preventDefault();
     const result = mode === "create" ? buildCreateItemInput(state) : buildUpdateItemInput(state);
@@ -205,9 +246,11 @@ export function ItemForm({
   const error = validationError ?? submitError;
   // The banner says what's wrong; the image field itself also carries it.
   const imageMissing = state.kind === "image" && validationError !== null && !state.image.r2Key;
+  // Saving now would drop the image: the link payload has no key for it yet.
+  const previewImageUploading = state.kind === "link" && uploadStatus === "loading";
 
   return (
-    <form className="item-form" onSubmit={handleSubmit}>
+    <form className="item-form" onSubmit={handleSubmit} onPaste={handlePaste}>
       {error && (
         <p className="dialog-error" role="alert">
           <CircleAlert size={16} aria-hidden="true" />
@@ -300,13 +343,52 @@ export function ItemForm({
               onChange={(event) => updateKindData("link", { description: event.target.value })}
             />
           </label>
-          {state.link.previewImage && (
-            <img
-              className="item-form__preview"
-              src={resolveMediaRef(state.link.previewImage)}
-              alt="Link preview"
-            />
-          )}
+          <div className="item-form__field">
+            <label htmlFor={`${formId}-link-preview-file`}>Preview image</label>
+            {/* A second label: clicking anywhere on the picker opens the file dialog. */}
+            <label className="file-picker" htmlFor={`${formId}-link-preview-file`}>
+              <input
+                id={`${formId}-link-preview-file`}
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  setPickedFileName(file?.name ?? null);
+                  void handlePreviewImageFile(file);
+                }}
+              />
+              <span className="button button--secondary button--sm" aria-hidden="true">
+                <Upload size={16} />
+                Upload image
+              </span>
+              <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
+            </label>
+            <span className="item-form__hint">Or paste a screenshot with Ctrl+V (⌘V on Mac).</span>
+            {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
+            {uploadStatus === "error" && (
+              <span className="field__error">
+                <CircleAlert size={14} aria-hidden="true" />
+                Upload failed.
+              </span>
+            )}
+            {state.link.previewImage && (
+              <div className="item-form__preview-row">
+                <img
+                  className="item-form__preview"
+                  src={resolveMediaRef(state.link.previewImage)}
+                  alt="Link preview"
+                />
+                <IconButton
+                  icon={X}
+                  label="Remove preview image"
+                  tooltipAlign="end"
+                  onClick={removePreviewImage}
+                />
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -599,7 +681,7 @@ export function ItemForm({
           type="submit"
           variant="accent"
           icon={mode === "create" ? Plus : Check}
-          disabled={submitting}
+          disabled={submitting || previewImageUploading}
         >
           {mode === "create" ? "Add item" : "Save changes"}
         </Button>
