@@ -565,3 +565,235 @@ describe("ItemForm — category picker hierarchy (T11b B6 item 5)", () => {
     expect(childItem?.closest("ul")?.parentElement).toBe(parentItem);
   });
 });
+
+describe("ItemForm — link preview image", () => {
+  function linkItem(previewImage?: string) {
+    return {
+      id: "01HZY3Q3G0K8R4S8T2V6W0X4Y6",
+      kind: "link" as const,
+      title: "A site",
+      url: "https://example.com",
+      source: "web",
+      categoryIds: [] as string[],
+      tags: [] as string[],
+      createdAt: "2026-09-23T00:00:00.000Z",
+      updatedAt: "2026-09-23T00:00:00.000Z",
+      data: previewImage ? { previewImage } : {},
+    };
+  }
+
+  it("uploads a picked preview image and submits its r2Key", async () => {
+    const uploadPreviewImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/11/shot.png",
+      mime: "image/png",
+      size: 3,
+    });
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    const file = new File(["abc"], "shot.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Preview image"), { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadPreviewImage).toHaveBeenCalledWith(file));
+    expect(await screen.findByAltText("Link preview")).toHaveAttribute(
+      "src",
+      "/api/media/media/2026/11/shot.png",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      kind: "link",
+      data: { previewImage: "media/2026/11/shot.png" },
+    });
+  });
+
+  it("uploads a screenshot pasted anywhere in the link form", async () => {
+    const uploadPreviewImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/11/pasted.png",
+      mime: "image/png",
+      size: 3,
+    });
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    const file = new File(["abc"], "pasted.png", { type: "image/png" });
+    fireEvent.paste(screen.getByLabelText("Description"), {
+      clipboardData: { files: [file], items: [] },
+    });
+
+    await waitFor(() => expect(uploadPreviewImage).toHaveBeenCalledWith(file));
+    expect(await screen.findByAltText("Link preview")).toHaveAttribute(
+      "src",
+      "/api/media/media/2026/11/pasted.png",
+    );
+  });
+
+  it("ignores a paste that carries no image", () => {
+    const uploadPreviewImage = vi.fn();
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    fireEvent.paste(screen.getByLabelText("Description"), {
+      clipboardData: {
+        files: [],
+        items: [{ kind: "string", type: "text/plain", getAsFile: () => null }],
+      },
+    });
+
+    expect(uploadPreviewImage).not.toHaveBeenCalled();
+  });
+
+  it("removes an existing preview image from the submitted payload", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem("media/2026/11/old.png"))}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByAltText("Link preview")).toHaveAttribute(
+      "src",
+      "/api/media/media/2026/11/old.png",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove preview image" }));
+    expect(screen.queryByAltText("Link preview")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const submitted = onSubmit.mock.calls[0]?.[0] as { data?: Record<string, unknown> } | undefined;
+    expect(submitted?.data).not.toHaveProperty("previewImage");
+  });
+
+  it("keeps a chosen preview image when Fetch preview returns another one", async () => {
+    const uploadPreviewImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/11/shot.png",
+      mime: "image/png",
+      size: 3,
+    });
+    const unfurl = vi.fn().mockResolvedValue({
+      previewImage: "https://example.com/og.png",
+      description: "From the site",
+    });
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    const file = new File(["abc"], "shot.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Preview image"), { target: { files: [file] } });
+    await screen.findByAltText("Link preview");
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch preview" }));
+    await waitFor(() => expect(screen.getByLabelText("Description")).toHaveValue("From the site"));
+
+    expect(screen.getByAltText("Link preview")).toHaveAttribute(
+      "src",
+      "/api/media/media/2026/11/shot.png",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      data: { previewImage: "media/2026/11/shot.png", description: "From the site" },
+    });
+  });
+
+  it("lets Fetch preview fill the image again after the chosen one is removed", async () => {
+    const uploadPreviewImage = vi.fn().mockResolvedValue({
+      r2Key: "media/2026/11/shot.png",
+      mime: "image/png",
+      size: 3,
+    });
+    const unfurl = vi.fn().mockResolvedValue({ previewImage: "https://example.com/og.png" });
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    const file = new File(["abc"], "shot.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Preview image"), { target: { files: [file] } });
+    await screen.findByAltText("Link preview");
+    fireEvent.click(screen.getByRole("button", { name: "Remove preview image" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Fetch preview" }));
+    expect(await screen.findByAltText("Link preview")).toHaveAttribute(
+      "src",
+      "https://example.com/og.png",
+    );
+  });
+
+  it("blocks saving while a preview image is still uploading", async () => {
+    let finishUpload: (stored: { r2Key: string; mime: string; size: number }) => void = () => {};
+    const uploadPreviewImage = vi.fn(
+      () =>
+        new Promise<{ r2Key: string; mime: string; size: number }>((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    render(
+      <ItemForm
+        mode="edit"
+        initialState={formStateFromItem(linkItem())}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        uploadPreviewImage={uploadPreviewImage}
+      />,
+    );
+
+    const file = new File(["abc"], "shot.png", { type: "image/png" });
+    fireEvent.change(screen.getByLabelText("Preview image"), { target: { files: [file] } });
+
+    await waitFor(() => expect(uploadPreviewImage).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+
+    finishUpload({ r2Key: "media/2026/11/shot.png", mime: "image/png", size: 3 });
+    await screen.findByAltText("Link preview");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+  });
+});
