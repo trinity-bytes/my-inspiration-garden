@@ -19,9 +19,15 @@
   touch-action: none;
 }
 
-.canvas-host__webgl-target:focus-visible {
-  outline: var(--focus-ring-width) solid var(--color-focus-ring);
-  outline-offset: calc(-1 * var(--focus-ring-width));
+/* Keyboard focus cue, desktop only: a faint accent hairline instead of the
+   full-strength frame that read as an orange screen border (owner feedback).
+   `:focus-visible` keeps it to keyboard activation, so pointer focus and
+   touch never paint it. Phones get no cue at all. */
+@media (min-width: 481px) {
+  .canvas-host__webgl-target:focus-visible {
+    outline: 1px solid color-mix(in srgb, var(--color-focus-ring) 30%, transparent);
+    outline-offset: -1px;
+  }
 }
 
 /* Empty/fetch-error state (T8b): the canvas still renders behind this. Top
