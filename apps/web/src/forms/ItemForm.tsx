@@ -194,14 +194,14 @@ export function ItemForm({
   }
 
   function handlePaste(event: React.ClipboardEvent<HTMLFormElement>): void {
-    // Only link items carry a preview image; a text paste keeps its native
+    // Only link and image items take an image; a text paste keeps its native
     // behavior because `firstClipboardImage` ignores non-image payloads.
-    if (state.kind !== "link") return;
+    if (state.kind !== "link" && state.kind !== "image") return;
     const file = firstClipboardImage(event.clipboardData);
     if (!file) return;
     event.preventDefault();
     setPickedFileName(file.name || "Pasted image");
-    void handlePreviewImageFile(file);
+    void (state.kind === "link" ? handlePreviewImageFile(file) : handleImageFileChange(file));
   }
 
   function removePreviewImage(): void {
@@ -419,6 +419,7 @@ export function ItemForm({
             </span>
             <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
           </label>
+          <span className="item-form__hint">Or paste a screenshot with Ctrl+V (⌘V on Mac).</span>
           {imageMissing && (
             <span className="field__error">
               <CircleAlert size={14} aria-hidden="true" />
