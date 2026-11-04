@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A personal infinite canvas gallery for collecting inspiration." />
+    <meta name="theme-color" content="#f6f3fa" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Installed on Android as a standalone app (no address bar). Chrome only
+         offers "Install app" instead of a plain shortcut when this manifest is
+         installable: name, 192px + 512px PNG icons, start_url, standalone
+         display. A service worker is not part of the criteria. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Inspiration Garden</title>
   </head>
   <body>
