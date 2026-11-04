@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import indexHtml from "../index.html?raw";
+import appleTouchIcon from "../public/apple-touch-icon.png?inline";
 import icon192 from "../public/icon-192.png?inline";
 import icon512 from "../public/icon-512.png?inline";
 import iconMaskable512 from "../public/icon-maskable-512.png?inline";
@@ -103,5 +104,44 @@ describe("web app manifest", () => {
     const content = meta?.[0].match(/content=["'](#[0-9a-f]{6})["']/i)?.[1];
 
     expect(content?.toLowerCase()).toBe(manifest.theme_color?.toLowerCase());
+  });
+});
+
+/**
+ * iOS is the other half of "install it and it launches like an app": Safari has
+ * no install prompt and, before iOS 16.4, ignores the manifest `display`
+ * entirely. It reads a set of `apple-*` tags instead, and it needs its own
+ * opaque 180px icon because it composites transparency onto black.
+ */
+function metaContent(name: string): string | undefined {
+  const meta = new RegExp(`<meta\\b[^>]*\\bname=["']${name}["'][^>]*>`, "i").exec(indexHtml);
+
+  return meta?.[0].match(/content=["']([^"']+)["']/i)?.[1];
+}
+
+describe("iOS home-screen app", () => {
+  it("declares the legacy capable flag, the only switch older iOS reads", () => {
+    expect(metaContent("apple-mobile-web-app-capable")).toBe("yes");
+  });
+
+  it("ships the 180px opaque apple-touch-icon Safari expects", () => {
+    const link = /<link\b[^>]*\brel=["']apple-touch-icon["'][^>]*>/i.exec(indexHtml);
+
+    expect(link, 'index.html declares no <link rel="apple-touch-icon">').not.toBeNull();
+    expect(link?.[0]).toMatch(/href=["']\/apple-touch-icon\.png["']/);
+    expect(pngSize(appleTouchIcon)).toEqual({ width: 180, height: 180 });
+  });
+
+  it("keeps the iOS title short enough to fit under the icon", () => {
+    expect(metaContent("apple-mobile-web-app-title")).toBe(manifest.short_name);
+  });
+
+  it("leaves the status bar visible, since black-translucent needs safe-area layout", () => {
+    // "black-translucent" pulls the page under the clock and battery. It is only
+    // correct together with viewport-fit=cover and env(safe-area-inset-*) in the
+    // layout, none of which this app has — so the tag must stay "default".
+    expect(metaContent("apple-mobile-web-app-status-bar-style")).toBe("default");
+    const viewport = /<meta\b[^>]*\bname=["']viewport["'][^>]*>/i.exec(indexHtml)?.[0];
+    expect(viewport).not.toMatch(/viewport-fit=cover/i);
   });
 });
