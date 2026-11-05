@@ -125,7 +125,9 @@ export function ItemForm({
           description: metadata.description ?? current.link.description,
         },
       }));
-      setUnfurlStatus("idle");
+      // Sites that block server fetches still answer 200 here, with no metadata.
+      const foundPreview = metadata.title || metadata.description || metadata.previewImage;
+      setUnfurlStatus(foundPreview ? "idle" : "error");
     } catch {
       setUnfurlStatus("error");
     }
@@ -307,7 +309,7 @@ export function ItemForm({
           {unfurlStatus === "error" && (
             <span className="field__error">
               <CircleAlert size={14} aria-hidden="true" />
-              Could not fetch a preview.
+              Could not fetch a preview. Fill in the details by hand.
             </span>
           )}
         </label>
