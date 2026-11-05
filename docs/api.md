@@ -101,8 +101,16 @@ visitors can browse and filter.
   Pinterest); otherwise fetches the page HTML (capped at 512 KB, same URL
   safety/timeout rules as media import) and extracts Open Graph / Twitter
   card / `<title>` / meta description / `link[rel=canonical]` via
-  `HTMLRewriter`, resolving relative image URLs against the page URL. Never
-  throws on partial metadata — returns whatever it found.
+  `HTMLRewriter`, resolving relative image URLs against the page URL. Only a
+  `200` counts as a successful fetch. Never throws on partial metadata —
+  returns whatever it found, so a blocked page comes back with no title,
+  description or image and the form asks for the details by hand.
+  Pinterest's 236px oEmbed thumbnail is upgraded to the 736px rendition.
+- Known limit: Dribbble (AWS WAF challenge, `202`) and Behance (`403`) block
+  server-side fetches, whatever the user agent. Future idea: a browser
+  extension that reads the metadata from the owner's own session and sends it
+  with a write token (the actor middleware already accepts
+  `client: "extension"`).
 
 ## Palette / color indexing
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeUnfurlMetadata, resolveUrl } from "../src/unfurl";
+import { mergeUnfurlMetadata, resolveUrl, upgradePinterestThumbnail } from "../src/unfurl";
 
 describe("resolveUrl", () => {
   it("resolves a relative path against the page URL", () => {
@@ -45,5 +45,20 @@ describe("mergeUnfurlMetadata", () => {
       author: undefined,
       embed: undefined,
     });
+  });
+});
+
+describe("upgradePinterestThumbnail", () => {
+  it("swaps the 236px rendition for the 736px one on Pinterest's image host", () => {
+    expect(upgradePinterestThumbnail("https://i.pinimg.com/236x/a7/66/56/a.jpg")).toBe(
+      "https://i.pinimg.com/736x/a7/66/56/a.jpg",
+    );
+  });
+
+  it("leaves other hosts and other renditions untouched", () => {
+    const otherHost = "https://cdn.example.com/236x/a.jpg";
+    const otherSize = "https://i.pinimg.com/originals/a7/66/56/a.jpg";
+    expect(upgradePinterestThumbnail(otherHost)).toBe(otherHost);
+    expect(upgradePinterestThumbnail(otherSize)).toBe(otherSize);
   });
 });

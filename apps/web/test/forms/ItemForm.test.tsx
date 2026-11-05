@@ -176,6 +176,34 @@ describe("ItemForm — link kind", () => {
   });
 });
 
+describe("ItemForm — link preview with nothing to show", () => {
+  it("tells the owner to fill in the details when the unfurl comes back empty", async () => {
+    const unfurl = vi.fn().mockResolvedValue({
+      url: "https://dribbble.com/shots/1",
+      platform: "dribbble",
+    });
+    render(
+      <ItemForm
+        mode="create"
+        initialState={createEmptyFormState("link")}
+        categories={categories}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        unfurl={unfurl}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("URL"), {
+      target: { value: "https://dribbble.com/shots/1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Fetch preview" }));
+
+    expect(
+      await screen.findByText("Could not fetch a preview. Fill in the details by hand."),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("ItemForm — image kind", () => {
   it("flags the image field itself when saving without an upload, and shows the picked file name", async () => {
     const onSubmit = vi.fn();
