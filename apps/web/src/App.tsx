@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import { deleteItem } from "./api/endpoints";
 import { CategoryManagerModal } from "./categories/CategoryManagerModal";
 import { CanvasHost } from "./components/CanvasHost/CanvasHost";
-import { LoadingScreen } from "./components/LoadingScreen/LoadingScreen";
 import { Navbar } from "./components/Navbar/Navbar";
 import { ItemDetailModal } from "./detail/ItemDetailModal";
 import { useCategoryNames } from "./detail/useCategoryNames";
@@ -20,8 +19,6 @@ import { TrashModal } from "./trash/TrashModal";
 export function App() {
   const ownerSession = useOwnerSession();
   const isOwner = ownerSession.status === "owner";
-  const [canvasReady, setCanvasReady] = useState(false);
-  const handleCanvasReady = useCallback(() => setCanvasReady(true), []);
   const [filters, setFilters] = useState(defaultFilterState());
   // T10 owner QA: the filter panel opening/closing must pause/resume canvas
   // drift, same as the item detail modal below.
@@ -82,7 +79,6 @@ export function App() {
       data-selected-item-id={selectedItemId ?? undefined}
     >
       <CanvasHost
-        onReady={handleCanvasReady}
         items={items}
         itemsStatus={itemsStatus}
         onItemOpen={openItem}
@@ -105,7 +101,6 @@ export function App() {
         onCategoriesClick={isOwner ? () => setIsCategoriesOpen(true) : undefined}
         onTokensClick={isOwner ? () => setIsTokensOpen(true) : undefined}
       />
-      <LoadingScreen ready={canvasReady} message="Growing the garden…" />
       {selectedItem && (
         <ItemDetailModal
           item={selectedItem}
