@@ -1,0 +1,6 @@
+# The home page is public. /api/ holds saved images by other authors, which
+# should not surface in search under this site.
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/

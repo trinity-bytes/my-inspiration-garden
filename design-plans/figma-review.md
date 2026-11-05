@@ -31,6 +31,8 @@ Notes: icons are Lucide `lucide-static@1.63.0` (ISC), fetched from `https://unpk
 | F13 | Canvas keyboard focus cue: 1px accent hairline at 30%, desktop only, no cue on phones | Proposals `51:3008` | — | Approved (L9); shipped in v0.10.0 |
 | F14 | Image description and visible notes: Description field on image items; Item Note block (`57:212`, Icon/sticky-note `56:2785`) in the item detail for every kind, below the description, hidden when empty; form hints "What the image shows." and "Why you saved it, in your own words." | Proposals `57:2787` | — | Approved (L11) |
 | F16 | Skeleton loading: skeleton cards on the real masonry grid replace the full-screen spinner; navbar visible from the first frame; one sheen band across the canvas; per-card cross-fade reveal; first load only | Proposals `68:3061`, Components (Skeleton Card `68:3075`), Screens (`72:3316`, `72:3366`) | — | Approved (L13); shipped in v0.13.0 |
+| F17 | Social preview image: 1200×630 Open Graph/Twitter card with the Bloom mark, name, tagline and sample Canvas Cards (no third-party images). Tagline approved (L16): "A personal space of resources, curated by me, for me." A Centered `75:3286`, C Bloom `83:3597` rejected (L17); D Cards `88:3709` chosen (L18): staggered real Canvas Cards, dark center card with white type and the chosen mark left of the name as a horizontal lockup (L19) | Proposals `75:3279` | — | Approved (L20); implemented, not deployed |
+| F18 | App icon v2: replaces the Bloom (F15) with a mark made of rounded cards. A Masonry `88:3650`, B Four cards `88:3686` chosen (L18) | Proposals `88:3642` | — | Approved (L18); implemented, not deployed |
 
 ## Log
 
@@ -67,3 +69,10 @@ Code first, Figma synced after (motion/shader work can't be designed in Figma). 
 - 2026-11-05: F16 built on Proposals (`68:3061`). Code evidence: `LoadingScreen` covers the viewport at z-index 40 and clears on the engine's first rendered frame (`fireReady`, `engine.ts`), not on `itemsStatus`, so the canvas sits empty until the fetch ends. `useGardenItems` only reports "loading" on the first load, so refetches never show the skeleton. The real canvas bends under the barrel lens, so the skeleton should be painted by the engine, not a flat DOM overlay.
 - L13 (2026-11-05, owner): "aprobado. trabaja por tu cuenta en la imolementacion ynencargate de subirlo a prod. usa oas herramientas que mecedites." — approves F16 and authorizes shipping it.
 - 2026-11-05: Figma synced with v0.13.0: F16 copy and Visitor bars match what shipped, Skeleton Card moved to Components, Home — Loading frames added to Screens, old loading pill removed from Canvas messages (`36:1557`; it survives in F16's Before frame).
+- L14 (2026-11-05, owner): "si. primero figma" — design the social preview image in Figma before the metadata, canonical and robots.txt work.
+- L15 (2026-11-05, owner): "me gusta el centrado. pero el tagline es muy generivo, inspiration gsrden es un espacio personal donde recokecto recursis curados por mi y pensados para ser ysados poe mi."
+- L16 (2026-11-05, owner): "si. pero aun asi el diseño se siente simple" — tagline approved; composition needs more character.
+- L17 (2026-11-05, owner): "no, ese giant bloom me hizo ver wue el bloom no pertenece a este diseño. osea, la interfaz es un csnvas infiniro de cards cuadradas, no hsy curculos flotando. por lo tanto, creo que hsu que cambiar el logo y por consiguiente el diseño del giant bloom que creo que tenis potencisl pero con csrds en lugar de circulos"
+- L18 (2026-11-05, owner): "me gusta el A pero me quedo con el B porque funciona mejor en tamaños pequeños. pero si, me quedo con la D tambien pero ese azul sobre naranja al centro es poco legible en tamaños peuqueños"
+- L19 (2026-11-05, owner): "pon el icono ao lado ixquierdo del nombre en un layout tipo isologotipo y creo que queda"
+- L20 (2026-11-05, owner): "queda. aprobado"

@@ -63,15 +63,15 @@ describe("favicon", () => {
     }
   });
 
-  it("draws the Bloom mark: six petals around one apricot center on the canvas tile", () => {
+  it("draws the Four cards mark: four rounded cards, one apricot, on the canvas tile", () => {
     const parsed = new DOMParser().parseFromString(faviconSvg, "image/svg+xml");
-    const fills = [...parsed.querySelectorAll("circle")].map((circle) =>
-      circle.getAttribute("fill")?.toLowerCase(),
-    );
+    const [tile, ...cards] = [...parsed.querySelectorAll("rect")];
+    const fills = cards.map((card) => card.getAttribute("fill")?.toLowerCase());
 
-    expect(parsed.querySelector("rect")?.getAttribute("fill")?.toLowerCase()).toBe("#1c1830");
-    expect(fills).toHaveLength(7);
+    expect(tile?.getAttribute("fill")?.toLowerCase()).toBe("#1c1830");
+    expect(fills).toHaveLength(4);
     expect(fills.filter((fill) => fill === "#f29a6b")).toHaveLength(1);
+    expect(parsed.querySelector("circle")).toBeNull();
   });
 
   it("is small enough to stay legible at 16x16", () => {
