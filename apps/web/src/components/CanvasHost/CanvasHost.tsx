@@ -7,8 +7,6 @@ import type { GardenItemsStatus } from "../../items/useGardenItems";
 import "./CanvasHost.css";
 
 export interface CanvasHostProps {
-  /** Fired once the canvas has drawn its first frame (or immediately, if WebGL is unavailable). */
-  onReady?: () => void;
   /** Items rendered as cards on the canvas (T8b). */
   items?: Item[];
   itemsStatus?: GardenItemsStatus;
@@ -51,7 +49,6 @@ function cardAriaLabel(card: CardInstance): string {
  * message shown alongside the still-rendering canvas.
  */
 export function CanvasHost({
-  onReady,
   items = [],
   itemsStatus = "loading",
   onItemOpen,
@@ -59,8 +56,6 @@ export function CanvasHost({
 }: CanvasHostProps) {
   const targetRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
-  const onReadyRef = useRef(onReady);
-  onReadyRef.current = onReady;
   const onItemOpenRef = useRef(onItemOpen);
   onItemOpenRef.current = onItemOpen;
   // Read once by the mount effect below (which intentionally only runs
@@ -68,6 +63,7 @@ export function CanvasHost({
   // changes flow through the separate `setItems` effect instead of
   // recreating the whole engine.
   const initialItemsRef = useRef(items);
+  const initialLoadingRef = useRef(itemsStatus === "loading");
 
   const [visibleCards, setVisibleCards] = useState<CardInstance[]>([]);
 
@@ -85,7 +81,7 @@ export function CanvasHost({
     const engine = new CanvasEngine({
       reducedMotion: prefersReducedMotion(),
       items: initialItemsRef.current,
-      onReady: () => onReadyRef.current?.(),
+      loading: initialLoadingRef.current,
       // WebGL failures (unsupported, lost context, texture load errors) fall
       // back to the CSS background in CanvasHost.css; nothing to do here.
       onError: () => {},
@@ -120,6 +116,10 @@ export function CanvasHost({
   }, [items]);
 
   useEffect(() => {
+    engineRef.current?.setLoading(itemsStatus === "loading");
+  }, [itemsStatus]);
+
+  useEffect(() => {
     engineRef.current?.setPaused(paused);
   }, [paused]);
 
@@ -142,6 +142,11 @@ export function CanvasHost({
         role="application"
         aria-label="Inspiration garden canvas. Move the cursor, drag, or use arrow keys to look around."
       />
+      {itemsStatus === "loading" && (
+        <p className="visually-hidden" role="status">
+          Growing the garden…
+        </p>
+      )}
       {(showEmptyMessage || showErrorMessage) && (
         <p className="glass message-pill canvas-host__message" role="status">
           {showEmptyMessage ? (

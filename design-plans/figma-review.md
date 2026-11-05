@@ -30,6 +30,7 @@ Notes: icons are Lucide `lucide-static@1.63.0` (ISC), fetched from `https://unpk
 | F12 | Link preview image: upload, paste and remove (no image, uploading, image set, upload failed, phone) | Proposals `51:2194` | — | Approved (L9); shipped in v0.10.0 |
 | F13 | Canvas keyboard focus cue: 1px accent hairline at 30%, desktop only, no cue on phones | Proposals `51:3008` | — | Approved (L9); shipped in v0.10.0 |
 | F14 | Image description and visible notes: Description field on image items; Item Note block (`57:212`, Icon/sticky-note `56:2785`) in the item detail for every kind, below the description, hidden when empty; form hints "What the image shows." and "Why you saved it, in your own words." | Proposals `57:2787` | — | Approved (L11) |
+| F16 | Skeleton loading: skeleton cards on the real masonry grid replace the full-screen spinner; navbar visible from the first frame; one sheen band across the canvas; per-card cross-fade reveal; first load only | Proposals `68:3061` (Skeleton Card `68:3075`) | — | Approved (L13) |
 
 ## Log
 
@@ -62,3 +63,6 @@ Notes: icons are Lucide `lucide-static@1.63.0` (ISC), fetched from `https://unpk
 ## F10 · Phone canvas (shipped v0.8, 2026-10-29)
 
 Code first, Figma synced after (motion/shader work can't be designed in Figma). Proposals section `47:2121`, phone `47:2201`: 2.4 columns below 480px (156px cards, 12px gutter, third column peeks), cards never grow/shrink at edges (desktop too, v0.8.1), 40px fade on phones, lens measured on the shorter side. Supersedes F7's two exact columns.
+- L12 (2026-11-05, owner): "me gustaria cambiar la animacion de carga por un skeletton. prepara una propuesta en figma".
+- 2026-11-05: F16 built on Proposals (`68:3061`). Code evidence: `LoadingScreen` covers the viewport at z-index 40 and clears on the engine's first rendered frame (`fireReady`, `engine.ts`), not on `itemsStatus`, so the canvas sits empty until the fetch ends. `useGardenItems` only reports "loading" on the first load, so refetches never show the skeleton. The real canvas bends under the barrel lens, so the skeleton should be painted by the engine, not a flat DOM overlay.
+- L13 (2026-11-05, owner): "aprobado. trabaja por tu cuenta en la imolementacion ynencargate de subirlo a prod. usa oas herramientas que mecedites." — approves F16 and authorizes shipping it.
