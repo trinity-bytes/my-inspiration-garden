@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover extends the canvas under Android's gesture bar.
+         Without it Chrome keeps the viewport above that bar and paints the
+         strip itself, which theme-color does not reach. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="A personal infinite canvas gallery for collecting inspiration." />
     <meta name="theme-color" content="#1c1830" />
     <meta name="color-scheme" content="dark" />
@@ -15,8 +18,7 @@
     <!-- iOS has no install prompt and, before iOS 16.4, ignores the manifest
          display entirely; Safari creates a home-screen web app only when these
          tags are present. The status bar stays "default": "black-translucent"
-         would pull the page under the clock and needs viewport-fit=cover plus
-         env(safe-area-inset-*) in the layout. iOS masks the icon itself, so
+         would pull the page under the clock. iOS masks the icon itself, so
          apple-touch-icon is the full-bleed opaque variant. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

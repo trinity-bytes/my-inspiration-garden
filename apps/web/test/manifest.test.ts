@@ -115,6 +115,12 @@ describe("web app manifest", () => {
     expect(manifest.background_color?.toLowerCase()).toBe(canvas?.toLowerCase());
   });
 
+  it("draws the canvas under the gesture bar, so Chrome paints no bar of its own there", () => {
+    const meta = /<meta\b[^>]*\bname=["']viewport["'][^>]*>/i.exec(indexHtml);
+
+    expect(meta?.[0]).toMatch(/viewport-fit=cover/);
+  });
+
   it("declares the page as dark, so the browser does not assume a light theme", () => {
     const meta = /<meta\b[^>]*\bname=["']color-scheme["'][^>]*>/i.exec(indexHtml);
 
@@ -151,12 +157,9 @@ describe("iOS home-screen app", () => {
     expect(metaContent("apple-mobile-web-app-title")).toBe(manifest.short_name);
   });
 
-  it("leaves the status bar visible, since black-translucent needs safe-area layout", () => {
-    // "black-translucent" pulls the page under the clock and battery. It is only
-    // correct together with viewport-fit=cover and env(safe-area-inset-*) in the
-    // layout, none of which this app has — so the tag must stay "default".
+  it("leaves the status bar visible, so the page stays clear of the clock", () => {
+    // "black-translucent" pulls the page under the clock and battery, and the
+    // top of the layout is not built for that — so the tag must stay "default".
     expect(metaContent("apple-mobile-web-app-status-bar-style")).toBe("default");
-    const viewport = /<meta\b[^>]*\bname=["']viewport["'][^>]*>/i.exec(indexHtml)?.[0];
-    expect(viewport).not.toMatch(/viewport-fit=cover/i);
   });
 });
