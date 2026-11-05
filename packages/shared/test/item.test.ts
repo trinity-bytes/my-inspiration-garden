@@ -192,6 +192,16 @@ describe("createItemInputSchema", () => {
 });
 
 describe("updateItemInputSchema", () => {
+  it("accepts null to clear title, notes and an optional url", () => {
+    const input = { kind: "text", title: null, notes: null, url: null };
+    expect(updateItemInputSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("rejects null for the url of a link item, which requires one", () => {
+    const input = { kind: "link", url: null };
+    expect(updateItemInputSchema.safeParse(input).success).toBe(false);
+  });
+
   it("allows partial updates with only kind and one field", () => {
     const input = { kind: "text", notes: "updated note" };
     const result = updateItemInputSchema.safeParse(input);

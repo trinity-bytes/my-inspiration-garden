@@ -92,6 +92,79 @@ describe("PATCH /api/items/:id", () => {
     expect(kindMismatch.status).toBe(422);
   });
 
+  it("clears title, notes and url when they are sent as null", async () => {
+    const auth = await writeToken("write-clear", "ig_write_clear");
+    const created = await createItem(auth, {
+      kind: "text",
+      source: "web",
+      title: "A title",
+      notes: "A note",
+      url: "https://example.com/source",
+      data: { body: "hi" },
+    });
+    const item = await created.json<{ id: string }>();
+
+    const patched = await SELF.fetch(`https://example.com/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify({ kind: "text", title: null, notes: null, url: null }),
+    });
+    expect(patched.status).toBe(200);
+    const patchedBody = await patched.json<Record<string, unknown>>();
+    expect(patchedBody).not.toHaveProperty("title");
+    expect(patchedBody).not.toHaveProperty("notes");
+    expect(patchedBody).not.toHaveProperty("url");
+
+    const reread = await SELF.fetch(`https://example.com/api/items/${item.id}`);
+    const rereadBody = await reread.json<Record<string, unknown>>();
+    expect(rereadBody).not.toHaveProperty("title");
+    expect(rereadBody).not.toHaveProperty("notes");
+    expect(rereadBody).not.toHaveProperty("url");
+  });
+
+  it("keeps title, notes and url when they are omitted", async () => {
+    const auth = await writeToken("write-keep", "ig_write_keep");
+    const created = await createItem(auth, {
+      kind: "text",
+      source: "web",
+      title: "A title",
+      notes: "A note",
+      url: "https://example.com/source",
+      data: { body: "hi" },
+    });
+    const item = await created.json<{ id: string }>();
+
+    const patched = await SELF.fetch(`https://example.com/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify({ kind: "text", tags: ["kept"] }),
+    });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toMatchObject({
+      title: "A title",
+      notes: "A note",
+      url: "https://example.com/source",
+    });
+  });
+
+  it("rejects clearing the url of a link item", async () => {
+    const auth = await writeToken("write-link-url", "ig_write_link_url");
+    const created = await createItem(auth, {
+      kind: "link",
+      source: "web",
+      url: "https://example.com/page",
+      data: {},
+    });
+    const item = await created.json<{ id: string }>();
+
+    const patched = await SELF.fetch(`https://example.com/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify({ kind: "link", url: null }),
+    });
+    expect(patched.status).toBe(400);
+  });
+
   it("404s updating a missing item", async () => {
     const auth = await writeToken("write-update-404", "ig_write_update_404");
     const res = await SELF.fetch("https://example.com/api/items/does-not-exist", {

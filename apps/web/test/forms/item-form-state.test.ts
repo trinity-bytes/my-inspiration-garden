@@ -243,6 +243,48 @@ describe("formStateFromItem / buildUpdateItemInput (edit mode)", () => {
     }
   });
 
+  it("sends null for an emptied title, notes and url, so the api clears them", () => {
+    const state = formStateFromItem({ ...textItem, url: "https://example.com/source" });
+    state.title = "  ";
+    state.notes = "";
+    state.url = "";
+
+    const result = buildUpdateItemInput(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.input).toMatchObject({ title: null, notes: null, url: null });
+    }
+  });
+
+  it("does not send a url for a kind whose form has no url field", () => {
+    const state = formStateFromItem({
+      ...textItem,
+      kind: "image",
+      data: { r2Key: "k", width: 1, height: 1, mime: "image/png" },
+    } as Item);
+    state.notes = "";
+
+    const result = buildUpdateItemInput(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.input).toMatchObject({ notes: null });
+      expect(result.input).not.toHaveProperty("url");
+    }
+  });
+
+  it("keeps create payloads free of null for empty fields", () => {
+    const state = formStateFromItem(textItem);
+    state.title = "";
+    state.notes = "";
+
+    const result = buildCreateItemInput(state);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.input.title).toBeUndefined();
+      expect(result.input.notes).toBeUndefined();
+    }
+  });
+
   it("rejects an update that would leave a required field empty", () => {
     const state = formStateFromItem(textItem);
     state.text.body = "";

@@ -239,7 +239,18 @@ export function buildUpdateItemInput(state: ItemFormState): BuildItemInputResult
   if (!created.ok) return created;
   // `UpdateItemInput` is a top-level partial of the create shape with `kind`
   // forced back to a required literal, and drops `source` entirely
-  // (packages/shared/src/item.ts) — the create payload already satisfies
-  // that shape (source is already omitted from it), so it's reused as-is.
-  return { ok: true, input: created.input as UpdateItemInput };
+  // (packages/shared/src/item.ts). The create payload omits empty fields, but
+  // an omitted field keeps its stored value on update, so each emptied field
+  // becomes `null` to clear it. `url` only applies to kinds whose payload
+  // carries it: the other forms have no url field to empty.
+  const { input } = created;
+  return {
+    ok: true,
+    input: {
+      ...input,
+      title: input.title ?? null,
+      notes: input.notes ?? null,
+      ...("url" in input ? { url: input.url ?? null } : {}),
+    } as UpdateItemInput,
+  };
 }

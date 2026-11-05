@@ -185,32 +185,41 @@ export type CreateItemInput = z.infer<typeof createItemInputSchema>;
  * discriminates which per-kind `data` shape applies. `data`, when present,
  * must be the *complete* object for that kind (not deep-partial) so a partial
  * update never leaves a kind's `data` in an inconsistent shape.
+ *
+ * An omitted field keeps its stored value, so `null` is how a patch clears an
+ * optional one. A link item's `url` is required and stays non-nullable.
  */
+const clearableFields = {
+  title: itemCore.title.nullable(),
+  notes: itemCore.notes.nullable(),
+};
+const clearableUrl = { url: z.url().nullable().optional() };
+
 export const updateItemInputSchema = z.discriminatedUnion("kind", [
   imageItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("image") }),
+    .extend({ kind: z.literal("image"), ...clearableFields, ...clearableUrl }),
   linkItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("link") }),
+    .extend({ kind: z.literal("link"), ...clearableFields }),
   textItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("text") }),
+    .extend({ kind: z.literal("text"), ...clearableFields, ...clearableUrl }),
   videoItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("video") }),
+    .extend({ kind: z.literal("video"), ...clearableFields, ...clearableUrl }),
   paletteItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("palette") }),
+    .extend({ kind: z.literal("palette"), ...clearableFields, ...clearableUrl }),
   fontItemSchema
     .omit(generatedFields)
     .partial()
-    .extend({ kind: z.literal("font") }),
+    .extend({ kind: z.literal("font"), ...clearableFields, ...clearableUrl }),
 ]);
 export type UpdateItemInput = z.infer<typeof updateItemInputSchema>;
 

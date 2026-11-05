@@ -116,6 +116,12 @@ visitors can browse and filter.
   (including a revision restore). `GET /api/items?color=#RRGGBB` matches
   against these rows.
 
+## Clearing item fields
+
+`PATCH /api/items/:id` keeps every field the body omits. To clear `title`,
+`notes` or `url`, send it as `null`. A `link` item requires its `url`, so
+`null` is rejected there with `400`.
+
 ## Link preview images
 
 On link item create and update (when the patch sets `data.previewImage`), an
