@@ -11,6 +11,7 @@ import {
   paintPlaceholderCanvas,
 } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
+import { skeletonHasLines, stepFade } from "../skeleton";
 import { TextureRegistry } from "../texture-registry";
 import { thumbnailUrlForItem } from "../thumbnail-source";
 import type { Vec2 } from "../types";
@@ -23,6 +24,20 @@ export interface CardLayerOptions {
   renderOrder: number;
 }
 
+/** Per-frame inputs shared by every card in a layer. */
+export interface CardFrame {
+  worldOffset: Vec2;
+  viewportWidth: number;
+  viewportHeight: number;
+  reducedMotion: boolean;
+  dtSeconds: number;
+  /** The whole layer's opacity: the skeleton and card layers cross-fade when the items land. */
+  layerOpacity: number;
+  /** See `skeleton.ts`; render-target pixels, the space of `gl_FragCoord`. */
+  sheenCenterPx: number;
+  sheenHalfWidthPx: number;
+}
+
 const CORNER_RADIUS_FRACTION = 0.08;
 
 interface CardUniforms {
@@ -31,6 +46,10 @@ interface CardUniforms {
   u_aspect: { value: number };
   u_cornerRadius: { value: number };
   u_highlight: { value: number };
+  u_reveal: { value: number };
+  u_lines: { value: number };
+  u_sheenCenter: { value: number };
+  u_sheenHalfWidth: { value: number };
   [key: string]: THREE.IUniform;
 }
 
@@ -43,6 +62,8 @@ interface PoolEntry {
   /** The texture cache key this entry currently holds a pin on (see `texture-registry.ts`), or `null` before its first assignment. Tracked separately from `assignedKey` because on a thumbnail load failure the entry re-pins to the placeholder key while keeping the same `assignedKey`. */
   pinnedTextureKey: string | null;
   loadToken: number;
+  /** True once `u_map` holds this assignment's texture; until then the card shows its skeleton. */
+  textureReady: boolean;
 }
 
 /**
@@ -76,6 +97,10 @@ export class CardLayer {
         u_aspect: { value: 1 },
         u_cornerRadius: { value: CORNER_RADIUS_FRACTION },
         u_highlight: { value: 0 },
+        u_reveal: { value: 0 },
+        u_lines: { value: 0 },
+        u_sheenCenter: { value: 0 },
+        u_sheenHalfWidth: { value: 1 },
       };
       const material = new THREE.ShaderMaterial({
         vertexShader: CARD_VERTEX_GLSL,
@@ -100,8 +125,14 @@ export class CardLayer {
         assignedKey: null,
         pinnedTextureKey: null,
         loadToken: 0,
+        textureReady: false,
       });
     }
+  }
+
+  private applyTexture(entry: PoolEntry, texture: THREE.Texture): void {
+    entry.uniforms.u_map.value = texture;
+    entry.textureReady = true;
   }
 
   /** Pins `entry` to `key` in the texture registry (protecting it from eviction while assigned), unpinning whatever key it held before. A no-op if already pinned to `key`. */
@@ -162,7 +193,7 @@ export class CardLayer {
       },
       (texture) => {
         if (!isStaleLoadCallback(entry.loadToken, token)) {
-          entry.uniforms.u_map.value = texture;
+          this.applyTexture(entry, texture);
         }
       },
       () => {
@@ -187,7 +218,7 @@ export class CardLayer {
           (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
           (texture) => {
             if (!isStaleLoadCallback(entry.loadToken, token)) {
-              entry.uniforms.u_map.value = texture;
+              this.applyTexture(entry, texture);
             }
           },
           () => {},
@@ -227,30 +258,60 @@ export class CardLayer {
       },
       (texture) => {
         if (!isStaleLoadCallback(entry.loadToken, token)) {
-          entry.uniforms.u_map.value = texture;
+          this.applyTexture(entry, texture);
         }
       },
       () => {},
     );
   }
 
+  /** Places `entry` on `instance`'s slot for this frame. */
+  private placeEntry(
+    entry: PoolEntry,
+    instance: CardInstance,
+    frame: CardFrame,
+    hover: ReturnType<typeof cardHoverStyle>,
+  ): void {
+    const screenRect = cardScreenRect(instance.worldRect, frame.worldOffset, 1);
+    const progress = cardEntryProgress(screenRect, frame.viewportWidth, frame.viewportHeight);
+    const width = instance.worldRect.width * hover.scale;
+    const height = instance.worldRect.height * hover.scale;
+
+    // Y negated: mesh position is scene space (y-up); worldRect is this
+    // engine's y-down world convention (coords.ts), same as every other layer.
+    entry.mesh.position.set(instance.worldRect.x, -instance.worldRect.y, 0);
+    entry.mesh.scale.set(width, height, 1);
+    entry.mesh.visible = true;
+
+    entry.uniforms.u_opacity.value =
+      cardOpacity(progress, frame.reducedMotion) * frame.layerOpacity;
+    entry.uniforms.u_aspect.value = width / height;
+    entry.uniforms.u_highlight.value = hover.highlight;
+    entry.uniforms.u_sheenCenter.value = frame.sheenCenterPx;
+    entry.uniforms.u_sheenHalfWidth.value = frame.sheenHalfWidthPx;
+  }
+
+  private hideEntriesFrom(start: number): void {
+    for (let i = start; i < this.pool.length; i++) {
+      const entry = this.pool[i];
+      if (entry) {
+        entry.mesh.visible = false;
+        entry.assignedKey = null;
+      }
+    }
+  }
+
   /**
    * `instances` is the current visible-card set (`item-layout.ts`'s
    * `visibleCardInstances`, already computed by the caller — this class
-   * does not do virtualization math itself). `worldOffset`/`viewport` drive
-   * the fade-in opacity (`card-fade.ts`). A card always fills its column
+   * does not do virtualization math itself). A card always fills its column
    * slot: shrinking it to its texture's resolution broke the even gutter on
    * high-DPR screens, so composed textures are painted at device resolution
-   * instead (`placeholder-texture.ts`'s `createDeviceCanvas`).
+   * instead (`placeholder-texture.ts`'s `createDeviceCanvas`). A card whose
+   * texture is still loading shows its skeleton and cross-fades when it lands;
+   * a cached texture arrives synchronously, so panning never fades.
    */
-  update(
-    instances: readonly CardInstance[],
-    worldOffset: Vec2,
-    viewportWidth: number,
-    viewportHeight: number,
-    reducedMotion: boolean,
-    hoveredKey: string | null,
-  ): void {
+  update(instances: readonly CardInstance[], frame: CardFrame, hoveredKey: string | null): void {
     const wanted = Math.min(instances.length, this.options.maxPoolSize);
     this.ensurePoolSize(wanted);
 
@@ -265,38 +326,45 @@ export class CardLayer {
       if (entry.assignedKey !== assignmentKey) {
         entry.assignedKey = assignmentKey;
         entry.loadToken++;
+        entry.textureReady = false;
         this.assignTexture(
           entry,
           instance.item,
           instance.worldRect.width,
           instance.worldRect.height,
         );
+        entry.uniforms.u_reveal.value = entry.textureReady ? 1 : 0;
       }
 
-      const hover = cardHoverStyle(hoveredKey === instance.key);
-      const screenRect = cardScreenRect(instance.worldRect, worldOffset, 1);
-      const progress = cardEntryProgress(screenRect, viewportWidth, viewportHeight);
-      const width = instance.worldRect.width * hover.scale;
-      const height = instance.worldRect.height * hover.scale;
-
-      // Y negated: mesh position is scene space (y-up); worldRect is this
-      // engine's y-down world convention (coords.ts), same as every other layer.
-      entry.mesh.position.set(instance.worldRect.x, -instance.worldRect.y, 0);
-      entry.mesh.scale.set(width, height, 1);
-      entry.mesh.visible = true;
-
-      entry.uniforms.u_opacity.value = cardOpacity(progress, reducedMotion);
-      entry.uniforms.u_aspect.value = width / height;
-      entry.uniforms.u_highlight.value = hover.highlight;
+      entry.uniforms.u_reveal.value = stepFade(
+        entry.uniforms.u_reveal.value,
+        entry.textureReady ? 1 : 0,
+        frame.dtSeconds,
+        frame.reducedMotion,
+      );
+      this.placeEntry(entry, instance, frame, cardHoverStyle(hoveredKey === instance.key));
     }
 
-    for (let i = wanted; i < this.pool.length; i++) {
+    this.hideEntriesFrom(wanted);
+  }
+
+  /** Draws `instances` as bare skeletons, with no textures: the placeholders shown while the items load. */
+  updateSkeletons(instances: readonly CardInstance[], frame: CardFrame): void {
+    const wanted = Math.min(instances.length, this.options.maxPoolSize);
+    this.ensurePoolSize(wanted);
+
+    for (let i = 0; i < wanted; i++) {
+      const instance = instances[i];
       const entry = this.pool[i];
-      if (entry) {
-        entry.mesh.visible = false;
-        entry.assignedKey = null;
+      if (!instance || !entry) {
+        continue;
       }
+      entry.uniforms.u_reveal.value = 0;
+      entry.uniforms.u_lines.value = skeletonHasLines(instance.item) ? 1 : 0;
+      this.placeEntry(entry, instance, frame, cardHoverStyle(false));
     }
+
+    this.hideEntriesFrom(wanted);
   }
 
   dispose(): void {

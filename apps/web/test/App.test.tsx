@@ -41,10 +41,12 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Filters" })).toBeInTheDocument();
   });
 
-  it("renders the loading screen", () => {
+  it("keeps the navbar reachable during the first load, with no cover over it", () => {
     render(<App />);
 
-    expect(screen.getByTestId("loading-screen")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Growing the garden…");
+    expect(screen.queryByTestId("loading-screen")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search the garden")).toBeInTheDocument();
   });
 
   it("does not show a sign-out link for a visitor session", async () => {

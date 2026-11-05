@@ -14,22 +14,23 @@ import {
   type ItemPeriod,
   visibleCardInstances,
 } from "./item-layout";
-import { CardLayer } from "./layers/cards";
+import { type CardFrame, CardLayer } from "./layers/cards";
 import { LruCache } from "./lru-cache";
 import { NavigationController } from "./navigation-controller";
 import { PointerInteractionController } from "./pointer-interaction";
 import { BarrelPass } from "./post/barrel";
 import { renderPixelRatio } from "./render-pixel-ratio";
+import { SKELETON_ITEMS, sheenCenterPx, sheenHalfWidthPx, stepFade } from "./skeleton";
 import type { Vec2 } from "./types";
 
 export interface CanvasEngineOptions {
-  /** Fired once the first frame is drawn (or immediately, on the WebGL-unavailable fallback path). */
-  onReady?: () => void;
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
   onError?: (error: unknown) => void;
   reducedMotion?: boolean;
   /** Items rendered as cards (see `item-layout.ts`); can also be set/updated later via `setItems`. */
   items?: Item[];
+  /** True while the first item fetch runs: the canvas shows skeleton cards. Can also be changed later via `setLoading`. */
+  loading?: boolean;
   /** Fired when a card is clicked (not after a drag — see `click-vs-drag.ts`) or opened via the parallel DOM/ARIA layer's Enter key. */
   onItemOpen?: (itemId: string) => void;
   /** Fired whenever the set of cards the parallel DOM/ARIA layer should mirror changes (see `dom-mirror.ts`). */
@@ -46,6 +47,7 @@ export interface WorldState {
 // Cards render above everything else in the scene (nothing else is drawn but
 // the solid clear color today; the headroom keeps room for future layers).
 const CARD_RENDER_ORDER = 200;
+const SKELETON_RENDER_ORDER = CARD_RENDER_ORDER - 1;
 const CARD_TEXTURE_CACHE_SIZE = 120;
 // A CardInstance's content is a pure, deterministic function of its cell
 // (see item-layout.ts) and never changes while `items` doesn't, so caching
@@ -63,8 +65,7 @@ const CARD_INSTANCE_CACHE_SIZE = DEFAULT_MAX_CARD_POOL_SIZE * 3;
  * invocation (each invocation should use its own `CanvasEngine` instance).
  *
  * If WebGL is unavailable, `mount` catches the failure, leaves the
- * existing CSS background (see `CanvasHost.css`) alone, and still calls
- * `onReady` so the loading screen clears.
+ * existing CSS background (see `CanvasHost.css`) alone.
  */
 export class CanvasEngine {
   private readonly options: CanvasEngineOptions;
@@ -82,6 +83,13 @@ export class CanvasEngine {
   private barrelPass: BarrelPass | null = null;
 
   private cards: CardLayer | null = null;
+  /** Placeholder cards shown while `loading`; they cross-fade with `cards` when the items land. */
+  private skeletons: CardLayer | null = null;
+  private loading: boolean;
+  private skeletonOpacity: number;
+  private cardsOpacity: number;
+  /** Reused like `lastCardInstances`, but never reaches hit-testing or the DOM mirror. */
+  private readonly skeletonInstances: CardInstance[] = [];
 
   private items: Item[];
   /** The full visible-card set computed last frame (hit-testing/hover use this; the DOM mirror uses a smaller, sorted subset — see `dom-mirror.ts`). Reused in place every frame (`visibleCardInstances`'s `out` param) rather than reassigned, so the array itself isn't reallocated either. */
@@ -111,12 +119,14 @@ export class CanvasEngine {
   private readonly distortionK = DEFAULT_BARREL_K;
 
   private disposed = false;
-  private readyFired = false;
 
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
     this.reducedMotion = options.reducedMotion ?? false;
     this.items = options.items ?? [];
+    this.loading = options.loading ?? false;
+    this.skeletonOpacity = this.loading ? 1 : 0;
+    this.cardsOpacity = this.loading ? 0 : 1;
   }
 
   /** Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for the items array it was computed from. */
@@ -124,6 +134,11 @@ export class CanvasEngine {
     this.items = items;
     this.cardInstanceCache.clear();
     this.columnPeriodCache.clear();
+  }
+
+  /** Shows or retires the skeleton cards; the change cross-fades over the next frames. */
+  setLoading(loading: boolean): void {
+    this.loading = loading;
   }
 
   /** Pans instantly so the card identified by `key` (see `CardInstance.key` / `dom-mirror.ts`) is centered on screen. A no-op if that card is not among the currently-known instances. */
@@ -155,7 +170,6 @@ export class CanvasEngine {
       });
     } catch (error) {
       this.options.onError?.(error);
-      this.fireReady();
       return;
     }
 
@@ -198,6 +212,13 @@ export class CanvasEngine {
       renderOrder: CARD_RENDER_ORDER,
     });
     this.scene.add(this.cards.group);
+    this.skeletons = new CardLayer({
+      maxPoolSize: DEFAULT_MAX_CARD_POOL_SIZE,
+      textureCacheSize: 1,
+      apiBaseUrl: "",
+      renderOrder: SKELETON_RENDER_ORDER,
+    });
+    this.scene.add(this.skeletons.group);
 
     // Pointer up/cancel/lostpointercapture are listened for on `window`, not `canvas` — see
     // `pointer-interaction.ts`'s `releaseTarget` doc for why: `NavigationController` below
@@ -256,8 +277,10 @@ export class CanvasEngine {
     this.pointerInteraction = null;
 
     this.cards?.dispose();
+    this.skeletons?.dispose();
     this.barrelPass?.dispose();
     this.cards = null;
+    this.skeletons = null;
     this.barrelPass = null;
 
     this.renderTarget?.dispose();
@@ -388,14 +411,6 @@ export class CanvasEngine {
     this.hoveredCardKey = key;
   }
 
-  private fireReady(): void {
-    if (this.readyFired) {
-      return;
-    }
-    this.readyFired = true;
-    this.options.onReady?.();
-  }
-
   /**
    * Cards use parallax 1 (they pan 1:1 with navigation):
    * `group.position = world` with fixed local card positions. Recomputes the visible-card set
@@ -404,8 +419,13 @@ export class CanvasEngine {
    * and notifies `onVisibleCardsChange` only when the DOM-mirrored subset actually
    * changes (`dom-mirror.ts`), so React doesn't re-render every frame.
    */
-  private updateCards(world: Vec2, viewport: { width: number; height: number }): void {
-    if (!this.cards) {
+  private updateCards(
+    world: Vec2,
+    viewport: { width: number; height: number },
+    nowSeconds: number,
+    dtSeconds: number,
+  ): void {
+    if (!this.cards || !this.skeletons) {
       return;
     }
 
@@ -452,14 +472,55 @@ export class CanvasEngine {
         this.canvas.style.cursor = hoverKey ? "pointer" : "";
       }
     }
-    this.cards.update(
-      this.lastCardInstances,
-      world,
-      viewport.width,
-      viewport.height,
+    this.skeletonOpacity = stepFade(
+      this.skeletonOpacity,
+      this.loading ? 1 : 0,
+      dtSeconds,
       this.reducedMotion,
-      hoverKey,
     );
+    this.cardsOpacity = stepFade(
+      this.cardsOpacity,
+      this.loading ? 0 : 1,
+      dtSeconds,
+      this.reducedMotion,
+    );
+
+    const renderWidth = this.renderTarget?.width ?? viewport.width;
+    const renderHeight = this.renderTarget?.height ?? viewport.height;
+    const frame: CardFrame = {
+      worldOffset: world,
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      reducedMotion: this.reducedMotion,
+      dtSeconds,
+      layerOpacity: this.cardsOpacity,
+      sheenCenterPx: sheenCenterPx(nowSeconds, renderWidth, renderHeight, this.reducedMotion),
+      sheenHalfWidthPx: sheenHalfWidthPx(renderWidth, renderHeight),
+    };
+    this.cards.update(this.lastCardInstances, frame, hoverKey);
+
+    this.skeletonInstances.length = 0;
+    if (this.skeletonOpacity > 0) {
+      visibleCardInstances(
+        SKELETON_ITEMS,
+        cardCenterWorld,
+        viewport.width,
+        viewport.height,
+        columnWidth,
+        DEFAULT_CARD_MARGIN_PX,
+        DEFAULT_MAX_CARD_POOL_SIZE,
+        undefined,
+        this.skeletonInstances,
+        undefined,
+        gutter,
+      );
+    }
+    this.skeletons.group.position.x = world.x;
+    this.skeletons.group.position.y = -world.y;
+    this.skeletons.updateSkeletons(this.skeletonInstances, {
+      ...frame,
+      layerOpacity: this.skeletonOpacity,
+    });
 
     const domCards = selectDomMirrorCards(this.lastCardInstances);
     const signature = domCards.map((card) => card.key).join("|");
@@ -500,13 +561,11 @@ export class CanvasEngine {
     const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
     const viewport = this.getViewportSize();
 
-    this.updateCards(world, viewport);
+    this.updateCards(world, viewport, nowSeconds, dt);
 
     this.renderer.setRenderTarget(this.renderTarget);
     this.renderer.render(this.scene, this.worldCamera);
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.postScene, this.postCamera);
-
-    this.fireReady();
   };
 }
