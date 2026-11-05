@@ -30,7 +30,7 @@ Notes: icons are Lucide `lucide-static@1.63.0` (ISC), fetched from `https://unpk
 | F12 | Link preview image: upload, paste and remove (no image, uploading, image set, upload failed, phone) | Proposals `51:2194` | — | Approved (L9); shipped in v0.10.0 |
 | F13 | Canvas keyboard focus cue: 1px accent hairline at 30%, desktop only, no cue on phones | Proposals `51:3008` | — | Approved (L9); shipped in v0.10.0 |
 | F14 | Image description and visible notes: Description field on image items; Item Note block (`57:212`, Icon/sticky-note `56:2785`) in the item detail for every kind, below the description, hidden when empty; form hints "What the image shows." and "Why you saved it, in your own words." | Proposals `57:2787` | — | Approved (L11) |
-| F16 | Skeleton loading: skeleton cards on the real masonry grid replace the full-screen spinner; navbar visible from the first frame; one sheen band across the canvas; per-card cross-fade reveal; first load only | Proposals `68:3061` (Skeleton Card `68:3075`) | — | Approved (L13) |
+| F16 | Skeleton loading: skeleton cards on the real masonry grid replace the full-screen spinner; navbar visible from the first frame; one sheen band across the canvas; per-card cross-fade reveal; first load only | Proposals `68:3061` (Skeleton Card `68:3075`) | — | Approved (L13); shipped in v0.13.0 |
 
 ## Log
 
