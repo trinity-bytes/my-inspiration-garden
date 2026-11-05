@@ -29,6 +29,7 @@ const PALETTE = new Set([
   "#8f7bb5", // lavender 400
   "#5e4c82", // lavender 500
   "#2a2140", // ink
+  "#1c1830", // canvas
   "#f29a6b", // accent
   "#e0784e", // accent strong
   "#fce3d3", // accent soft
@@ -60,6 +61,17 @@ describe("favicon", () => {
     for (const color of colors) {
       expect(PALETTE.has(color), `${color} is not in the garden palette`).toBe(true);
     }
+  });
+
+  it("draws the Bloom mark: six petals around one apricot center on the canvas tile", () => {
+    const parsed = new DOMParser().parseFromString(faviconSvg, "image/svg+xml");
+    const fills = [...parsed.querySelectorAll("circle")].map((circle) =>
+      circle.getAttribute("fill")?.toLowerCase(),
+    );
+
+    expect(parsed.querySelector("rect")?.getAttribute("fill")?.toLowerCase()).toBe("#1c1830");
+    expect(fills).toHaveLength(7);
+    expect(fills.filter((fill) => fill === "#f29a6b")).toHaveLength(1);
   });
 
   it("is small enough to stay legible at 16x16", () => {

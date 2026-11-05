@@ -1,37 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <!--
-    Inspiration Garden mark: a drifting dot field on the lavender dusk sky the
-    canvas uses, with one apricot bloom.
+    Inspiration Garden mark, "Bloom": six lavender dots gather around one
+    apricot center on the dark canvas color. Designed in Figma (Proposals page,
+    frame F15, component App Icon/A Bloom).
 
     Hand-written and hardcoded on purpose. A favicon is fetched as its own
-    resource, so it cannot see the page's CSS custom properties — a `var()`
+    resource, so it cannot see the page's CSS custom properties, and a `var()`
     reference to a design token here would resolve to nothing and paint
     black. Hex values mirror `src/styles/tokens.css`; keep the two in step.
     (XML forbids a double hyphen inside a comment, which is why that token is
     named rather than quoted.)
 
     Drawn on a 32px grid (2x a 16px tab) with only large, high-contrast
-    shapes, so it still reads as "a garden of drifting dots" when scaled down.
+    shapes. The PNG icons are rasterized from this file; the maskable and
+    apple-touch ones drop the tile radius, because the platform applies its
+    own mask.
   -->
   <title>Inspiration Garden</title>
 
-  <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="100%">
-      <stop offset="0" stop-color="#F6F3FA" />
-      <stop offset="1" stop-color="#D5CBE8" />
-    </linearGradient>
-  </defs>
+  <rect width="32" height="32" rx="7" fill="#1C1830" />
 
-  <rect width="32" height="32" rx="7" fill="url(#sky)" />
-
-  <!-- Distant field: pale, small, low contrast. -->
-  <circle cx="8" cy="12" r="1.7" fill="#B3A3D1" />
-  <circle cx="24" cy="11" r="1.5" fill="#B3A3D1" />
-
-  <!-- Mid field. -->
-  <circle cx="16" cy="13" r="2.2" fill="#5E4C82" />
-  <circle cx="22" cy="23" r="2.5" fill="#8F7BB5" />
+  <!-- Petals, clockwise from the top: light falls from above. -->
+  <circle cx="16" cy="8.375" r="3.375" fill="#E9E3F3" />
+  <circle cx="22.603" cy="12.188" r="3.375" fill="#D5CBE8" />
+  <circle cx="22.603" cy="19.813" r="3.375" fill="#B3A3D1" />
+  <circle cx="16" cy="23.625" r="3.375" fill="#8F7BB5" />
+  <circle cx="9.397" cy="19.813" r="3.375" fill="#B3A3D1" />
+  <circle cx="9.397" cy="12.188" r="3.375" fill="#D5CBE8" />
 
   <!-- The apricot bloom: the one accent, and the focal point. -->
-  <circle cx="11" cy="22" r="3.4" fill="#F29A6B" />
+  <circle cx="16" cy="16" r="3.5" fill="#F29A6B" />
 </svg>
