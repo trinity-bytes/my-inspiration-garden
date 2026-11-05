@@ -162,6 +162,61 @@ describe("POST /api/unfurl", () => {
     expect(body.title).toBeUndefined();
   });
 
+  it("ignores a 202 bot challenge page instead of parsing it as the real page", async () => {
+    const auth = await writeToken("unfurl-challenge", "ig_unfurl_challenge");
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("<html><head><title>Human Verification</title></head></html>", {
+          status: 202,
+          headers: { "content-type": "text/html; charset=UTF-8" },
+        }),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/unfurl",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://dribbble.com/shots/1" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json<{ platform: string; title?: string }>();
+    expect(body.platform).toBe("dribbble");
+    expect(body.title).toBeUndefined();
+  });
+
+  it("upgrades the small Pinterest oEmbed thumbnail to the 736px rendition", async () => {
+    const auth = await writeToken("unfurl-pinterest", "ig_unfurl_pinterest");
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            title: "A pin",
+            thumbnail_url: "https://i.pinimg.com/236x/a7/66/56/a76656.jpg",
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+    );
+    const app = createApp({ fetchImpl: fetchImpl as unknown as typeof fetch });
+
+    const res = await app.request(
+      "https://example.com/api/unfurl",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify({ url: "https://www.pinterest.com/pin/1/" }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json<{ title?: string; previewImage?: string }>();
+    expect(body.title).toBe("A pin");
+    expect(body.previewImage).toBe("https://i.pinimg.com/736x/a7/66/56/a76656.jpg");
+  });
+
   it("requests with redirect: manual for the HTML/OG fetch (never delegates redirect-following)", async () => {
     const auth = await writeToken("unfurl-manual-mode", "ig_unfurl_manual_mode");
     const fetchImpl = vi.fn(

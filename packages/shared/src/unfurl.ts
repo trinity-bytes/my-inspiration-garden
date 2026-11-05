@@ -22,6 +22,14 @@ export function resolveUrl(maybeRelative: string, base: string): string | undefi
   }
 }
 
+/**
+ * Pinterest's oEmbed thumbnail is the 236px rendition; the same image path
+ * also serves the 736px one its pin pages use for `og:image`.
+ */
+export function upgradePinterestThumbnail(url: string): string {
+  return url.replace(/^https:\/\/i\.pinimg\.com\/236x\//, "https://i.pinimg.com/736x/");
+}
+
 export interface UnfurlSources {
   oembed?: Partial<UnfurlMetadata> | null;
   og?: Partial<UnfurlMetadata> | null;

@@ -5,6 +5,7 @@ import {
   mergeUnfurlMetadata,
   resolveUrl,
   type UnfurlMetadata,
+  upgradePinterestThumbnail,
 } from "@garden/shared";
 import type { Hono } from "hono";
 import { AppError } from "../../lib/errors";
@@ -38,11 +39,13 @@ function oembedUrlFor(platform: LinkPlatform, pageUrl: string): string | null {
  * Fetches `url` through `fetchSafe` (manual-mode redirect walking with
  * per-hop `isSafeFetchUrl` revalidation — see `lib/safe-fetch.ts` — so a
  * safe-looking URL can't 302 its way to a private/loopback/link-local
- * address) and normalizes any failure/non-2xx result to `null`.
+ * address) and normalizes any failure/non-200 result to `null`. Other 2xx
+ * codes count as failures too: bot walls such as AWS WAF answer `202` with a
+ * challenge page, which must not be parsed as the real document.
  */
 async function fetchWithTimeout(fetchImpl: typeof fetch, url: string): Promise<Response | null> {
   const res = await fetchSafe(fetchImpl, url);
-  return res?.ok ? res : null;
+  return res?.status === 200 ? res : null;
 }
 
 async function fetchOembed(
@@ -56,11 +59,13 @@ async function fetchOembed(
   if (!res) return null;
   const json = (await res.json().catch(() => null)) as Record<string, unknown> | null;
   if (!json) return null;
+  const thumbnail = typeof json.thumbnail_url === "string" ? json.thumbnail_url : undefined;
   return {
     title: typeof json.title === "string" ? json.title : undefined,
     author: typeof json.author_name === "string" ? json.author_name : undefined,
     siteName: typeof json.provider_name === "string" ? json.provider_name : undefined,
-    previewImage: typeof json.thumbnail_url === "string" ? json.thumbnail_url : undefined,
+    previewImage:
+      thumbnail && platform === "pinterest" ? upgradePinterestThumbnail(thumbnail) : thumbnail,
     embed: typeof json.html === "string" ? json.html : undefined,
   };
 }
