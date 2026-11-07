@@ -40,9 +40,16 @@ export interface CardFrame {
 
 const CORNER_RADIUS_FRACTION = 0.08;
 
-/** Painted size suffix for texture cache keys: a texture is only valid at the size it was painted at. */
+/**
+ * Size component of texture/assignment keys, bucketed so a window drag does
+ * not repaint every visible card on every pixel. Within a bucket the texture
+ * painted for the first size is reused with at most a few pixels of stretch.
+ */
+const TEXTURE_SIZE_BUCKET_PX = 16;
 function sizeSuffix(widthPx: number, heightPx: number): string {
-  return `@${widthPx}x${heightPx}`;
+  const w = Math.round(widthPx / TEXTURE_SIZE_BUCKET_PX);
+  const h = Math.round(heightPx / TEXTURE_SIZE_BUCKET_PX);
+  return `@${w}x${h}`;
 }
 
 /**

@@ -48,7 +48,10 @@ function upsertSorted(items: readonly Item[], item: Item, truncated: boolean): I
   if (index === -1) {
     return truncated ? without : [...without, item];
   }
-  return [...without.slice(0, index), item, ...without.slice(index)];
+  const next = [...without.slice(0, index), item, ...without.slice(index)];
+  // A capped list keeps its loaded length: the last item now belongs to the next page.
+  if (truncated && next.length > items.length) next.pop();
+  return next;
 }
 
 /**
@@ -73,6 +76,8 @@ export function useGardenItems(filters: FilterState = defaultFilterState()): Use
   const filtersActive = isFilterActive(filters);
 
   const inFlightRef = useRef(false);
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const truncatedRef = useRef(false);
 
   // `filterKey` is the stable, deep-equality proxy for `listParams` (a
@@ -137,7 +142,9 @@ export function useGardenItems(filters: FilterState = defaultFilterState()): Use
         setItems((current) => current.filter((existing) => existing.id !== item.id));
         return;
       }
-      if (filtersActive || inFlightRef.current) {
+      // Patch locally only on top of a loaded list; after an error (or while a
+      // fetch is pending) the list is not a valid base, so refetch instead.
+      if (filtersActive || inFlightRef.current || phaseRef.current !== "loaded") {
         refetch();
         return;
       }

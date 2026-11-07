@@ -272,6 +272,34 @@ describe("useGardenItems", () => {
       expect(listItems).toHaveBeenCalledTimes(callsAfterLoad);
     });
 
+    it("keeps a truncated list at its loaded length when a created item sorts inside it", async () => {
+      vi.mocked(listItems).mockResolvedValue({ items: [newer, older], nextCursor: "more" });
+      vi.mocked(listItems).mockResolvedValueOnce({ items: [newer, older], nextCursor: "more" });
+      vi.mocked(listItems).mockResolvedValueOnce({ items: [newer, older], nextCursor: "more-2" });
+      const { result } = renderHook(() => useGardenItems());
+      await waitFor(() => expect(result.current.status).toBe("ready"));
+      const newest = makeItem("c", "text", {}, { createdAt: "2026-03-01T00:00:00.000Z" });
+
+      act(() => result.current.applySavedItem(newest));
+
+      // A refetch would return the same page-capped count, so the last loaded item drops off.
+      expect(result.current.items.map((item) => item.id)).toEqual(["c", "b"]);
+    });
+
+    it("recovers with a full refetch when a save follows a failed load", async () => {
+      vi.mocked(listItems).mockRejectedValueOnce(new Error("network down"));
+      const { result } = renderHook(() => useGardenItems());
+      await waitFor(() => expect(result.current.status).toBe("error"));
+      vi.mocked(listItems).mockResolvedValue({ items: [newer, older], nextCursor: null });
+      const callsAfterError = vi.mocked(listItems).mock.calls.length;
+
+      act(() => result.current.applySavedItem(makeItem("c")));
+
+      await waitFor(() => expect(result.current.status).toBe("ready"));
+      expect(result.current.items.map((item) => item.id)).toEqual(["b", "a"]);
+      expect(listItems).toHaveBeenCalledTimes(callsAfterError + 1);
+    });
+
     it("falls back to a full refetch while server-side filters are active", async () => {
       const { result } = await renderLoaded({ ...defaultFilterState(), q: "sunset" });
 

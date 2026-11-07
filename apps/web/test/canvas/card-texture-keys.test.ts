@@ -93,6 +93,17 @@ it("repaints a composed card at the new size after a resize", async () => {
   cards.dispose();
 });
 
+it("reuses the composed texture across a sub-bucket resize instead of repainting every pixel of a drag", async () => {
+  const cards = layer();
+  const item = makeItem("dragged", "text");
+  cards.update([instance(item, 160, 90)], frame, null);
+  await settle();
+  cards.update([instance(item, 163.5, 92)], frame, null);
+  await settle();
+  expect(paintItemCardCanvas).toHaveBeenCalledTimes(1);
+  cards.dispose();
+});
+
 it("repaints a photo card at the new size after a resize", async () => {
   const cards = layer();
   const item = makeItem("photo", "image");
