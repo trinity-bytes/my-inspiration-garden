@@ -72,13 +72,12 @@ it("releases hidden cards so their textures can be evicted under memory pressure
     apiBaseUrl: "",
     renderOrder: 1,
   });
-  layer.update(
-    [performanceInstance("evict-a", 0), performanceInstance("evict-b", 200)],
-    performanceFrame,
-    null,
-  );
+  const visible = [performanceInstance("evict-a", 0), performanceInstance("evict-b", 200)];
+  layer.update(visible, performanceFrame, null);
   await Promise.resolve();
   await Promise.resolve();
+  // Fresh loads apply on the next frame (per-frame upload budget).
+  layer.update(visible, performanceFrame, null);
   const textures = layer.group.children.map(
     (mesh) =>
       ((mesh as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.u_map
@@ -141,4 +140,38 @@ it("rejects duplicate assignment keys in one frame instead of sharing a mesh", (
   } finally {
     layer.dispose();
   }
+});
+
+it("applies textures that arrive asynchronously at most two per frame, cached ones at once", async () => {
+  const layer = new CardLayer({
+    maxPoolSize: 5,
+    textureCacheSize: 10,
+    apiBaseUrl: "",
+    renderOrder: 1,
+  });
+  const instances = ["budget-a", "budget-b", "budget-c", "budget-d", "budget-e"].map((id, i) =>
+    performanceInstance(id, i * 200),
+  );
+  const mapped = () =>
+    layer.group.children.filter(
+      (mesh) => ((mesh as THREE.Mesh).material as THREE.ShaderMaterial).uniforms.u_map?.value,
+    ).length;
+
+  layer.update(instances, performanceFrame, null);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(mapped()).toBe(0);
+
+  layer.update(instances, performanceFrame, null);
+  expect(mapped()).toBe(2);
+  layer.update(instances, performanceFrame, null);
+  expect(mapped()).toBe(4);
+  layer.update(instances, performanceFrame, null);
+  expect(mapped()).toBe(5);
+
+  // Cached textures are already on the GPU: a card coming back shows at once.
+  layer.update([], performanceFrame, null);
+  layer.update(instances, performanceFrame, null);
+  expect(mapped()).toBe(5);
+  layer.dispose();
 });

@@ -13,10 +13,10 @@ S7. Complement (B): texture paints/uploads landing in the same frame are spread 
 User wording: "prefiero que arranques por A porque es algo que realmente ataca el problema, luego le ponemos B como complemento. prefiero una solucion de ingenieria a primero probar parches"
 
 ## Tasks
-T1 — S1,S3,S5(images) — inline — API `GET /api/thumbs/:width/*` + Images binding + wrangler/docs — pending.
-T2 — S2,S3,S4(canvas) — inline — web cards request thumbnail variants; video cards stop downloading video — pending.
-T3 — S4(upload/detail) — inline — poster capture at video upload; detail video `poster` + `preload="none"` — pending.
-T4 — S5(videos) — inline — `apps/api/scripts/backfill-video-posters.mjs` + docs — pending.
+T1 — S1,S3,S5(images) — inline — API `GET /api/thumbs/:width/*` + Images binding + wrangler/docs — done; RED missing module → GREEN 7 tests; API 242/242 — commit 4f12040. Risk item 5 (new Images binding in deploy config).
+T2 — S2,S3,S4(canvas) — inline — web cards request thumbnail variants; video cards stop downloading video — done; RED 5 thumbnail-source + shared module → GREEN; web 760/760 — commit bfe1ad5.
+T3 — S4(upload/detail) — inline — poster capture at video upload; detail video `poster` + `preload="none"` — done; RED 4 → GREEN; web 765/765 — commit cacbd3f.
+T4 — S5(videos) — inline — `apps/api/scripts/backfill-video-posters.mjs` + docs — done; live dry-run lists 2 videos; ffmpeg capture checked (1920x1080 → 1706x960 WebP, 0.5 s clip falls back to frame 0) — commit 7d2090e. Real run pending owner token.
 T5 — S6,S7 — inline — off-main-thread decode, per-frame texture budget, cache sizing — pending.
 T6 — verification — Playwright mobile swipe benchmark before/after (baseline: long tasks ~8 s, p99 ~550 ms, ~101 MB media per session) — pending.
 

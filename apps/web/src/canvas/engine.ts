@@ -21,6 +21,7 @@ import { PointerInteractionController } from "./pointer-interaction";
 import { BarrelPass } from "./post/barrel";
 import { renderPixelRatio } from "./render-pixel-ratio";
 import { SKELETON_ITEMS, sheenCenterPx, sheenHalfWidthPx, stepFade } from "./skeleton";
+import { MIN_TEXTURE_CACHE_SIZE, textureCacheSizeFor } from "./texture-budget";
 import type { Vec2 } from "./types";
 
 export interface CanvasEngineOptions {
@@ -48,7 +49,6 @@ export interface WorldState {
 // the solid clear color today; the headroom keeps room for future layers).
 const CARD_RENDER_ORDER = 200;
 const SKELETON_RENDER_ORDER = CARD_RENDER_ORDER - 1;
-const CARD_TEXTURE_CACHE_SIZE = 120;
 // A CardInstance's content is a pure, deterministic function of its cell
 // (see item-layout.ts) and never changes while `items` doesn't, so caching
 // it keeps the per-frame hot path from reallocating an instance (+ its
@@ -238,7 +238,8 @@ export class CanvasEngine {
     // Cards load their own textures independently (layers/cards.ts).
     this.cards = new CardLayer({
       maxPoolSize: DEFAULT_MAX_CARD_POOL_SIZE,
-      textureCacheSize: CARD_TEXTURE_CACHE_SIZE,
+      // Resized to the device on the first layout (texture-budget.ts).
+      textureCacheSize: MIN_TEXTURE_CACHE_SIZE,
       apiBaseUrl: resolveApiBaseUrl(),
       renderOrder: CARD_RENDER_ORDER,
     });
@@ -458,6 +459,9 @@ export class CanvasEngine {
       this.lastColumnWidth = columnWidth;
       this.lastGutter = gutter;
       this.cardInstanceCache.clear();
+      this.cards.setTextureCacheSize(
+        textureCacheSizeFor(columnWidth, window.devicePixelRatio || 1),
+      );
       // Not strictly necessary for correctness (columnPeriodCache's key
       // already includes columnWidth, so a stale-width entry is simply
       // never hit again), but clears out entries for the old width that

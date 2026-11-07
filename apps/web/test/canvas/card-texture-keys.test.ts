@@ -56,6 +56,8 @@ it("repaints a composed card after its item is edited, even in the same cell", a
   const original = makeItem("edited", "text", { body: "before" });
   cards.update([instance(original)], frame, null);
   await settle();
+  // Fresh loads apply on the next frame (per-frame upload budget).
+  cards.update([instance(original)], frame, null);
   const before = mapOf(cards);
   const edited = makeItem(
     "edited",
@@ -65,6 +67,7 @@ it("repaints a composed card after its item is edited, even in the same cell", a
   );
   cards.update([instance(edited)], frame, null);
   await settle();
+  cards.update([instance(edited)], frame, null);
   expect(paintItemCardCanvas).toHaveBeenCalledTimes(2);
   expect(vi.mocked(paintItemCardCanvas).mock.calls[1]?.[0]).toBe(edited);
   expect(mapOf(cards)).not.toBe(before);
