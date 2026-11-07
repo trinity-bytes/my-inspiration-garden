@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import {
   index,
@@ -40,6 +41,13 @@ export const items = sqliteTable(
     index("items_kind_idx").on(table.kind),
     index("items_created_at_idx").on(table.createdAt),
     index("items_deleted_at_idx").on(table.deletedAt),
+    // Serves the list query: `deleted_at` filter + `created_at DESC, id DESC`
+    // keyset order, so pages are read in index order without a sort step.
+    index("items_deleted_at_created_at_id_idx").on(
+      table.deletedAt,
+      sql`${table.createdAt} desc`,
+      sql`${table.id} desc`,
+    ),
   ],
 );
 

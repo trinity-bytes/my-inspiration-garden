@@ -1,0 +1,1 @@
+CREATE INDEX `items_deleted_at_created_at_id_idx` ON `items` (`deleted_at`,"created_at" desc,"id" desc);
