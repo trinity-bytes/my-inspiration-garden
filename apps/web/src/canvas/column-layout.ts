@@ -1,9 +1,8 @@
 import { clamp } from "./deadzone";
 
 /**
- * Responsive column geometry for the masonry item layout (owner feedback,
- * T8b: replace the jittered per-cell hash grid with ordered, equal-width
- * columns — see `item-layout.ts`). Pure function of the viewport's CSS
+ * Responsive column geometry for the masonry item layout: ordered,
+ * equal-width columns (see `item-layout.ts`). Pure function of the viewport's CSS
  * width, so it naturally recomputes on resize with no special-case handling
  * needed: the caller (`item-layout.ts`'s `visibleCardInstances`, invoked
  * every frame from `engine.ts`) already recomputes the layout from the
@@ -12,27 +11,16 @@ import { clamp } from "./deadzone";
 
 /**
  * Constant gutter used for BOTH the horizontal gap between columns and the
- * vertical gap between stacked cards (owner feedback: horizontal separation
- * was fine, vertical was irregular — using the SAME constant for both axes
- * removes the irregularity instead of retuning either one).
- *
- * Originally derived from the previous per-cell grid's own effective
- * horizontal gap (340*0.295 ≈ 100px — see prior revisions of this comment).
- * Reduced to 56 (T9b, owner feedback): both the horizontal gap between
- * columns and the vertical gap between stacked cards felt too spacious once
- * real per-kind card content (T9) was in place — one constant still drives
- * both axes, so tightening it removes the excess space uniformly instead of
- * retuning either axis independently.
- *
- * Halved to 28 (owner feedback, 2026-10-04): once the sky background was
- * replaced with a solid color, the empty space between cards read as too
- * wide.
+ * vertical gap between stacked cards: using the SAME constant for both axes
+ * keeps spacing regular, and tuning it changes both axes uniformly instead
+ * of retuning either one independently. 28px keeps the gaps tight against
+ * the solid canvas background, where wider empty space reads as too wide.
  */
 export const COLUMN_GUTTER_PX = 28;
 
 /**
- * Gutter below `PHONE_MAX_WIDTH_PX` (F7, owner feedback 2026-10-29:
- * on phones the cards looked too far apart). Same rule as the desktop
+ * Gutter below `PHONE_MAX_WIDTH_PX` (on phones the desktop gutter makes
+ * cards look too far apart). Same rule as the desktop
  * gutter: one constant for both axes, per viewport.
  */
 export const MOBILE_COLUMN_GUTTER_PX = 12;
@@ -53,9 +41,9 @@ export const MAX_COLUMN_WIDTH_PX = 420;
  * === width`) before the min/max width clamp.
  */
 /**
- * Phones fit 2 full columns plus a peek of a third (owner feedback,
- * 2026-10-29): two columns tiling the width exactly left nothing cut at the
- * sides, so the canvas no longer read as continuing sideways.
+ * Phones fit 2 full columns plus a peek of a third: two columns tiling the
+ * width exactly leave nothing cut at the sides, so the canvas stops reading
+ * as continuing sideways.
  */
 export const PHONE_VISIBLE_COLUMNS = 2.4;
 

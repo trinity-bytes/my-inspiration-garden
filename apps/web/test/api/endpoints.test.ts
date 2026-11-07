@@ -73,6 +73,17 @@ describe("listItems", () => {
     expect(url).toContain("limit=10");
   });
 
+  it("forwards an abort signal to fetch so a superseded list request can be cancelled", async () => {
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextCursor: null }));
+    const controller = new AbortController();
+
+    await listItems({}, { signal: controller.signal });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBe(controller.signal);
+  });
+
   it("propagates a typed ApiError when the request fails", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValue(jsonResponse({ error: { code: "bad", message: "x" } }, 400));

@@ -3,9 +3,9 @@ import { useRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { useDialogFocusTrap } from "../../../src/components/Dialog/useDialogFocusTrap";
 
-function TestDialog({ onClose }: { onClose: () => void }) {
+function TestDialog({ onClose, suspended }: { onClose: () => void; suspended?: boolean }) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const { handleTabKey } = useDialogFocusTrap(dialogRef, onClose);
+  const { handleTabKey } = useDialogFocusTrap(dialogRef, onClose, { suspended });
   return (
     <div>
       <button type="button">outside</button>
@@ -55,5 +55,20 @@ describe("useDialogFocusTrap", () => {
 
     expect(outsideButton).toHaveFocus();
     outsideButton.remove();
+  });
+
+  it("ignores Escape and Tab while suspended (a nested dialog owns them), and resumes afterwards", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(<TestDialog onClose={onClose} suspended />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    const last = screen.getByRole("button", { name: "last" });
+    last.focus();
+    const tab = fireEvent.keyDown(last, { key: "Tab" });
+    expect(tab).toBe(true);
+
+    rerender(<TestDialog onClose={onClose} />);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

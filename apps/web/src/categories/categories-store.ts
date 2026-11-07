@@ -1,5 +1,5 @@
 /**
- * Tiny shared invalidation signal (T11b B6): the category manager modal is
+ * Tiny shared invalidation signal: the category manager modal is
  * the only writer of categories, but `useCategories`, `useFilterOptions`,
  * and `useCategoryNames` each independently fetch `GET /api/categories` in
  * their own component subtree, with no shared cache or context between

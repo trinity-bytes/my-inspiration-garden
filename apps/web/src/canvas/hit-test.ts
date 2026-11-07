@@ -70,8 +70,9 @@ export function worldToPointer(
   };
 }
 
+/** Structurally a `CardInstance` subset, so the engine passes its visible instances as-is. */
 export interface HitTestableCard {
-  id: string;
+  key: string;
   worldRect: { x: number; y: number; width: number; height: number };
 }
 
@@ -102,7 +103,7 @@ export function hitTestCard(
   let hit: string | null = null;
   for (const card of cards) {
     if (pointInRect(world, card.worldRect)) {
-      hit = card.id;
+      hit = card.key;
     }
   }
   return hit;

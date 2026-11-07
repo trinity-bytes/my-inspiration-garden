@@ -1,5 +1,5 @@
 /**
- * WCAG-style contrast helpers. Used by the palette detail view (T9) to pick
+ * WCAG-style contrast helpers. Used by the palette detail view to pick
  * readable text (ink vs white) for a hex value drawn directly on top of its
  * own swatch — the swatch's own color is arbitrary (owner-uploaded), so a
  * single fixed text color can't stay readable across every possible hue.

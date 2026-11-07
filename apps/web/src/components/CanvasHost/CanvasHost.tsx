@@ -7,12 +7,12 @@ import type { GardenItemsStatus } from "../../items/useGardenItems";
 import "./CanvasHost.css";
 
 export interface CanvasHostProps {
-  /** Items rendered as cards on the canvas (T8b). */
+  /** Items rendered as cards on the canvas. */
   items?: Item[];
   itemsStatus?: GardenItemsStatus;
   /** Fired when a card is opened (clicked, or activated via the parallel DOM/ARIA layer). */
   onItemOpen?: (itemId: string) => void;
-  /** Pauses canvas navigation (drift + keyboard pan) — set while the item detail modal (T9) is open. */
+  /** Pauses canvas navigation (drift + keyboard pan) — set while the item detail modal is open. */
   paused?: boolean;
 }
 
@@ -33,7 +33,7 @@ function cardAriaLabel(card: CardInstance): string {
 }
 
 /**
- * Full-viewport host for the T8 WebGL infinite canvas. Mounts a
+ * Full-viewport host for the WebGL infinite canvas. Mounts a
  * `CanvasEngine` imperatively into `.canvas-host__webgl-target` — vanilla
  * three.js, not r3f; React only owns lifecycle here. The target div is the
  * focusable navigation region (arrow keys / WASD pan it while focused; see
@@ -41,7 +41,7 @@ function cardAriaLabel(card: CardInstance): string {
  * accessible label instead of `aria-hidden`. Until (or unless) the engine
  * mounts, `CanvasHost.css` paints the solid canvas color as a static CSS background.
  *
- * T8b adds: item cards (hover/click handled inside the engine via
+ * It also hosts item cards (hover/click handled inside the engine via
  * hit-testing through the barrel distortion, see `canvas/hit-test.ts`), a
  * parallel DOM/ARIA card list (`.canvas-host__card-list`, visually hidden
  * — keyboard-focusable, mirrors whatever cards are currently visible;

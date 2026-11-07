@@ -1,7 +1,7 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
-import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
-import { cardHoverStyle } from "../card-hover";
+import { type CardScreenRect, cardEntryProgress, cardOpacity } from "../card-fade";
+import { type CardHoverStyle, cardHoverStyle } from "../card-hover";
 import { paintItemCardCanvas, paintPhotoCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
@@ -40,8 +40,40 @@ export interface CardFrame {
 
 const CORNER_RADIUS_FRACTION = 0.08;
 
+/**
+ * Size component of texture/assignment keys, bucketed so a window drag does
+ * not repaint every visible card on every pixel. Within a bucket the texture
+ * painted for the first size is reused with at most a few pixels of stretch.
+ */
+const TEXTURE_SIZE_BUCKET_PX = 16;
+function sizeSuffix(widthPx: number, heightPx: number): string {
+  const w = Math.round(widthPx / TEXTURE_SIZE_BUCKET_PX);
+  const h = Math.round(heightPx / TEXTURE_SIZE_BUCKET_PX);
+  return `@${w}x${h}`;
+}
+
+/**
+ * Pool assignment identity: the cell/item/revision (`cardAssignmentKey`) plus
+ * the painted size, so a resize (same cell, same item, new column width)
+ * repaints instead of stretching the old texture. Memoized per instance
+ * because the engine reuses immutable `CardInstance`s across frames
+ * (`cardInstanceCache`) and this runs for every visible card every frame.
+ */
+const assignmentKeyCache = new WeakMap<CardInstance, string>();
+function layerAssignmentKey(instance: CardInstance): string {
+  let key = assignmentKeyCache.get(instance);
+  if (key === undefined) {
+    key =
+      cardAssignmentKey(instance) + sizeSuffix(instance.worldRect.width, instance.worldRect.height);
+    assignmentKeyCache.set(instance, key);
+  }
+  return key;
+}
+
+/** Reused by `placeEntry`; consumed synchronously, never stored. */
+const scratchScreenRect: CardScreenRect = { center: { x: 0, y: 0 }, halfWidth: 0, halfHeight: 0 };
+
 interface CardUniforms {
-  u_videoAspect: { value: number };
   u_map: { value: THREE.Texture | null };
   u_opacity: { value: number };
   u_aspect: { value: number };
@@ -58,7 +90,7 @@ interface PoolEntry {
   mesh: THREE.Mesh;
   material: THREE.ShaderMaterial;
   uniforms: CardUniforms;
-  /** `cardAssignmentKey` of the instance this entry currently renders — reload triggers when this changes, not just the cell key (see `item-layout.ts`). */
+  /** `layerAssignmentKey` of the instance this entry currently renders — reload triggers when this changes, not just the cell key (see `item-layout.ts`). */
   assignedKey: string | null;
   /** The texture cache key this entry currently holds a pin on (see `texture-registry.ts`), or `null` before its first assignment. Tracked separately from `assignedKey` because on a thumbnail load failure the entry re-pins to the placeholder key while keeping the same `assignedKey`. */
   pinnedTextureKey: string | null;
@@ -79,20 +111,8 @@ export class CardLayer {
   readonly group: THREE.Group;
   private readonly options: CardLayerOptions;
   private readonly pool: PoolEntry[] = [];
+  private readonly assignmentKeys: string[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
-
-  private playbackKey: string | null = null;
-  private playbackTexture: THREE.VideoTexture | null = null;
-
-  setPlayback(key: string | null, texture: THREE.VideoTexture | null): void {
-    this.playbackKey = key;
-    this.playbackTexture = texture;
-    for (const entry of this.pool) {
-      entry.uniforms.u_map.value = entry.poster;
-      entry.uniforms.u_videoAspect.value = 0;
-      if (!entry.textureReady) entry.uniforms.u_reveal.value = 0;
-    }
-  }
 
   constructor(options: CardLayerOptions) {
     this.options = options;
@@ -108,7 +128,6 @@ export class CardLayer {
     while (this.pool.length < size) {
       const uniforms: CardUniforms = {
         u_map: { value: null },
-        u_videoAspect: { value: 0 },
         u_opacity: { value: 0 },
         u_aspect: { value: 1 },
         u_cornerRadius: { value: CORNER_RADIUS_FRACTION },
@@ -120,18 +139,7 @@ export class CardLayer {
       };
       const material = new THREE.ShaderMaterial({
         vertexShader: CARD_VERTEX_GLSL,
-        fragmentShader: CARD_FRAGMENT_GLSL.replace(
-          "uniform sampler2D u_map;",
-          "uniform sampler2D u_map;\nuniform float u_videoAspect;",
-        ).replace(
-          "vec4 tex = texture2D(u_map, vUv);",
-          `vec2 mediaUv = vUv;
-          if (u_videoAspect > 0.0) {
-            vec2 crop = vec2(min(1.0, u_aspect / u_videoAspect), min(1.0, u_videoAspect / u_aspect));
-            mediaUv = (vUv - 0.5) * crop + 0.5;
-          }
-          vec4 tex = texture2D(u_map, mediaUv);`,
-        ),
+        fragmentShader: CARD_FRAGMENT_GLSL,
         transparent: true,
         depthTest: false,
         depthWrite: false,
@@ -176,7 +184,7 @@ export class CardLayer {
     this.textures.pin(key);
   }
 
-  /** Dispatches to the raw full-bleed photo path (`image` — "no chrome", see `odd/tasks/garden-mvp.md`'s T9 scope) or the composed per-kind painted path (every other kind, `card-painters.ts`). */
+  /** Dispatches to the raw full-bleed photo path (`image` — "no chrome") or the composed per-kind painted path (every other kind, `card-painters.ts`). */
   private assignTexture(entry: PoolEntry, item: Item, widthPx: number, heightPx: number): void {
     if (item.kind === "image") {
       this.assignPhotoTexture(entry, item, widthPx, heightPx);
@@ -203,7 +211,11 @@ export class CardLayer {
     heightPx: number,
   ): void {
     const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
-    const cacheKey = thumbnailUrl ?? `placeholder:${item.id}`;
+    // The media URL already changes when the file is replaced (new R2 key), so
+    // a metadata-only edit keeps reusing the decoded photo.
+    const size = sizeSuffix(widthPx, heightPx);
+    const placeholderKey = `placeholder:${item.id}:${item.updatedAt}${size}`;
+    const cacheKey = thumbnailUrl ? `photo:${thumbnailUrl}${size}` : placeholderKey;
     const token = entry.loadToken;
 
     this.pinEntryTexture(entry, cacheKey);
@@ -240,10 +252,9 @@ export class CardLayer {
         if (isStaleLoadCallback(entry.loadToken, token)) {
           return;
         }
-        const fallbackKey = `placeholder:${item.id}`;
-        this.pinEntryTexture(entry, fallbackKey);
+        this.pinEntryTexture(entry, placeholderKey);
         this.textures.load(
-          fallbackKey,
+          placeholderKey,
           (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
           (texture) => {
             if (!isStaleLoadCallback(entry.loadToken, token)) {
@@ -271,7 +282,7 @@ export class CardLayer {
     widthPx: number,
     heightPx: number,
   ): void {
-    const cacheKey = `composed:${item.kind}:${item.id}`;
+    const cacheKey = `composed:${item.kind}:${item.id}:${item.updatedAt}${sizeSuffix(widthPx, heightPx)}`;
     const token = entry.loadToken;
 
     this.pinEntryTexture(entry, cacheKey);
@@ -299,9 +310,14 @@ export class CardLayer {
     entry: PoolEntry,
     instance: CardInstance,
     frame: CardFrame,
-    hover: ReturnType<typeof cardHoverStyle>,
+    hover: Readonly<CardHoverStyle>,
   ): void {
-    const screenRect = cardScreenRect(instance.worldRect, frame.worldOffset, 1);
+    // Same as `cardScreenRect(worldRect, worldOffset, 1)`, without a per-card allocation.
+    const screenRect = scratchScreenRect;
+    screenRect.center.x = instance.worldRect.x + frame.worldOffset.x;
+    screenRect.center.y = instance.worldRect.y + frame.worldOffset.y;
+    screenRect.halfWidth = instance.worldRect.width / 2;
+    screenRect.halfHeight = instance.worldRect.height / 2;
     const progress = cardEntryProgress(screenRect, frame.viewportWidth, frame.viewportHeight);
     const width = instance.worldRect.width * hover.scale;
     const height = instance.worldRect.height * hover.scale;
@@ -320,12 +336,57 @@ export class CardLayer {
     entry.uniforms.u_sheenHalfWidth.value = frame.sheenHalfWidthPx;
   }
 
+  /** Keep surviving cells on their meshes; only entering cells acquire a new assignment. */
+  private alignPool(keys: readonly string[], wanted: number): void {
+    let aligned = true;
+    for (let i = 0; i < wanted; i++) {
+      if (this.pool[i]?.assignedKey !== (keys[i] as string)) {
+        aligned = false;
+        break;
+      }
+    }
+    if (aligned) return;
+
+    const wantedKeys = new Set<string>();
+    for (let i = 0; i < wanted; i++) wantedKeys.add(keys[i] as string);
+    // Invariant: assignment keys are unique per frame. A duplicate would map
+    // two slots onto the same retained entry and render one mesh twice.
+    if (import.meta.env.DEV && wantedKeys.size !== wanted) {
+      throw new Error("CardLayer.alignPool: duplicate assignment keys in one frame");
+    }
+    const retained = new Map<string, PoolEntry>();
+    const free: PoolEntry[] = [];
+    for (const entry of this.pool) {
+      if (entry.assignedKey !== null && wantedKeys.has(entry.assignedKey)) {
+        retained.set(entry.assignedKey, entry);
+      } else {
+        free.push(entry);
+      }
+    }
+    const ordered: PoolEntry[] = [];
+    let nextFree = 0;
+    for (let i = 0; i < wanted; i++) {
+      const key = keys[i] as string;
+      ordered.push(retained.get(key) ?? (free[nextFree++] as PoolEntry));
+    }
+    this.pool.splice(0, this.pool.length, ...ordered, ...free.slice(nextFree));
+  }
+
   private hideEntriesFrom(start: number): void {
     for (let i = start; i < this.pool.length; i++) {
       const entry = this.pool[i];
       if (entry) {
         entry.mesh.visible = false;
-        entry.assignedKey = null;
+        if (entry.assignedKey !== null) {
+          entry.assignedKey = null;
+          entry.loadToken++;
+          if (entry.pinnedTextureKey !== null) this.textures.unpin(entry.pinnedTextureKey);
+          entry.pinnedTextureKey = null;
+          entry.poster = null;
+          entry.textureReady = false;
+          entry.uniforms.u_map.value = null;
+          entry.uniforms.u_reveal.value = 0;
+        }
       }
     }
   }
@@ -343,6 +404,13 @@ export class CardLayer {
   update(instances: readonly CardInstance[], frame: CardFrame, hoveredKey: string | null): void {
     const wanted = Math.min(instances.length, this.options.maxPoolSize);
     this.ensurePoolSize(wanted);
+    this.assignmentKeys.length = wanted;
+    for (let i = 0; i < wanted; i++) {
+      this.assignmentKeys[i] = layerAssignmentKey(instances[i] as CardInstance);
+    }
+    this.alignPool(this.assignmentKeys, wanted);
+    // Retire departing cells before new loads can trigger texture eviction.
+    this.hideEntriesFrom(wanted);
 
     for (let i = 0; i < wanted; i++) {
       const instance = instances[i];
@@ -351,7 +419,7 @@ export class CardLayer {
         continue;
       }
 
-      const assignmentKey = cardAssignmentKey(instance);
+      const assignmentKey = this.assignmentKeys[i] as string;
       if (entry.assignedKey !== assignmentKey) {
         entry.assignedKey = assignmentKey;
         entry.loadToken++;
@@ -367,26 +435,14 @@ export class CardLayer {
       }
 
       entry.uniforms.u_map.value = entry.poster;
-      entry.uniforms.u_videoAspect.value = 0;
-      let liveReady = false;
-      if (instance.key === this.playbackKey && this.playbackTexture) {
-        const video = this.playbackTexture.image as HTMLVideoElement;
-        if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
-          liveReady = true;
-          entry.uniforms.u_map.value = this.playbackTexture;
-          entry.uniforms.u_videoAspect.value = video.videoWidth / video.videoHeight;
-        }
-      }
       entry.uniforms.u_reveal.value = stepFade(
         entry.uniforms.u_reveal.value,
-        entry.textureReady || liveReady ? 1 : 0,
+        entry.textureReady ? 1 : 0,
         frame.dtSeconds,
         frame.reducedMotion,
       );
       this.placeEntry(entry, instance, frame, cardHoverStyle(hoveredKey === instance.key));
     }
-
-    this.hideEntriesFrom(wanted);
   }
 
   /** Draws `instances` as bare skeletons, with no textures: the placeholders shown while the items load. */
@@ -414,6 +470,7 @@ export class CardLayer {
       entry.material.dispose();
     }
     this.pool.length = 0;
+    this.assignmentKeys.length = 0;
     this.textures.clear();
   }
 }

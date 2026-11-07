@@ -42,7 +42,7 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Owner-only API token manager (T12), opened from the Navbar's owner
+ * Owner-only API token manager, opened from the Navbar's owner
  * controls next to Categories. Lists existing tokens (name, scope, created,
  * last used — never a secret), creates new scoped tokens (showing the
  * plaintext secret exactly once, right after creation), and revokes tokens

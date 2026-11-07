@@ -33,8 +33,7 @@ function matchRank(name: string, query: string): number | null {
 }
 
 /**
- * Accessible chip-based tag input with autocomplete (T11b B3). Replaces the
- * old comma-separated free-text field: existing tags render as removable
+ * Accessible chip-based tag input with autocomplete: existing tags render as removable
  * chips, and typing suggests matches from `GET /api/tags` (excluding
  * already-selected tags, sorted by item count). Enter/comma commits the
  * highlighted suggestion, or the typed text as a brand-new tag when nothing
@@ -115,7 +114,7 @@ export function TagInput({ id, tags, onChange, getTags = getTagsDefault }: TagIn
       // field lets Tab move focus as usual.
       event.preventDefault();
       // Tab autocompletes: without an explicit highlight it takes the top
-      // suggestion (owner feedback, 2026-10-04). Enter/comma still commit the
+      // suggestion. Enter/comma still commit the
       // typed text, so a tag that is a substring of an existing one can be
       // created.
       const topSuggestion = highlightedIndex < 0 ? suggestions[0] : undefined;

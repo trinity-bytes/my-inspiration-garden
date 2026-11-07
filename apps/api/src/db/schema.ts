@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import {
   index,
@@ -40,6 +41,13 @@ export const items = sqliteTable(
     index("items_kind_idx").on(table.kind),
     index("items_created_at_idx").on(table.createdAt),
     index("items_deleted_at_idx").on(table.deletedAt),
+    // Serves the list query: `deleted_at` filter + `created_at DESC, id DESC`
+    // keyset order, so pages are read in index order without a sort step.
+    index("items_deleted_at_created_at_id_idx").on(
+      table.deletedAt,
+      sql`${table.createdAt} desc`,
+      sql`${table.id} desc`,
+    ),
   ],
 );
 
@@ -66,7 +74,7 @@ export const itemRevisions = sqliteTable(
  * Hierarchical category tree, unlimited depth via self-referencing `parent_id`.
  *
  * FK delete behavior: `ON DELETE SET NULL`, a safety net for a raw delete
- * that bypasses the repository. `CategoriesRepository.delete` (T11b B6) is
+ * that bypasses the repository. `CategoriesRepository.delete` is
  * the intended path: it re-parents direct children to the deleted
  * category's own parent (its `parent_id`, possibly `null`) before removing
  * the row, so those children keep their place one level up the tree
@@ -131,7 +139,7 @@ export const itemTags = sqliteTable(
 
 /**
  * Denormalized per-item color weights, populated by palette-extraction
- * ingestion (T6) to power color filtering without re-decoding images.
+ * ingestion to power color filtering without re-decoding images.
  */
 export const itemColors = sqliteTable(
   "item_colors",

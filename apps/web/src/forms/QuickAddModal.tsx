@@ -1,4 +1,4 @@
-import type { Category } from "@garden/shared";
+import type { Category, Item } from "@garden/shared";
 import { useRef, useState } from "react";
 import { createItem as createItemDefault } from "../api/endpoints";
 import { ApiError } from "../api/errors";
@@ -11,12 +11,12 @@ import { type CreateItemFormInput, createEmptyFormState } from "./item-form-stat
 export interface QuickAddModalProps {
   categories: Category[];
   onClose: () => void;
-  /** Called after a successful create, so the caller can refetch the canvas (T11). */
-  onCreated: () => void;
-  createItem?: (input: CreateItemFormInput) => Promise<{ id: string }>;
+  /** Called with the created item after a successful create, so the caller can show it on the canvas. */
+  onCreated: (item: Item) => void;
+  createItem?: (input: CreateItemFormInput) => Promise<Item>;
 }
 
-/** Owner-only quick-add dialog (T11): a solid cartoon-style modal wrapping `ItemForm`. */
+/** Owner-only quick-add dialog: a solid cartoon-style modal wrapping `ItemForm`. */
 export function QuickAddModal({
   categories,
   onClose,
@@ -33,8 +33,8 @@ export function QuickAddModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createItem(input);
-      onCreated();
+      const created = await createItem(input);
+      onCreated(created);
       onClose();
     } catch (error) {
       setSubmitError(

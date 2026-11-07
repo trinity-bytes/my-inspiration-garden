@@ -1,11 +1,11 @@
 /**
  * Card sprite shader: rounded corners via a signed-distance-field mask
- * (T8b requirement — no geometry-level rounding, cards stay a single
- * PlaneGeometry(1,1) like clouds, see `layers/cards.ts`), the fade-in
+ * (no geometry-level rounding, cards stay a single
+ * PlaneGeometry(1,1), see `layers/cards.ts`), the fade-in
  * opacity from `card-fade.ts`, and a subtle hover highlight (mixes toward
  * the apricot-soft accent — `styles/tokens.css`'s `--garden-accent-soft`).
- * Premultiplied-alpha output + (ONE, ONE_MINUS_SRC_ALPHA) blending, same
- * technique to avoid dark edge fringing.
+ * Premultiplied-alpha output + (ONE, ONE_MINUS_SRC_ALPHA) blending, to
+ * avoid dark edge fringing.
  *
  * Below `u_reveal` 1 the card shows its skeleton (Figma Proposals `68:3061`):
  * white at 8% (`--color-surface-raised` on the canvas), optional text lines

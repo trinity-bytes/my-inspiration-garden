@@ -564,4 +564,21 @@ describe("NavigationController", () => {
 
     expect(after).toEqual(before);
   });
+
+  it("hands out stable read-only offset and velocity views instead of per-call copies", () => {
+    const controller = new NavigationController({
+      container,
+      getViewportSize: () => ({ width: 1000, height: 1000 }),
+      maxSpeed: 300,
+    });
+    controller.mount();
+    const offset = controller.getWorldOffset();
+    const velocity = controller.getVelocity();
+    dispatchPointerMove(window, 900, 500);
+    controller.update(1 / 60);
+    expect(controller.getWorldOffset()).toBe(offset);
+    expect(controller.getVelocity()).toBe(velocity);
+    expect(offset.x).not.toBe(0);
+    controller.dispose();
+  });
 });

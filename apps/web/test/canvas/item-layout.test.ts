@@ -8,6 +8,7 @@ import {
   cardHeightForItem,
   columnPeriod,
   DEFAULT_MAX_CARD_POOL_SIZE,
+  LayoutPeriodCache,
   visibleCardInstances,
 } from "../../src/canvas/item-layout";
 import { makeItem } from "../fixtures/items";
@@ -392,6 +393,12 @@ describe("cardAssignmentKey", () => {
     const b = cardAssignmentKey({ key: "3,4", item: makeItem("b") });
     expect(a).not.toBe(b);
   });
+
+  it("differs when the same item was edited (new updatedAt), so its card reloads", () => {
+    const a = cardAssignmentKey({ key: "3,4", item: makeItem("a") });
+    const edited = makeItem("a", "text", {}, { updatedAt: "2026-02-01T00:00:00.000Z" });
+    expect(cardAssignmentKey({ key: "3,4", item: edited })).not.toBe(a);
+  });
 });
 
 describe("visibleCardInstances", () => {
@@ -682,5 +689,100 @@ describe("visibleCardInstances", () => {
         expect(currItem.item.id).not.toBe(prevItem.item.id);
       }
     }
+  });
+});
+
+describe("library-wide layout preparation", () => {
+  it("measures content once while exploring new columns, including after period eviction", () => {
+    let reads = 0;
+    const items = Array.from({ length: 100 }, (_, i) => {
+      const item = makeItem(`prepared-${i}`, "text");
+      Object.defineProperty(item.data, "body", {
+        get: () => {
+          reads++;
+          return "A long body to wrap across multiple lines. ".repeat(10);
+        },
+      });
+      return item;
+    });
+    const cache = new LayoutPeriodCache(2);
+    columnPeriod(items, 220, 0, cache);
+    const initialReads = reads;
+    expect(initialReads).toBeGreaterThan(0);
+    for (const column of [-12, -1, 1, 8, 0]) columnPeriod(items, 220, column, cache);
+    expect(reads).toBe(initialReads);
+  });
+
+  it("preserves uncached layout across columns, responsive geometry and item replacement", () => {
+    const cache = new LayoutPeriodCache(2);
+    const items = seedItems();
+    const replacement = items.map((item) => ({ ...item, title: "Changed title ".repeat(20) }));
+    for (const library of [items, replacement]) {
+      for (const width of [180, 260]) {
+        for (const gutter of [12, 24]) {
+          for (const column of [-17, -1, 0, 1, 19]) {
+            expect(columnPeriod(library, width, column, cache, gutter)).toEqual(
+              columnPeriod(library, width, column, undefined, gutter),
+            );
+          }
+          for (const center of [
+            { x: -1500, y: -10000 },
+            { x: 3000, y: 12000 },
+          ]) {
+            expect(
+              visibleCardInstances(
+                library,
+                center,
+                390,
+                844,
+                width,
+                100,
+                240,
+                undefined,
+                [],
+                cache,
+                gutter,
+              ),
+            ).toEqual(
+              visibleCardInstances(
+                library,
+                center,
+                390,
+                844,
+                width,
+                100,
+                240,
+                undefined,
+                [],
+                undefined,
+                gutter,
+              ),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it("preserves count-key invalidation when the same array grows or shrinks", () => {
+    const items = [makeItem("first", "text")];
+    const cache = new LayoutPeriodCache(2);
+    columnPeriod(items, 220, 0, cache);
+    items.push(makeItem("second", "image"));
+    expect(columnPeriod(items, 220, 1, cache)).toEqual(columnPeriod(items, 220, 1));
+    items.pop();
+    expect(columnPeriod(items, 220, 0, cache)).toEqual(columnPeriod(items, 220, 0));
+  });
+
+  it("clear invalidates preparation even when an edited items array keeps its identity", () => {
+    const item = makeItem("edited", "text", { body: "short" });
+    const items = [item];
+    const cache = new LayoutPeriodCache(2);
+    const before = columnPeriod(items, 220, 0, cache);
+    item.data.body = "Much longer content ".repeat(100);
+    cache.clear();
+    const after = columnPeriod(items, 220, 0, cache);
+    expect(after).toEqual(columnPeriod(items, 220, 0));
+    expect(after.heights).not.toEqual(before.heights);
   });
 });

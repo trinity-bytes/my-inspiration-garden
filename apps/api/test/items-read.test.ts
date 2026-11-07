@@ -121,6 +121,22 @@ describe("GET /api/items filters", () => {
     expect(ids).not.toContain("color-far");
   });
 
+  it("matches colors exactly at the threshold boundary, case-insensitively", async () => {
+    // Squared distance 60^2 is a match; 61^2 is not (see lib/color.ts).
+    await insertItem("color-boundary-in", {});
+    await insertItem("color-boundary-out", {});
+    await insertItem("color-boundary-upper", {});
+    await insertItemColor("color-boundary-in", "#3c0000");
+    await insertItemColor("color-boundary-out", "#3d0000");
+    await insertItemColor("color-boundary-upper", "#0A0B0C");
+
+    const res = await SELF.fetch("https://example.com/api/items?color=%23000000&limit=100");
+    const ids = (await res.json<{ items: { id: string }[] }>()).items.map((i) => i.id);
+    expect(ids).toContain("color-boundary-in");
+    expect(ids).toContain("color-boundary-upper");
+    expect(ids).not.toContain("color-boundary-out");
+  });
+
   it("matches full-text search against title/notes/body", async () => {
     await insertItem("fts-title-item", { title: "Nature Moodboard Search Target" });
     const res = await SELF.fetch("https://example.com/api/items?q=Moodboard");
@@ -277,5 +293,66 @@ describe("GET /api/categories and /api/tags", () => {
     const body = await res.json<{ tags: { id: string; count: number }[] }>();
     const found = body.tags.find((t) => t.id === "count-tag");
     expect(found?.count).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("GET /api/items filters on large match sets", () => {
+  // D1 caps bound parameters per statement at 100, so filters must not bind
+  // one parameter per matching item id.
+  const bulkCount = 130;
+  const bulkCategoryId = "33333333-3333-4333-8333-333333333333";
+
+  beforeAll(async () => {
+    await insertTag("bulk-tag", "bulktag");
+    await insertCategory(bulkCategoryId, { name: "Bulk", slug: "bulk" });
+    const statements = [];
+    for (let i = 0; i < bulkCount; i++) {
+      const id = `bulk-item-${String(i).padStart(3, "0")}`;
+      statements.push(
+        env.DB.prepare(
+          `INSERT INTO items (id, kind, title, data, source, created_at, updated_at)
+           VALUES (?, 'text', 'bulkfilterword', '{"body":"x"}', 'web', ?, ?)`,
+        ).bind(id, now, now),
+        env.DB.prepare(`INSERT INTO item_tags (item_id, tag_id) VALUES (?, 'bulk-tag')`).bind(id),
+        env.DB.prepare(`INSERT INTO item_categories (item_id, category_id) VALUES (?, ?)`).bind(
+          id,
+          bulkCategoryId,
+        ),
+        env.DB.prepare(
+          `INSERT INTO item_colors (item_id, hex, weight) VALUES (?, '#123456', 1)`,
+        ).bind(id),
+      );
+    }
+    await env.DB.batch(statements);
+  });
+
+  async function collectAllIds(filter: string): Promise<string[]> {
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const url = `https://example.com/api/items?limit=100&${filter}${
+        cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
+      }`;
+      const res = await SELF.fetch(url);
+      expect(res.status).toBe(200);
+      const body = await res.json<{ items: { id: string }[]; nextCursor: string | null }>();
+      ids.push(...body.items.map((i) => i.id));
+      cursor = body.nextCursor;
+    } while (cursor);
+    return ids;
+  }
+
+  const expectedIds = Array.from(
+    { length: bulkCount },
+    (_, i) => `bulk-item-${String(i).padStart(3, "0")}`,
+  ).reverse();
+
+  it.each([
+    ["tag", "tag=bulktag"],
+    ["category", `categoryId=${bulkCategoryId}`],
+    ["color", "color=%23123457"],
+    ["search", "q=bulkfilterword"],
+  ])("pages through more than 100 %s matches in created_at/id order", async (_name, filter) => {
+    expect(await collectAllIds(filter)).toEqual(expectedIds);
   });
 });

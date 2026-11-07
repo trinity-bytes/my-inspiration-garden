@@ -62,23 +62,23 @@ describe("hitTestCard", () => {
     const cardWorld = { x: 200, y: -100 };
     const pointer = worldToPointer(cardWorld, viewport, offset, k);
     const cards = [
-      { id: "far-away", worldRect: { x: -900, y: 700, width: 100, height: 100 } },
-      { id: "target", worldRect: { x: 200, y: -100, width: 300, height: 200 } },
+      { key: "far-away", worldRect: { x: -900, y: 700, width: 100, height: 100 } },
+      { key: "target", worldRect: { x: 200, y: -100, width: 300, height: 200 } },
     ];
     expect(hitTestCard(pointer, viewport, offset, k, cards)).toBe("target");
   });
 
   it("returns null when the pointer is outside every card", () => {
     const pointer = worldToPointer({ x: 5000, y: 5000 }, viewport, offset, k);
-    const cards = [{ id: "only", worldRect: { x: 0, y: 0, width: 100, height: 100 } }];
+    const cards = [{ key: "only", worldRect: { x: 0, y: 0, width: 100, height: 100 } }];
     expect(hitTestCard(pointer, viewport, offset, k, cards)).toBeNull();
   });
 
   it("returns the topmost (last) card when rects overlap", () => {
     const pointer = worldToPointer({ x: 0, y: 0 }, viewport, offset, k);
     const cards = [
-      { id: "bottom", worldRect: { x: 0, y: 0, width: 200, height: 200 } },
-      { id: "top", worldRect: { x: 0, y: 0, width: 200, height: 200 } },
+      { key: "bottom", worldRect: { x: 0, y: 0, width: 200, height: 200 } },
+      { key: "top", worldRect: { x: 0, y: 0, width: 200, height: 200 } },
     ];
     expect(hitTestCard(pointer, viewport, offset, k, cards)).toBe("top");
   });
@@ -88,7 +88,7 @@ describe("hitTestCard", () => {
     const cardWorld = { x: -400, y: 250 };
     const pointer = worldToPointer(cardWorld, viewport, panned, k);
     const cards = [
-      { id: "panned-target", worldRect: { x: -400, y: 250, width: 150, height: 150 } },
+      { key: "panned-target", worldRect: { x: -400, y: 250, width: 150, height: 150 } },
     ];
     expect(hitTestCard(pointer, viewport, panned, k, cards)).toBe("panned-target");
   });

@@ -1,5 +1,5 @@
 /**
- * Deploy-configuration validation (T13).
+ * Deploy-configuration validation.
  *
  * `wrangler.jsonc` ships with placeholder values because this machine has no
  * Cloudflare account, and inventing an account id, Access team domain or AUD

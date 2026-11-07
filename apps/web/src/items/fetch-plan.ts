@@ -1,8 +1,8 @@
 import type { Item } from "@garden/shared";
 
 /**
- * Pure pagination policy for `useGardenItems.ts`: the canvas needs "a few
- * hundred items max for now" (T8b scope), not the full catalog, so fetching
+ * Pure pagination policy for `useGardenItems.ts`: the canvas needs a few
+ * hundred items at most, not the full catalog, so fetching
  * stops once the cursor is exhausted, the item cap is reached, the page
  * cap is reached, or the API is stuck (cursor didn't advance, or a page
  * contributed no new unique items) — the last two guard against unbounded

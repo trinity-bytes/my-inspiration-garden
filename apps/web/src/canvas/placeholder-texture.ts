@@ -11,7 +11,7 @@ import { wrapText } from "./wrap-text";
  * implemented: getContext()" warnings elsewhere in this suite); covered by
  * `pnpm --filter web build` + manual visual QA, like the rest of the GPU
  * glue in this directory. Also the fallback for every per-kind painter
- * (`card-painters.ts`, T9) when its own content can't be painted.
+ * (`card-painters.ts`) when its own content can't be painted.
  */
 /**
  * Upper bound for a card texture's longer edge, in device px. Bounds GPU memory for the texture
@@ -26,8 +26,8 @@ const CORNER_RADIUS_FRACTION = 0.06;
  * A `<canvas>` with one texel per device pixel of the card's on-screen CSS size (`widthPx` x
  * `heightPx` at `dpr`), with its longer edge capped at `MAX_TEXTURE_EDGE_PX`. Painting at the
  * screen's resolution keeps text sharp on Retina screens without shrinking the card below its
- * column slot (owner feedback, 2026-10-29: on a 2x iMac the cards looked too far apart because a
- * fixed 512px budget forced them smaller than their columns).
+ * column slot (a fixed 512px budget would force cards on a 2x iMac smaller than their columns,
+ * so they look too far apart).
  */
 export function createDeviceCanvas(
   widthPx: number,
@@ -103,7 +103,7 @@ export function createPlaceholderTexture(
  * Wraps a card canvas (`createDeviceCanvas`-sized, so drawn at ~1 texel per device px) as a
  * texture. Mipmaps are skipped: a card is never drawn much smaller than its texture, and
  * generating them made every card upload cost more while cards stream in during fast panning
- * (owner feedback, 2026-10-29: stutter growing with pan speed).
+ * (a stutter that grows with pan speed).
  */
 export function createCardCanvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   const texture = new THREE.CanvasTexture(canvas);

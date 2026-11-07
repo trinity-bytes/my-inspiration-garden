@@ -6,10 +6,9 @@ import type { Vec2 } from "./types";
  * drag and keyboard math in `navigation-controller.ts` (which are already
  * CSS/DOM convention: `clientY` grows downward). Every uniform (shaders)
  * and every sprite position (cards) must go through these two
- * functions so the sign convention never diverges between subsystems again
- * (see the T8a "Y axis inverted" correction: the previous background shaders
- * derived `screenPx` from clip-space, which is y-UP, and mixed it directly
- * with this y-DOWN `worldOffset`).
+ * functions so the sign convention never diverges between subsystems
+ * (gotcha: a `screenPx` derived from clip-space is y-UP, and mixing it
+ * directly with this y-DOWN `worldOffset` inverts the Y axis).
  *
  * `worldToScreen`/`screenToWorld` are exact inverses of each other for any
  * fixed `worldOffset`/`parallax` (see `screenToWorld(worldToScreen(p)) === p`
@@ -39,7 +38,7 @@ export function screenToWorld(screen: Vec2, worldOffset: Vec2, parallax: number)
 /**
  * The world offset that puts `worldPoint` exactly at the screen center for a
  * layer with the given `parallax` (`screenToWorld({x:0,y:0}, offset,
- * parallax) === worldPoint`). Used by T8b to pan-to-center a card (parallax
+ * parallax) === worldPoint`). Used to pan-to-center a card (parallax
  * 1, the card layer tracks navigation 1:1) when it gains keyboard focus via
  * the parallel DOM/ARIA layer.
  */

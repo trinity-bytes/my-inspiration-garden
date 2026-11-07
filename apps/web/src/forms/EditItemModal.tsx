@@ -12,12 +12,12 @@ export interface EditItemModalProps {
   item: Item;
   categories: Category[];
   onClose: () => void;
-  /** Called after a successful save, so the caller can refetch the canvas (T11). */
-  onUpdated: () => void;
+  /** Called with the saved item after a successful save, so the caller can update the canvas. */
+  onUpdated: (item: Item) => void;
   updateItem?: (id: string, input: UpdateItemInput) => Promise<Item>;
 }
 
-/** Owner-only edit dialog (T11): a solid cartoon-style modal wrapping `ItemForm` in edit mode. */
+/** Owner-only edit dialog: a solid cartoon-style modal wrapping `ItemForm` in edit mode. */
 export function EditItemModal({
   item,
   categories,
@@ -35,8 +35,8 @@ export function EditItemModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await updateItem(item.id, input);
-      onUpdated();
+      const updated = await updateItem(item.id, input);
+      onUpdated(updated);
       onClose();
     } catch (error) {
       setSubmitError(

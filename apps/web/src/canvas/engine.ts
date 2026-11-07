@@ -2,17 +2,16 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { canvasBackgroundRgb01 } from "./background";
-import { cardEntryProgress, cardScreenRect } from "./card-fade";
 import { visibleHoverKey } from "./card-hover";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
-import { selectDomMirrorCards } from "./dom-mirror";
+import { DomMirrorTracker } from "./dom-mirror";
 import { hitTestCard } from "./hit-test";
 import {
   type CardInstance,
   DEFAULT_CARD_MARGIN_PX,
   DEFAULT_MAX_CARD_POOL_SIZE,
-  type ItemPeriod,
+  LayoutPeriodCache,
   visibleCardInstances,
 } from "./item-layout";
 import { type CardFrame, CardLayer } from "./layers/cards";
@@ -23,7 +22,6 @@ import { BarrelPass } from "./post/barrel";
 import { renderPixelRatio } from "./render-pixel-ratio";
 import { SKELETON_ITEMS, sheenCenterPx, sheenHalfWidthPx, stepFade } from "./skeleton";
 import type { Vec2 } from "./types";
-import { VideoPlayback } from "./video-playback";
 
 export interface CanvasEngineOptions {
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
@@ -36,7 +34,6 @@ export interface CanvasEngineOptions {
   /** Fired when a card is clicked (not after a drag — see `click-vs-drag.ts`) or opened via the parallel DOM/ARIA layer's Enter key. */
   onItemOpen?: (itemId: string) => void;
   /** Fired whenever the set of cards the parallel DOM/ARIA layer should mirror changes (see `dom-mirror.ts`). */
-  onPlaybackChange?: (key: string | null, error?: string) => void;
   onVisibleCardsChange?: (cards: CardInstance[]) => void;
 }
 
@@ -60,6 +57,7 @@ const CARD_TEXTURE_CACHE_SIZE = 120;
 // pool cap so cells stay cached through small pans, not just exactly the
 // currently-visible set.
 const CARD_INSTANCE_CACHE_SIZE = DEFAULT_MAX_CARD_POOL_SIZE * 3;
+const ZERO: Readonly<Vec2> = Object.freeze({ x: 0, y: 0 });
 
 /**
  * Owns the full WebGL scene: the card layer on a solid background and the
@@ -75,6 +73,7 @@ export class CanvasEngine {
   private reducedMotion: boolean;
 
   private container: HTMLElement | null = null;
+  private viewport: Readonly<{ width: number; height: number }> = { width: 0, height: 0 };
   private canvas: HTMLCanvasElement | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
 
@@ -102,9 +101,28 @@ export class CanvasEngine {
     CARD_INSTANCE_CACHE_SIZE,
     () => {},
   );
-  /** Memoizes `columnPeriod` results by `(columnIndex, columnWidth, itemCount)` (T9 carried follow-up) — cleared alongside `cardInstanceCache` (same invalidation triggers: `setItems`, and a resize that changes `columnWidth`), since a period is only valid for the items/column-width it was computed from. */
-  private readonly columnPeriodCache = new LruCache<ItemPeriod>(CARD_INSTANCE_CACHE_SIZE, () => {});
-  private lastDomMirrorSignature = "";
+  /** Bounded column periods plus library-wide content measurements; invalidated on setItems and geometry changes. */
+  private readonly columnPeriodCache = new LayoutPeriodCache();
+  private readonly domMirror = new DomMirrorTracker();
+  /**
+   * Container's top-left in client px, measured with its size in `handleResize`.
+   * The host is `position: fixed; inset: 0` (CanvasHost.css), so scrolling never
+   * moves it and only a resize can change this.
+   */
+  private containerOrigin: Vec2 = { x: 0, y: 0 };
+  // Per-frame scratch, rewritten in place each frame and consumed synchronously.
+  private readonly cardCenterWorld: Vec2 = { x: 0, y: 0 };
+  private readonly frame: CardFrame = {
+    worldOffset: ZERO,
+    viewportWidth: 0,
+    viewportHeight: 0,
+    reducedMotion: false,
+    dtSeconds: 0,
+    layerOpacity: 0,
+    sheenCenterPx: 0,
+    sheenHalfWidthPx: 1,
+  };
+  private readonly skeletonFrame: CardFrame = { ...this.frame };
   /** The column width `visibleCardInstances` was last called with — a resize changes it, which invalidates every cached `CardInstance` (their `worldRect.width`/`x` are only valid for the column width they were computed with). */
   private lastColumnWidth = -1;
   private lastGutter = -1;
@@ -121,15 +139,10 @@ export class CanvasEngine {
   private lastFrameTime: number | null = null;
   private readonly distortionK = DEFAULT_BARREL_K;
 
-  private readonly playback: VideoPlayback;
   private disposed = false;
 
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
-    this.playback = new VideoPlayback((key, error) => {
-      this.cards?.setPlayback(key, this.playback.texture);
-      options.onPlaybackChange?.(key, error);
-    });
     this.reducedMotion = options.reducedMotion ?? false;
     this.items = options.items ?? [];
     this.loading = options.loading ?? false;
@@ -137,9 +150,12 @@ export class CanvasEngine {
     this.cardsOpacity = this.loading ? 0 : 1;
   }
 
-  /** Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for the items array it was computed from. */
+  /**
+   * Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell
+   * instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for
+   * the items array it was computed from.
+   */
   setItems(items: Item[]): void {
-    this.playback.stop();
     this.items = items;
     this.cardInstanceCache.clear();
     this.columnPeriodCache.clear();
@@ -163,15 +179,6 @@ export class CanvasEngine {
     const card = this.lastCardInstances.find((candidate) => candidate.key === key);
     if (!card) return;
     this.options.onItemOpen?.(card.item.id);
-  }
-
-  openCardDetails(key: string): void {
-    const card = this.lastCardInstances.find((candidate) => candidate.key === key);
-    if (card) this.options.onItemOpen?.(card.item.id);
-  }
-
-  stopPlayback(): void {
-    this.playback.stop();
   }
 
   mount(container: HTMLElement): void {
@@ -201,8 +208,7 @@ export class CanvasEngine {
     this.canvas = canvas;
     this.renderer = renderer;
     // SRGBColorSpace is the only valid renderer.outputColorSpace (NoColorSpace
-    // throws inside three.js's internal drawing-buffer lookup — confirmed via
-    // a headless-chromium repro, see the T8a QA-correction commit). It is
+    // throws inside three.js's internal drawing-buffer lookup). It is
     // also a harmless default: a canvas's drawing buffer is sRGB either way,
     // and this setting only matters to three.js's built-in materials'
     // `<colorspace_fragment>` chunk, which our custom ShaderMaterials never
@@ -280,7 +286,6 @@ export class CanvasEngine {
       return;
     }
     this.disposed = true;
-    this.playback.stop();
 
     if (this.rafHandle !== null) {
       cancelAnimationFrame(this.rafHandle);
@@ -321,6 +326,7 @@ export class CanvasEngine {
     this.postScene = null;
     this.postCamera = null;
     this.container = null;
+    this.viewport = { width: 0, height: 0 };
   }
 
   setReducedMotion(reduced: boolean): void {
@@ -328,36 +334,38 @@ export class CanvasEngine {
     this.navigation?.setReducedMotion(reduced);
   }
 
-  /** Pauses (or resumes) canvas navigation (T9: the item detail modal). */
+  /** Pauses (or resumes) canvas navigation (e.g. while the item detail modal is open). */
   setPaused(paused: boolean): void {
-    if (paused) this.playback.stop();
     this.navigation?.setPaused(paused);
   }
 
-  /** Minimal read-only state T8b needs: world offset, viewport size, distortion params. */
+  /** Minimal read-only world state: world offset, viewport size, distortion params. */
   getWorldState(): WorldState {
     const viewport = this.getViewportSize();
     return {
-      worldOffset: this.navigation?.getWorldOffset() ?? { x: 0, y: 0 },
+      // A snapshot: the controller's offset is a live object mutated every frame.
+      worldOffset: { ...(this.navigation?.getWorldOffset() ?? ZERO) },
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       distortionK: this.distortionK,
     };
   }
 
-  private getViewportSize(): { width: number; height: number } {
-    if (!this.container) {
-      return { width: 0, height: 0 };
-    }
-    const rect = this.container.getBoundingClientRect();
-    return { width: rect.width, height: rect.height };
+  private getViewportSize(): Readonly<{ width: number; height: number }> {
+    return this.viewport;
   }
 
   private handleResize(): void {
     if (!this.container || !this.renderer || !this.worldCamera) {
       return;
     }
-    const { width: rawWidth, height: rawHeight } = this.getViewportSize();
+    // ResizeObserver owns measurement; animation, navigation and hit-testing
+    // share raw CSS dimensions without asking layout on every frame.
+    const rect = this.container.getBoundingClientRect();
+    const { width: rawWidth, height: rawHeight } = rect;
+    this.viewport = { width: rawWidth, height: rawHeight };
+    // The canvas fills the container (100% x 100%, display block), so its origin is the container's.
+    this.containerOrigin = { x: rect.left, y: rect.top };
     const width = Math.max(1, Math.round(rawWidth));
     const height = Math.max(1, Math.round(rawHeight));
     const dpr = renderPixelRatio(window.devicePixelRatio, width, height);
@@ -405,25 +413,15 @@ export class CanvasEngine {
 
   /** Container-relative pointer position (CSS px, origin top-left) — the convention `hit-test.ts` expects. */
   private pointerFromEvent(event: PointerEvent): Vec2 {
-    const rect = this.canvas?.getBoundingClientRect();
-    if (!rect) {
-      return { x: 0, y: 0 };
-    }
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    // Uses the origin cached by `handleResize`: measuring here would force layout on every move.
+    return { x: event.clientX - this.containerOrigin.x, y: event.clientY - this.containerOrigin.y };
   }
 
-  /** Cards, keyed by their layout cell (`CardInstance.key`), for `hit-test.ts` — matches what `layers/cards.ts` renders this frame. */
-  private hitTestableCards(): { id: string; worldRect: CardInstance["worldRect"] }[] {
-    return this.lastCardInstances.map((instance) => ({
-      id: instance.key,
-      worldRect: instance.worldRect,
-    }));
-  }
-
+  /** Hit-tests what `layers/cards.ts` renders this frame; results are cell keys (`CardInstance.key`). */
   private hitTestAt(pointer: Vec2): string | null {
-    const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
+    const world = this.navigation?.getWorldOffset() ?? ZERO;
     const viewport = this.getViewportSize();
-    return hitTestCard(pointer, viewport, world, this.distortionK, this.hitTestableCards());
+    return hitTestCard(pointer, viewport, world, this.distortionK, this.lastCardInstances);
   }
 
   private setHoveredCardKey(key: string | null): void {
@@ -442,8 +440,8 @@ export class CanvasEngine {
    * changes (`dom-mirror.ts`), so React doesn't re-render every frame.
    */
   private updateCards(
-    world: Vec2,
-    viewport: { width: number; height: number },
+    world: Readonly<Vec2>,
+    viewport: Readonly<{ width: number; height: number }>,
     nowSeconds: number,
     dtSeconds: number,
   ): void {
@@ -467,7 +465,9 @@ export class CanvasEngine {
       this.columnPeriodCache.clear();
     }
 
-    const cardCenterWorld: Vec2 = { x: -world.x, y: -world.y };
+    const cardCenterWorld = this.cardCenterWorld;
+    cardCenterWorld.x = -world.x;
+    cardCenterWorld.y = -world.y;
     visibleCardInstances(
       this.items,
       cardCenterWorld,
@@ -484,10 +484,7 @@ export class CanvasEngine {
 
     this.cards.group.position.x = world.x;
     this.cards.group.position.y = -world.y;
-    const hoverKey = visibleHoverKey(
-      this.hoveredCardKey,
-      this.navigation?.getVelocity() ?? { x: 0, y: 0 },
-    );
+    const hoverKey = visibleHoverKey(this.hoveredCardKey, this.navigation?.getVelocity() ?? ZERO);
     if (hoverKey !== this.renderedHoverKey) {
       this.renderedHoverKey = hoverKey;
       if (this.canvas) {
@@ -509,29 +506,15 @@ export class CanvasEngine {
 
     const renderWidth = this.renderTarget?.width ?? viewport.width;
     const renderHeight = this.renderTarget?.height ?? viewport.height;
-    const frame: CardFrame = {
-      worldOffset: world,
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
-      reducedMotion: this.reducedMotion,
-      dtSeconds,
-      layerOpacity: this.cardsOpacity,
-      sheenCenterPx: sheenCenterPx(nowSeconds, renderWidth, renderHeight, this.reducedMotion),
-      sheenHalfWidthPx: sheenHalfWidthPx(renderWidth, renderHeight),
-    };
-    if (this.playback.key) {
-      const active = this.lastCardInstances.find((card) => card.key === this.playback.key);
-      if (
-        !active ||
-        cardEntryProgress(
-          cardScreenRect(active.worldRect, world, 1),
-          viewport.width,
-          viewport.height,
-        ) === 0
-      ) {
-        this.playback.stop();
-      }
-    }
+    const frame = this.frame;
+    frame.worldOffset = world;
+    frame.viewportWidth = viewport.width;
+    frame.viewportHeight = viewport.height;
+    frame.reducedMotion = this.reducedMotion;
+    frame.dtSeconds = dtSeconds;
+    frame.layerOpacity = this.cardsOpacity;
+    frame.sheenCenterPx = sheenCenterPx(nowSeconds, renderWidth, renderHeight, this.reducedMotion);
+    frame.sheenHalfWidthPx = sheenHalfWidthPx(renderWidth, renderHeight);
     this.cards.update(this.lastCardInstances, frame, hoverKey);
 
     this.skeletonInstances.length = 0;
@@ -552,15 +535,13 @@ export class CanvasEngine {
     }
     this.skeletons.group.position.x = world.x;
     this.skeletons.group.position.y = -world.y;
-    this.skeletons.updateSkeletons(this.skeletonInstances, {
-      ...frame,
-      layerOpacity: this.skeletonOpacity,
-    });
+    const skeletonFrame = this.skeletonFrame;
+    Object.assign(skeletonFrame, frame);
+    skeletonFrame.layerOpacity = this.skeletonOpacity;
+    this.skeletons.updateSkeletons(this.skeletonInstances, skeletonFrame);
 
-    const domCards = selectDomMirrorCards(this.lastCardInstances);
-    const signature = domCards.map((card) => card.key).join("|");
-    if (signature !== this.lastDomMirrorSignature) {
-      this.lastDomMirrorSignature = signature;
+    const domCards = this.domMirror.update(this.lastCardInstances);
+    if (domCards) {
       this.options.onVisibleCardsChange?.(domCards);
     }
   }
@@ -593,7 +574,7 @@ export class CanvasEngine {
       return;
     }
 
-    const world = this.navigation?.getWorldOffset() ?? { x: 0, y: 0 };
+    const world = this.navigation?.getWorldOffset() ?? ZERO;
     const viewport = this.getViewportSize();
 
     this.updateCards(world, viewport, nowSeconds, dt);

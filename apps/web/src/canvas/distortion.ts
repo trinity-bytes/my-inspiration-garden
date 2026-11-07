@@ -5,16 +5,15 @@ import type { Vec2 } from "./types";
  * post-process (see `post/barrel.ts`). `k` is small on purpose — content
  * should barely bend. The pass is uniform across every layer; faster
  * (nearer) layers only *look* more bent because they sweep through the
- * curved edge faster. 0.045 = 0.75 × the original 0.06 (owner feedback).
+ * curved edge faster.
  */
 export const DEFAULT_BARREL_K = 0.045;
 
 /**
  * Per-axis factor from plain NDC to lens space, whose unit is half the
- * viewport's SHORTER side (owner feedback, 2026-10-29: on portrait phones
- * the lens, measured in heights, barely reached the side edges). Landscape
- * keeps the height as the unit, so desktop is unchanged; portrait now
- * bends its side edges like a desktop's top edge.
+ * viewport's SHORTER side (on portrait phones a lens measured in heights
+ * barely reaches the side edges). Landscape keeps the height as the unit;
+ * portrait bends its side edges like a desktop's top edge.
  */
 export function lensScale(viewport: { width: number; height: number }): Vec2 {
   const aspect = viewport.width / Math.max(viewport.height, 1);
@@ -31,7 +30,7 @@ export function barrelForward(p: Vec2, k: number): Vec2 {
 /**
  * Inverse of `barrelForward`, solved by Newton iteration on the radius
  * (the mapping is radially symmetric: `r_d = r_u * (1 + k * r_u^2)`).
- * Used by T8b to map a pointer position through the distortion to world
+ * Used to map a pointer position through the distortion to world
  * space for hit-testing.
  */
 export function barrelInverse(p: Vec2, k: number, iterations = 8): Vec2 {
