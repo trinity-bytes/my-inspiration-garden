@@ -2,7 +2,6 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { canvasBackgroundRgb01 } from "./background";
-import { cardEntryProgress, cardScreenRect } from "./card-fade";
 import { visibleHoverKey } from "./card-hover";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
@@ -23,7 +22,6 @@ import { BarrelPass } from "./post/barrel";
 import { renderPixelRatio } from "./render-pixel-ratio";
 import { SKELETON_ITEMS, sheenCenterPx, sheenHalfWidthPx, stepFade } from "./skeleton";
 import type { Vec2 } from "./types";
-import { VideoPlayback } from "./video-playback";
 
 export interface CanvasEngineOptions {
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
@@ -36,7 +34,6 @@ export interface CanvasEngineOptions {
   /** Fired when a card is clicked (not after a drag — see `click-vs-drag.ts`) or opened via the parallel DOM/ARIA layer's Enter key. */
   onItemOpen?: (itemId: string) => void;
   /** Fired whenever the set of cards the parallel DOM/ARIA layer should mirror changes (see `dom-mirror.ts`). */
-  onPlaybackChange?: (key: string | null, error?: string) => void;
   onVisibleCardsChange?: (cards: CardInstance[]) => void;
 }
 
@@ -107,8 +104,6 @@ export class CanvasEngine {
   /** Bounded column periods plus library-wide content measurements; invalidated on setItems and geometry changes. */
   private readonly columnPeriodCache = new LayoutPeriodCache();
   private readonly domMirror = new DomMirrorTracker();
-  /** Item id of the card playing in place, so `setItems` and relayouts keep or stop it by item rather than by cell. */
-  private playbackItemId: string | null = null;
   /**
    * Container's top-left in client px, measured with its size in `handleResize`.
    * The host is `position: fixed; inset: 0` (CanvasHost.css), so scrolling never
@@ -144,16 +139,10 @@ export class CanvasEngine {
   private lastFrameTime: number | null = null;
   private readonly distortionK = DEFAULT_BARREL_K;
 
-  private readonly playback: VideoPlayback;
   private disposed = false;
 
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
-    this.playback = new VideoPlayback((key, error) => {
-      if (key === null) this.playbackItemId = null;
-      this.cards?.setPlayback(key, this.playback.texture);
-      options.onPlaybackChange?.(key, error);
-    });
     this.reducedMotion = options.reducedMotion ?? false;
     this.items = options.items ?? [];
     this.loading = options.loading ?? false;
@@ -164,23 +153,9 @@ export class CanvasEngine {
   /**
    * Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell
    * instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for
-   * the items array it was computed from. In-place playback survives when its item is still
-   * present (e.g. another item was saved); `updateCards` stops it if a relayout moved that item
-   * out of the playing cell.
+   * the items array it was computed from.
    */
   setItems(items: Item[]): void {
-    if (this.playback.key !== null) {
-      const playingKey = this.playback.key;
-      const playingId =
-        this.playbackItemId ??
-        this.lastCardInstances.find((card) => card.key === playingKey)?.item.id ??
-        null;
-      if (playingId !== null && items.some((item) => item.id === playingId)) {
-        this.playbackItemId = playingId;
-      } else {
-        this.playback.stop();
-      }
-    }
     this.items = items;
     this.cardInstanceCache.clear();
     this.columnPeriodCache.clear();
@@ -204,10 +179,6 @@ export class CanvasEngine {
     const card = this.lastCardInstances.find((candidate) => candidate.key === key);
     if (!card) return;
     this.options.onItemOpen?.(card.item.id);
-  }
-
-  stopPlayback(): void {
-    this.playback.stop();
   }
 
   mount(container: HTMLElement): void {
@@ -315,7 +286,6 @@ export class CanvasEngine {
       return;
     }
     this.disposed = true;
-    this.playback.stop();
 
     if (this.rafHandle !== null) {
       cancelAnimationFrame(this.rafHandle);
@@ -366,7 +336,6 @@ export class CanvasEngine {
 
   /** Pauses (or resumes) canvas navigation (e.g. while the item detail modal is open). */
   setPaused(paused: boolean): void {
-    if (paused) this.playback.stop();
     this.navigation?.setPaused(paused);
   }
 
@@ -546,20 +515,6 @@ export class CanvasEngine {
     frame.layerOpacity = this.cardsOpacity;
     frame.sheenCenterPx = sheenCenterPx(nowSeconds, renderWidth, renderHeight, this.reducedMotion);
     frame.sheenHalfWidthPx = sheenHalfWidthPx(renderWidth, renderHeight);
-    if (this.playback.key) {
-      const active = this.lastCardInstances.find((card) => card.key === this.playback.key);
-      if (
-        !active ||
-        (this.playbackItemId !== null && active.item.id !== this.playbackItemId) ||
-        cardEntryProgress(
-          cardScreenRect(active.worldRect, world, 1),
-          viewport.width,
-          viewport.height,
-        ) === 0
-      ) {
-        this.playback.stop();
-      }
-    }
     this.cards.update(this.lastCardInstances, frame, hoverKey);
 
     this.skeletonInstances.length = 0;

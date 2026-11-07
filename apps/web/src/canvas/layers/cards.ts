@@ -74,7 +74,6 @@ function layerAssignmentKey(instance: CardInstance): string {
 const scratchScreenRect: CardScreenRect = { center: { x: 0, y: 0 }, halfWidth: 0, halfHeight: 0 };
 
 interface CardUniforms {
-  u_videoAspect: { value: number };
   u_map: { value: THREE.Texture | null };
   u_opacity: { value: number };
   u_aspect: { value: number };
@@ -115,19 +114,6 @@ export class CardLayer {
   private readonly assignmentKeys: string[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
 
-  private playbackKey: string | null = null;
-  private playbackTexture: THREE.VideoTexture | null = null;
-
-  setPlayback(key: string | null, texture: THREE.VideoTexture | null): void {
-    this.playbackKey = key;
-    this.playbackTexture = texture;
-    for (const entry of this.pool) {
-      entry.uniforms.u_map.value = entry.poster;
-      entry.uniforms.u_videoAspect.value = 0;
-      if (!entry.textureReady) entry.uniforms.u_reveal.value = 0;
-    }
-  }
-
   constructor(options: CardLayerOptions) {
     this.options = options;
     this.group = new THREE.Group();
@@ -142,7 +128,6 @@ export class CardLayer {
     while (this.pool.length < size) {
       const uniforms: CardUniforms = {
         u_map: { value: null },
-        u_videoAspect: { value: 0 },
         u_opacity: { value: 0 },
         u_aspect: { value: 1 },
         u_cornerRadius: { value: CORNER_RADIUS_FRACTION },
@@ -154,18 +139,7 @@ export class CardLayer {
       };
       const material = new THREE.ShaderMaterial({
         vertexShader: CARD_VERTEX_GLSL,
-        fragmentShader: CARD_FRAGMENT_GLSL.replace(
-          "uniform sampler2D u_map;",
-          "uniform sampler2D u_map;\nuniform float u_videoAspect;",
-        ).replace(
-          "vec4 tex = texture2D(u_map, vUv);",
-          `vec2 mediaUv = vUv;
-          if (u_videoAspect > 0.0) {
-            vec2 crop = vec2(min(1.0, u_aspect / u_videoAspect), min(1.0, u_videoAspect / u_aspect));
-            mediaUv = (vUv - 0.5) * crop + 0.5;
-          }
-          vec4 tex = texture2D(u_map, mediaUv);`,
-        ),
+        fragmentShader: CARD_FRAGMENT_GLSL,
         transparent: true,
         depthTest: false,
         depthWrite: false,
@@ -411,7 +385,6 @@ export class CardLayer {
           entry.poster = null;
           entry.textureReady = false;
           entry.uniforms.u_map.value = null;
-          entry.uniforms.u_videoAspect.value = 0;
           entry.uniforms.u_reveal.value = 0;
         }
       }
@@ -462,19 +435,9 @@ export class CardLayer {
       }
 
       entry.uniforms.u_map.value = entry.poster;
-      entry.uniforms.u_videoAspect.value = 0;
-      let liveReady = false;
-      if (instance.key === this.playbackKey && this.playbackTexture) {
-        const video = this.playbackTexture.image as HTMLVideoElement;
-        if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
-          liveReady = true;
-          entry.uniforms.u_map.value = this.playbackTexture;
-          entry.uniforms.u_videoAspect.value = video.videoWidth / video.videoHeight;
-        }
-      }
       entry.uniforms.u_reveal.value = stepFade(
         entry.uniforms.u_reveal.value,
-        entry.textureReady || liveReady ? 1 : 0,
+        entry.textureReady ? 1 : 0,
         frame.dtSeconds,
         frame.reducedMotion,
       );

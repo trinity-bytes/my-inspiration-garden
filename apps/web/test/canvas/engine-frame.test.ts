@@ -5,7 +5,6 @@ import { DEFAULT_BARREL_K } from "../../src/canvas/distortion";
 import { CanvasEngine } from "../../src/canvas/engine";
 import { worldToPointer } from "../../src/canvas/hit-test";
 import type { CardInstance } from "../../src/canvas/item-layout";
-import type { VideoPlayback } from "../../src/canvas/video-playback";
 import { makeItem } from "../fixtures/items";
 
 vi.mock("three", async (original) => ({
@@ -89,7 +88,6 @@ function mountEngine(options: ConstructorParameters<typeof CanvasEngine>[0]) {
   const canvas = container.querySelector("canvas") as HTMLCanvasElement;
   const internals = engine as unknown as {
     lastCardInstances: CardInstance[];
-    playback: VideoPlayback;
   };
   return {
     engine,
@@ -151,34 +149,6 @@ it("hit-tests pointer moves against the cached container rect without forcing la
     );
     nextFrame();
     expect(canvas.style.cursor).toBe("");
-  } finally {
-    cleanup();
-  }
-});
-
-it("keeps canvas playback running across setItems while the playing item still exists", () => {
-  const onPlaybackChange = vi.fn();
-  const { engine, internals, cleanup } = mountEngine({ items: photos(), onPlaybackChange });
-  try {
-    nextFrame();
-    const video = document.createElement("video");
-    vi.spyOn(video, "load").mockImplementation(() => {});
-    vi.spyOn(video, "pause").mockImplementation(() => {});
-    vi.spyOn(video, "play").mockResolvedValue();
-    vi.spyOn(document, "createElement").mockReturnValue(video);
-    const playing = onScreen(internals.lastCardInstances);
-    internals.playback.toggle(playing.key, "/api/media/clip.mp4");
-    expect(onPlaybackChange).toHaveBeenLastCalledWith(playing.key, undefined);
-
-    engine.setItems(photos("2026-02-01T00:00:00.000Z"));
-    nextFrame();
-    nextFrame();
-    expect(onPlaybackChange).toHaveBeenCalledTimes(1);
-    expect(internals.playback.key).toBe(playing.key);
-
-    engine.setItems(photos().filter((item) => item.id !== playing.item.id));
-    expect(onPlaybackChange).toHaveBeenLastCalledWith(null, undefined);
-    expect(internals.playback.key).toBeNull();
   } finally {
     cleanup();
   }

@@ -5,15 +5,14 @@ import type { CardInstance } from "../../src/canvas/item-layout";
 
 afterEach(() => vi.restoreAllMocks());
 
-it("opens uploaded-video details without canvas playback and preserves other item details", async () => {
+it("opens uploaded-video details without starting a decoder and preserves other item details", async () => {
   const video = document.createElement("video");
   vi.spyOn(document, "createElement").mockReturnValue(video);
   vi.spyOn(video, "load").mockImplementation(() => {});
   vi.spyOn(video, "pause").mockImplementation(() => {});
   vi.spyOn(video, "play").mockResolvedValue();
   const open = vi.fn();
-  const change = vi.fn();
-  const engine = new CanvasEngine({ onItemOpen: open, onPlaybackChange: change });
+  const engine = new CanvasEngine({ onItemOpen: open });
   const uploaded = {
     id: "file",
     kind: "video",
@@ -39,10 +38,9 @@ it("opens uploaded-video details without canvas playback and preserves other ite
   engine.activateCardKey("c");
   expect(open).toHaveBeenLastCalledWith("youtube");
   engine.setPaused(true);
-  expect(change).not.toHaveBeenCalled();
   engine.activateCardKey("a");
   engine.setItems([]);
-  expect(change).not.toHaveBeenCalled();
+  expect(video.play).not.toHaveBeenCalled();
   engine.dispose();
   await Promise.resolve();
 });
