@@ -69,7 +69,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     const addButton = await screen.findByRole("button", { name: "Add item" });
     fireEvent.click(addButton);
 
-    const dialog = screen.getByRole("dialog", { name: "Add item" });
+    const dialog = await screen.findByRole("dialog", { name: "Add item" });
     fireEvent.change(within(dialog).getByLabelText("Body"), { target: { value: "hello garden" } });
     await waitFor(() => expect(listItems).toHaveBeenCalled());
     const listItemsCallsBefore = vi.mocked(listItems).mock.calls.length;
@@ -149,7 +149,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     const detailDialog = await screen.findByRole("dialog", { name: "Item A" });
     fireEvent.click(within(detailDialog).getByRole("button", { name: "Edit" }));
 
-    const editDialog = screen.getByRole("dialog", { name: "Edit item" });
+    const editDialog = await screen.findByRole("dialog", { name: "Edit item" });
     fireEvent.change(within(editDialog).getByLabelText("Title"), { target: { value: "Renamed" } });
     fireEvent.click(within(editDialog).getByRole("button", { name: "Save changes" }));
 

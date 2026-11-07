@@ -1,21 +1,36 @@
 import type { Item } from "@garden/shared";
-import { useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { deleteItem, restoreItem } from "./api/endpoints";
-import { CategoryManagerModal } from "./categories/CategoryManagerModal";
 import { CanvasHost } from "./components/CanvasHost/CanvasHost";
 import { Navbar } from "./components/Navbar/Navbar";
 import { ItemDetailModal } from "./detail/ItemDetailModal";
 import { useCategoryNames } from "./detail/useCategoryNames";
 import { useItemDetail } from "./detail/useItemDetail";
 import { defaultFilterState } from "./filters/filter-state";
-import { EditItemModal } from "./forms/EditItemModal";
-import { QuickAddModal } from "./forms/QuickAddModal";
-import { RevisionHistoryModal } from "./forms/RevisionHistoryModal";
 import { useCategories } from "./forms/useCategories";
 import { useGardenItems } from "./items/useGardenItems";
 import { useOwnerSession } from "./session/useOwnerSession";
-import { TokensModal } from "./tokens/TokensModal";
-import { TrashModal } from "./trash/TrashModal";
+
+// Owner-only dialogs load on first open: visitors never download them, and the
+// entry chunk stays focused on the canvas.
+const CategoryManagerModal = lazy(() =>
+  import("./categories/CategoryManagerModal").then((m) => ({ default: m.CategoryManagerModal })),
+);
+const EditItemModal = lazy(() =>
+  import("./forms/EditItemModal").then((m) => ({ default: m.EditItemModal })),
+);
+const QuickAddModal = lazy(() =>
+  import("./forms/QuickAddModal").then((m) => ({ default: m.QuickAddModal })),
+);
+const RevisionHistoryModal = lazy(() =>
+  import("./forms/RevisionHistoryModal").then((m) => ({ default: m.RevisionHistoryModal })),
+);
+const TokensModal = lazy(() =>
+  import("./tokens/TokensModal").then((m) => ({ default: m.TokensModal })),
+);
+const TrashModal = lazy(() =>
+  import("./trash/TrashModal").then((m) => ({ default: m.TrashModal })),
+);
 
 /**
  * Owner-only dialogs. They are modal (their backdrop covers the navbar and the
@@ -127,31 +142,33 @@ export function App() {
           onDelete={isOwner ? handleDelete : undefined}
         />
       )}
-      {isOwner && activeDialog === "quickAdd" && (
-        <QuickAddModal categories={categories} onClose={closeDialog} onCreated={applySavedItem} />
-      )}
-      {isOwner && activeDialog === "trash" && (
-        <TrashModal onClose={closeDialog} onRestored={noop} restoreItem={restoreFromTrash} />
-      )}
-      {isOwner && activeDialog === "categories" && (
-        <CategoryManagerModal categories={categories} onClose={closeDialog} />
-      )}
-      {isOwner && activeDialog === "tokens" && <TokensModal onClose={closeDialog} />}
-      {isOwner && selectedItem && activeDialog === "edit" && (
-        <EditItemModal
-          item={selectedItem}
-          categories={categories}
-          onClose={closeDialog}
-          onUpdated={handleItemSaved}
-        />
-      )}
-      {isOwner && selectedItem && activeDialog === "history" && (
-        <RevisionHistoryModal
-          item={selectedItem}
-          onClose={closeDialog}
-          onRestored={handleItemSaved}
-        />
-      )}
+      <Suspense fallback={null}>
+        {isOwner && activeDialog === "quickAdd" && (
+          <QuickAddModal categories={categories} onClose={closeDialog} onCreated={applySavedItem} />
+        )}
+        {isOwner && activeDialog === "trash" && (
+          <TrashModal onClose={closeDialog} onRestored={noop} restoreItem={restoreFromTrash} />
+        )}
+        {isOwner && activeDialog === "categories" && (
+          <CategoryManagerModal categories={categories} onClose={closeDialog} />
+        )}
+        {isOwner && activeDialog === "tokens" && <TokensModal onClose={closeDialog} />}
+        {isOwner && selectedItem && activeDialog === "edit" && (
+          <EditItemModal
+            item={selectedItem}
+            categories={categories}
+            onClose={closeDialog}
+            onUpdated={handleItemSaved}
+          />
+        )}
+        {isOwner && selectedItem && activeDialog === "history" && (
+          <RevisionHistoryModal
+            item={selectedItem}
+            onClose={closeDialog}
+            onRestored={handleItemSaved}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
