@@ -1,22 +1,32 @@
 import type { Item } from "@garden/shared";
-import { resolveMediaRef } from "../api/media-ref";
+import { resolveThumbnailRef } from "../api/media-ref";
 
 /**
- * The URL of an image-like representation of `item`, or `null` when none
- * exists — decides whether to load a thumbnail texture or fall back to a
- * generated placeholder (see `layers/cards.ts`). `image` items are served from R2 via `GET
- * /api/media/*key` (`docs/api.md`); `link`/`video` items use whatever
- * preview ingestion already resolved into their `data` (a link `previewImage`
- * is an R2 key, or a legacy remote URL).
+ * The URL of the image a canvas card paints for `item`, or `null` when none
+ * exists (the card then paints its generated layout, see `layers/cards.ts`).
+ * R2-stored media (an `image` item's upload, a link `previewImage` key, an
+ * uploaded video's poster in `thumbnail`) resolves to its card thumbnail sized
+ * for `paintedWidthPx` device pixels; remote URLs (legacy link previews,
+ * YouTube/Vimeo thumbnails) pass through. Never the video file itself: a card
+ * must not download a video to show one frame.
  */
-export function thumbnailUrlForItem(item: Item, apiBaseUrl = ""): string | null {
+export function thumbnailUrlForItem(
+  item: Item,
+  paintedWidthPx: number,
+  apiBaseUrl = "",
+): string | null {
+  const ref = cardImageRef(item);
+  return ref ? resolveThumbnailRef(ref, paintedWidthPx, apiBaseUrl) : null;
+}
+
+function cardImageRef(item: Item): string | null {
   switch (item.kind) {
     case "image":
-      return item.data.r2Key ? `${apiBaseUrl}/api/media/${item.data.r2Key}` : null;
+      return item.data.r2Key || null;
     case "link":
-      return item.data.previewImage ? resolveMediaRef(item.data.previewImage, apiBaseUrl) : null;
+      return item.data.previewImage || null;
     case "video":
-      return item.data.thumbnail ?? null;
+      return item.data.thumbnail || null;
     default:
       return null;
   }

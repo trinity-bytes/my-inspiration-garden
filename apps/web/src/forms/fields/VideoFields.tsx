@@ -5,6 +5,10 @@ import type { ItemFormState } from "../item-form-state";
 import { FilePicker } from "./FilePicker";
 import type { AsyncStatus, UpdateKindData } from "./types";
 
+function isRemoteUrl(value: string | undefined): boolean {
+  return value !== undefined && /^https?:\/\//i.test(value);
+}
+
 const VIDEO_PROVIDER_OPTIONS: SelectOption<ItemFormState["video"]["provider"]>[] = [
   { value: "youtube", label: "YouTube" },
   { value: "vimeo", label: "Vimeo" },
@@ -73,7 +77,16 @@ export function VideoFields({
           id={`${formId}-video-provider`}
           value={video.provider}
           options={VIDEO_PROVIDER_OPTIONS}
-          onChange={(provider) => updateKindData("video", { provider })}
+          onChange={(provider) =>
+            // An uploaded video's poster is an R2 key, meaningless (and an
+            // invalid URL) for an embed provider's Thumbnail URL field.
+            updateKindData(
+              "video",
+              provider === "file" || isRemoteUrl(video.thumbnail)
+                ? { provider }
+                : { provider, thumbnail: undefined },
+            )
+          }
         />
       </label>
       {isEmbedProvider && (
@@ -99,17 +112,22 @@ export function VideoFields({
           />
           {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
           {uploadStatus === "error" && <span className="item-form__hint">Upload failed.</span>}
+          {uploadStatus === "idle" && video.r2Key && video.thumbnail && (
+            <span className="item-form__hint">Cover frame saved.</span>
+          )}
         </div>
       )}
-      <label className="item-form__field" htmlFor={`${formId}-video-thumbnail`}>
-        Thumbnail URL
-        <input
-          id={`${formId}-video-thumbnail`}
-          type="url"
-          value={video.thumbnail ?? ""}
-          onChange={(event) => updateKindData("video", { thumbnail: event.target.value })}
-        />
-      </label>
+      {isEmbedProvider && (
+        <label className="item-form__field" htmlFor={`${formId}-video-thumbnail`}>
+          Thumbnail URL
+          <input
+            id={`${formId}-video-thumbnail`}
+            type="url"
+            value={video.thumbnail ?? ""}
+            onChange={(event) => updateKindData("video", { thumbnail: event.target.value })}
+          />
+        </label>
+      )}
     </>
   );
 }

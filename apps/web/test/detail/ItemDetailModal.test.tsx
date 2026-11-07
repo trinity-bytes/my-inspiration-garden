@@ -39,6 +39,31 @@ describe("ItemDetailModal", () => {
     expect(video).not.toHaveAttribute("autoplay");
   });
 
+  it("shows an uploaded video's poster and loads the video only when played", () => {
+    const item = makeItem("uploaded-poster", "video", {
+      provider: "file",
+      r2Key: "media/clip.mp4",
+      thumbnail: "media/poster.webp",
+    });
+    const { container } = render(
+      <ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />,
+    );
+    const video = container.querySelector("video");
+    expect(video).toHaveAttribute("src", "/api/media/media/clip.mp4");
+    expect(video).toHaveAttribute("poster", "/api/media/media/poster.webp");
+    expect(video).toHaveAttribute("preload", "none");
+  });
+
+  it("preloads only metadata for an uploaded video without a poster", () => {
+    const item = makeItem("uploaded-bare", "video", { provider: "file", r2Key: "media/clip.mp4" });
+    const { container } = render(
+      <ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />,
+    );
+    const video = container.querySelector("video");
+    expect(video).not.toHaveAttribute("poster");
+    expect(video).toHaveAttribute("preload", "metadata");
+  });
+
   it("renders as a labelled dialog", () => {
     const item = makeItem("i1", "text", { body: "hello" }, { title: "My note" });
     render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);

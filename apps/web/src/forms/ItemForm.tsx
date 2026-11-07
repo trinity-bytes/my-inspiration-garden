@@ -29,6 +29,7 @@ import type { UpdateKindData } from "./fields/types";
 import { VideoFields } from "./fields/VideoFields";
 import { type ImageUploadResult, uploadImageFile } from "./media-upload";
 import { TagInput } from "./TagInput";
+import { uploadVideoPosterFile } from "./video-poster";
 import { deriveVideoEmbed } from "./video-url";
 
 const KIND_OPTIONS: SelectOption<ItemKind>[] = (
@@ -46,6 +47,8 @@ export interface ItemFormProps {
   unfurl?: (url: string) => Promise<UnfurlMetadataResult>;
   uploadImage?: (file: File) => Promise<ImageUploadResult>;
   uploadVideoFile?: (file: File) => Promise<StoredMedia>;
+  /** Captures and stores an uploaded video's poster frame; `null` when it cannot. */
+  uploadVideoPoster?: (file: File) => Promise<StoredMedia | null>;
   /** Link preview image upload; defaults to the plain media upload (no palette extraction). */
   uploadPreviewImage?: (file: File) => Promise<StoredMedia>;
 }
@@ -68,6 +71,7 @@ export function ItemForm({
   unfurl = unfurlLink,
   uploadImage = uploadImageFile,
   uploadVideoFile = uploadMedia,
+  uploadVideoPoster = uploadVideoPosterFile,
   uploadPreviewImage = uploadMedia,
 }: ItemFormProps) {
   const [state, setState] = useState<ItemFormState>(initialState);
@@ -155,8 +159,12 @@ export function ItemForm({
     if (!file) return;
     setUploadStatus("loading");
     try {
-      const stored = await uploadVideoFile(file);
-      updateKindData("video", { r2Key: stored.r2Key });
+      // The poster is captured from the local file while the video uploads.
+      const [stored, poster] = await Promise.all([
+        uploadVideoFile(file),
+        uploadVideoPoster(file).catch(() => null),
+      ]);
+      updateKindData("video", { r2Key: stored.r2Key, thumbnail: poster?.r2Key });
       setUploadStatus("idle");
     } catch {
       setUploadStatus("error");

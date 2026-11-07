@@ -1,4 +1,4 @@
-/** Decode one frame without playback. The composed-texture cache owns the result. */
+/** Decodes one frame of a video without playing it, onto a canvas the caller owns. */
 export function loadVideoFrame(
   url: string,
   width: number,

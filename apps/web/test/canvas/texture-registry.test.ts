@@ -22,6 +22,22 @@ describe("TextureRegistry", () => {
     expect(disposed).toEqual(["A"]);
   });
 
+  it("setMaxSize() shrinking evicts least-recently-used unpinned entries, growing evicts nothing", () => {
+    const dispose = vi.fn();
+    const registry = new TextureRegistry<string>({ maxSize: 4, dispose });
+    for (const key of ["a", "b", "c", "d"]) registry.set(key, key);
+    registry.pin("a");
+
+    registry.setMaxSize(2);
+    expect(dispose.mock.calls.map(([value]) => value)).toEqual(["b", "c"]);
+    expect(registry.has("a")).toBe(true);
+    expect(registry.has("d")).toBe(true);
+
+    registry.setMaxSize(10);
+    registry.set("e", "e");
+    expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
   it("set() is a no-op when the value is already cached under that key (no dispose)", () => {
     const dispose = vi.fn();
     const registry = new TextureRegistry<{ id: number }>({ maxSize: 2, dispose });

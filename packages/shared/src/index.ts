@@ -7,6 +7,7 @@ export * from "./item";
 export * from "./palette";
 export * from "./platform";
 export * from "./primitives";
+export * from "./thumbnail";
 export * from "./token";
 export * from "./unfurl";
 export * from "./url-safety";
