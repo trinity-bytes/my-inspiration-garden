@@ -79,6 +79,7 @@ export class CardLayer {
   readonly group: THREE.Group;
   private readonly options: CardLayerOptions;
   private readonly pool: PoolEntry[] = [];
+  private readonly assignmentKeys: string[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
 
   private playbackKey: string | null = null;
@@ -320,12 +321,58 @@ export class CardLayer {
     entry.uniforms.u_sheenHalfWidth.value = frame.sheenHalfWidthPx;
   }
 
+  /** Keep surviving cells on their meshes; only entering cells acquire a new assignment. */
+  private alignPool(keys: readonly string[], wanted: number): void {
+    let aligned = true;
+    for (let i = 0; i < wanted; i++) {
+      if (this.pool[i]?.assignedKey !== (keys[i] as string)) {
+        aligned = false;
+        break;
+      }
+    }
+    if (aligned) return;
+
+    const wantedKeys = new Set<string>();
+    for (let i = 0; i < wanted; i++) wantedKeys.add(keys[i] as string);
+    // Invariant: assignment keys are unique per frame. A duplicate would map
+    // two slots onto the same retained entry and render one mesh twice.
+    if (import.meta.env.DEV && wantedKeys.size !== wanted) {
+      throw new Error("CardLayer.alignPool: duplicate assignment keys in one frame");
+    }
+    const retained = new Map<string, PoolEntry>();
+    const free: PoolEntry[] = [];
+    for (const entry of this.pool) {
+      if (entry.assignedKey !== null && wantedKeys.has(entry.assignedKey)) {
+        retained.set(entry.assignedKey, entry);
+      } else {
+        free.push(entry);
+      }
+    }
+    const ordered: PoolEntry[] = [];
+    let nextFree = 0;
+    for (let i = 0; i < wanted; i++) {
+      const key = keys[i] as string;
+      ordered.push(retained.get(key) ?? (free[nextFree++] as PoolEntry));
+    }
+    this.pool.splice(0, this.pool.length, ...ordered, ...free.slice(nextFree));
+  }
+
   private hideEntriesFrom(start: number): void {
     for (let i = start; i < this.pool.length; i++) {
       const entry = this.pool[i];
       if (entry) {
         entry.mesh.visible = false;
-        entry.assignedKey = null;
+        if (entry.assignedKey !== null) {
+          entry.assignedKey = null;
+          entry.loadToken++;
+          if (entry.pinnedTextureKey !== null) this.textures.unpin(entry.pinnedTextureKey);
+          entry.pinnedTextureKey = null;
+          entry.poster = null;
+          entry.textureReady = false;
+          entry.uniforms.u_map.value = null;
+          entry.uniforms.u_videoAspect.value = 0;
+          entry.uniforms.u_reveal.value = 0;
+        }
       }
     }
   }
@@ -343,6 +390,13 @@ export class CardLayer {
   update(instances: readonly CardInstance[], frame: CardFrame, hoveredKey: string | null): void {
     const wanted = Math.min(instances.length, this.options.maxPoolSize);
     this.ensurePoolSize(wanted);
+    this.assignmentKeys.length = wanted;
+    for (let i = 0; i < wanted; i++) {
+      this.assignmentKeys[i] = cardAssignmentKey(instances[i] as CardInstance);
+    }
+    this.alignPool(this.assignmentKeys, wanted);
+    // Retire departing cells before new loads can trigger texture eviction.
+    this.hideEntriesFrom(wanted);
 
     for (let i = 0; i < wanted; i++) {
       const instance = instances[i];
@@ -351,7 +405,7 @@ export class CardLayer {
         continue;
       }
 
-      const assignmentKey = cardAssignmentKey(instance);
+      const assignmentKey = this.assignmentKeys[i] as string;
       if (entry.assignedKey !== assignmentKey) {
         entry.assignedKey = assignmentKey;
         entry.loadToken++;
@@ -385,8 +439,6 @@ export class CardLayer {
       );
       this.placeEntry(entry, instance, frame, cardHoverStyle(hoveredKey === instance.key));
     }
-
-    this.hideEntriesFrom(wanted);
   }
 
   /** Draws `instances` as bare skeletons, with no textures: the placeholders shown while the items load. */
@@ -414,6 +466,7 @@ export class CardLayer {
       entry.material.dispose();
     }
     this.pool.length = 0;
+    this.assignmentKeys.length = 0;
     this.textures.clear();
   }
 }

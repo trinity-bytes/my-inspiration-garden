@@ -12,7 +12,7 @@ import {
   type CardInstance,
   DEFAULT_CARD_MARGIN_PX,
   DEFAULT_MAX_CARD_POOL_SIZE,
-  type ItemPeriod,
+  LayoutPeriodCache,
   visibleCardInstances,
 } from "./item-layout";
 import { type CardFrame, CardLayer } from "./layers/cards";
@@ -75,6 +75,7 @@ export class CanvasEngine {
   private reducedMotion: boolean;
 
   private container: HTMLElement | null = null;
+  private viewport: Readonly<{ width: number; height: number }> = { width: 0, height: 0 };
   private canvas: HTMLCanvasElement | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
 
@@ -102,8 +103,8 @@ export class CanvasEngine {
     CARD_INSTANCE_CACHE_SIZE,
     () => {},
   );
-  /** Memoizes `columnPeriod` results by `(columnIndex, columnWidth, itemCount)` (T9 carried follow-up) — cleared alongside `cardInstanceCache` (same invalidation triggers: `setItems`, and a resize that changes `columnWidth`), since a period is only valid for the items/column-width it was computed from. */
-  private readonly columnPeriodCache = new LruCache<ItemPeriod>(CARD_INSTANCE_CACHE_SIZE, () => {});
+  /** Bounded column periods plus library-wide content measurements; invalidated on setItems and geometry changes. */
+  private readonly columnPeriodCache = new LayoutPeriodCache();
   private lastDomMirrorSignature = "";
   /** The column width `visibleCardInstances` was last called with — a resize changes it, which invalidates every cached `CardInstance` (their `worldRect.width`/`x` are only valid for the column width they were computed with). */
   private lastColumnWidth = -1;
@@ -321,6 +322,7 @@ export class CanvasEngine {
     this.postScene = null;
     this.postCamera = null;
     this.container = null;
+    this.viewport = { width: 0, height: 0 };
   }
 
   setReducedMotion(reduced: boolean): void {
@@ -345,19 +347,18 @@ export class CanvasEngine {
     };
   }
 
-  private getViewportSize(): { width: number; height: number } {
-    if (!this.container) {
-      return { width: 0, height: 0 };
-    }
-    const rect = this.container.getBoundingClientRect();
-    return { width: rect.width, height: rect.height };
+  private getViewportSize(): Readonly<{ width: number; height: number }> {
+    return this.viewport;
   }
 
   private handleResize(): void {
     if (!this.container || !this.renderer || !this.worldCamera) {
       return;
     }
-    const { width: rawWidth, height: rawHeight } = this.getViewportSize();
+    // ResizeObserver owns measurement; animation, navigation and hit-testing
+    // share raw CSS dimensions without asking layout on every frame.
+    const { width: rawWidth, height: rawHeight } = this.container.getBoundingClientRect();
+    this.viewport = { width: rawWidth, height: rawHeight };
     const width = Math.max(1, Math.round(rawWidth));
     const height = Math.max(1, Math.round(rawHeight));
     const dpr = renderPixelRatio(window.devicePixelRatio, width, height);

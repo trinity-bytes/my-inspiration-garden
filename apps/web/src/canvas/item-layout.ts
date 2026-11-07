@@ -14,6 +14,7 @@ import {
 } from "./card-painters";
 import { COLUMN_GUTTER_PX } from "./column-layout";
 import { clamp } from "./deadzone";
+import { LruCache } from "./lru-cache";
 import type { Vec2 } from "./types";
 import { approxMeasure, wrapText } from "./wrap-text";
 
@@ -248,8 +249,63 @@ export interface ItemPeriod {
 
 /** Minimal get/set surface a hot-path caller can plug in to reuse `ItemPeriod`s across calls instead of recomputing them (see `engine.ts`'s `columnPeriodCache`, an `LruCache`, which already satisfies this shape). */
 export interface ColumnPeriodCache {
+  prepare?(items: readonly Item[], columnWidth: number, gutter: number): PreparedLayout;
   get(key: string): ItemPeriod | undefined;
   set(key: string, value: ItemPeriod): void;
+}
+
+interface PreparedLayout {
+  order: number[];
+  /** Heights indexed by item index, not rotated column position. */
+  heights: number[];
+}
+
+/**
+ * Engine-owned preparation: wrap content and shuffle once per library/geometry
+ * generation, not once per newly visited column. clear() also invalidates edits
+ * to the same items array (setItems deliberately supports that case).
+ * Period eviction does not discard preparation. Keep period capacity small:
+ * each column holds three arrays proportional to the entire library size.
+ * Preparation is keyed by array identity: callers must pass the same `items`
+ * array every frame. A freshly derived array (e.g. `items.filter(...)` per
+ * frame) would clear the cache on every call and silently undo the benefit.
+ */
+export class LayoutPeriodCache extends LruCache<ItemPeriod> {
+  private items: readonly Item[] | undefined;
+  private itemCount = -1;
+  private width = -1;
+  private gutter = -1;
+  private prepared: PreparedLayout | undefined;
+
+  constructor(maxSize = 32) {
+    super(maxSize, () => {});
+  }
+
+  prepare(items: readonly Item[], columnWidth: number, gutter: number): PreparedLayout {
+    if (
+      items !== this.items ||
+      items.length !== this.itemCount ||
+      columnWidth !== this.width ||
+      gutter !== this.gutter
+    ) {
+      this.clear();
+      this.items = items;
+      this.itemCount = items.length;
+      this.width = columnWidth;
+      this.gutter = gutter;
+    }
+    this.prepared ??= {
+      order: sharedOrder(items.length),
+      heights: items.map((item) => cardHeightForItem(item, columnWidth)),
+    };
+    return this.prepared;
+  }
+
+  override clear(): void {
+    super.clear();
+    this.items = undefined;
+    this.prepared = undefined;
+  }
 }
 
 /** The cache key `columnPeriod` memoizes under: T9 carried follow-up — a column's period depends on all three of `columnIndex`, `columnWidth` (a resize changes card heights) and `itemCount` (a shorter/longer items array changes the whole permutation), so all three must be part of the key. */
@@ -284,13 +340,14 @@ export function columnPeriod(
     return { itemCount: 0, order: [], heights: [], tops: [], periodHeight: 0 };
   }
 
+  const prepared = cache?.prepare?.(items, columnWidth, gutter);
   const cacheKey = columnPeriodCacheKey(columnIndex, columnWidth, itemCount, gutter);
   const cached = cache?.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const shared = sharedOrder(itemCount);
+  const shared = prepared?.order ?? sharedOrder(itemCount);
   const phase = columnPhase(columnIndex, itemCount);
   const order: number[] = new Array(itemCount);
   const heights: number[] = new Array(itemCount);
@@ -299,7 +356,7 @@ export function columnPeriod(
   for (let k = 0; k < itemCount; k++) {
     const itemIndex = shared[(phase + k) % itemCount] as number;
     const item = items[itemIndex] as Item;
-    const height = cardHeightForItem(item, columnWidth);
+    const height = prepared?.heights[itemIndex] ?? cardHeightForItem(item, columnWidth);
     order[k] = itemIndex;
     heights[k] = height;
     tops[k] = cursor;
@@ -400,11 +457,9 @@ export interface CardInstanceCache {
  * supplied, a slot's `CardInstance` is memoized (deterministic, only needs
  * computing once per cache lifetime) and results are written into the
  * caller's reused `out` array, so steady-state panning allocates only for
- * slots newly entering the render margin. Each visible column's
- * `columnPeriod` is still rebuilt every call — O(itemCount) per column,
- * cheap for the realistic item counts this layout targets (tens to low
- * hundreds) — trading a small, well-bounded per-frame cost for not needing
- * a second cache layer and its invalidation rules.
+ * slots newly entering the render margin. `periodCache` reuses column periods;
+ * an engine-owned `LayoutPeriodCache`
+ * additionally shares expensive content measurements across new columns.
  */
 export function visibleCardInstances(
   items: Item[],
