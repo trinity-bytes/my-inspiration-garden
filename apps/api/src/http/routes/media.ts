@@ -4,6 +4,14 @@ import { AppError } from "../../lib/errors";
 import { IMAGE_MIME_TYPES, sniffMime, VIDEO_MIME_TYPES } from "../../lib/magic-bytes";
 import { maxBytesForMime } from "../../lib/media-limits";
 import { CACHE_CONTROL_IMMUTABLE, importRemoteImage, storeMedia } from "../../lib/media-store";
+import {
+  imagesBindingThumbnailer,
+  isThumbnailSourceKey,
+  isThumbnailWidth,
+  THUMBNAIL_MIME,
+  THUMBNAIL_WIDTHS,
+  thumbnailKeyFor,
+} from "../../lib/thumbnails";
 import { requireAuth } from "../middleware/require";
 import type { AppDeps, AppEnv } from "../types";
 
@@ -103,6 +111,55 @@ export function registerMediaRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void
       status: selectedRange ? 206 : 200,
       headers,
     });
+  });
+
+  app.get("/api/thumbs/:width/*", async (c) => {
+    const width = Number(c.req.param("width"));
+    if (!isThumbnailWidth(width)) {
+      throw AppError.badRequest(
+        "invalid_width",
+        `width must be one of ${THUMBNAIL_WIDTHS.join(", ")}`,
+      );
+    }
+    const key = c.req.path.replace(/^\/api\/thumbs\/[^/]+\//, "");
+    if (!isThumbnailSourceKey(key)) throw AppError.notFound("media object not found");
+
+    const thumbnailKey = thumbnailKeyFor(key, width);
+    const cached = await c.env.MEDIA.get(thumbnailKey);
+    if (cached) return new Response(cached.body, { headers: mediaHeaders(cached) });
+
+    const metadata = await c.env.MEDIA.head(key);
+    if (!metadata) throw AppError.notFound("media object not found");
+    if (!IMAGE_MIME_TYPES.has((metadata.httpMetadata?.contentType ?? "") as never)) {
+      throw AppError.notFound("no thumbnail for this media type");
+    }
+
+    const thumbnailer =
+      deps.thumbnailer ?? (c.env.IMAGES ? imagesBindingThumbnailer(c.env.IMAGES) : null);
+    const original = thumbnailer ? await c.env.MEDIA.get(key) : null;
+    let bytes: ArrayBuffer | null = null;
+    if (thumbnailer && original) {
+      try {
+        bytes = await new Response(await thumbnailer(original.body, width)).arrayBuffer();
+      } catch {
+        bytes = null;
+      }
+    }
+    if (!bytes || bytes.byteLength === 0) {
+      // Fall back to the original, cached briefly so a transient failure
+      // (quota, binding outage) is retried later instead of pinned for a year.
+      return new Response(null, {
+        status: 307,
+        headers: { Location: `/api/media/${key}`, "Cache-Control": "public, max-age=300" },
+      });
+    }
+
+    const stored = await c.env.MEDIA.put(thumbnailKey, bytes, {
+      httpMetadata: { contentType: THUMBNAIL_MIME, cacheControl: CACHE_CONTROL_IMMUTABLE },
+    });
+    const headers = mediaHeaders(stored);
+    headers.set("Content-Length", String(bytes.byteLength));
+    return new Response(bytes, { headers });
   });
 
   app.post("/api/media/import", requireAuth("write"), async (c) => {

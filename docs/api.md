@@ -89,6 +89,18 @@ visitors can browse and filter.
   return `416` with `Content-Range: bytes */size`. Malformed, unsupported-unit,
   and multipart ranges are ignored (full `200` response). `If-Range` only permits
   a range for a matching strong ETag; other validators receive the full object.
+- `GET /api/thumbs/:width/*key` — public, no auth. A WebP card thumbnail of
+  the stored image `key` (`media/...`), no wider than `width` (`384` or `768`;
+  anything else is `400 invalid_width`). Generated on first request with the
+  Cloudflare Images binding (`IMAGES`), stored in R2 under
+  `thumbs/w<width>/<key>.webp` and served immutable like the original, so each
+  image costs at most one transformation per width and existing images are
+  backfilled by their first view. When the thumbnail cannot be generated (no
+  binding, transformation error or quota) it answers `307` to
+  `/api/media/<key>` with `Cache-Control: public, max-age=300`, so clients
+  still get the original and retry later. `404` for a missing original, a
+  non-image (videos) or a key outside `media/`. Canvas cards use this; the
+  detail view keeps the original.
 - `POST /api/media/import { url }` — fetches a remote image on the server's
   behalf and stores it the same way as a direct upload (used to persist link
   preview images so they survive the source page disappearing). `url` must
@@ -167,6 +179,11 @@ not automated here):
   answer `/auth/login` with `index.html` and HTTP 200 instead of its 302.
   Because the web build output must exist at deploy time, deploy via the root
   `pnpm deploy`, which builds the web app first.
+- **Images binding**: `wrangler.jsonc` binds Cloudflare Images as `IMAGES`
+  for `GET /api/thumbs/*`. It needs Images available on the account (the
+  Images binding is not available on legacy billing, error 9432). The free
+  plan includes 5,000 unique transformations per month; past that, new
+  thumbnails fall back to the originals until the next month, at no charge.
 - **Access application**: create one Cloudflare Access application scoped
   to **only** `/auth/login` on that hostname (not `/api/*`, not the rest of
   the site) — this is what makes the owner login flow work while keeping
