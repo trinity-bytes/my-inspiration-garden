@@ -1,4 +1,5 @@
 import type { Item } from "@garden/shared";
+import { loadFontOnce } from "../fonts/load-font";
 import {
   fontCardContent,
   linkCardContent,
@@ -361,33 +362,6 @@ function paintPaletteCard(item: PaletteItem, widthPx: number, heightPx: number):
   return canvas;
 }
 
-/** Loads `family` from `sourceUrl` via the FontFace API, racing a timeout; resolves `false` (never throws) on any failure or timeout, or when the font is already loadable without a URL (nothing to fetch). */
-async function loadCardFont(
-  family: string,
-  sourceUrl: string | undefined,
-  timeoutMs: number,
-): Promise<boolean> {
-  if (
-    !sourceUrl ||
-    typeof FontFace === "undefined" ||
-    typeof document === "undefined" ||
-    !document.fonts
-  ) {
-    return false;
-  }
-  try {
-    const face = new FontFace(family, `url(${sourceUrl})`);
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("font load timeout")), timeoutMs);
-    });
-    const loaded = await Promise.race([face.load(), timeout]);
-    document.fonts.add(loaded);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function paintFontCard(
   item: FontItem,
   widthPx: number,
@@ -399,7 +373,7 @@ async function paintFontCard(
   if (!ctx) return canvas;
 
   const content = fontCardContent(item);
-  const loaded = await loadCardFont(content.family, item.data.sourceUrl, timeoutMs);
+  const loaded = await loadFontOnce(content.family, item.data.sourceUrl, timeoutMs);
   const specimenFamily = loaded ? content.family : "Geist Variable";
   const padding = canvas.width * PADDING_FRACTION;
 

@@ -60,8 +60,10 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     window.history.replaceState({}, "", "/");
   });
 
-  it("opens the quick-add modal from the navbar and creates an item, refetching the canvas", async () => {
-    vi.mocked(createItem).mockResolvedValue({ id: "new1" } as never);
+  it("opens the quick-add modal from the navbar and creates an item, adding it without refetching the library", async () => {
+    vi.mocked(createItem).mockResolvedValue(
+      makeItem("new1", "text", { body: "hello garden" }, { createdAt: "2026-05-01T00:00:00.000Z" }),
+    );
     render(<App />);
 
     const addButton = await screen.findByRole("button", { name: "Add item" });
@@ -69,16 +71,18 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Add item" });
     fireEvent.change(within(dialog).getByLabelText("Body"), { target: { value: "hello garden" } });
+    await waitFor(() => expect(listItems).toHaveBeenCalled());
+    const listItemsCallsBefore = vi.mocked(listItems).mock.calls.length;
     fireEvent.click(within(dialog).getByRole("button", { name: "Add item" }));
 
     await waitFor(() => expect(createItem).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(listItems).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Add item" })).not.toBeInTheDocument(),
     );
+    expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
-  it("opens the trash modal from the navbar and restores an item, refetching the canvas", async () => {
+  it("opens the trash modal from the navbar and restores an item, adding it without refetching the library", async () => {
     vi.mocked(listItems).mockImplementation(async (params) =>
       params && "deletedOnly" in params && params.deletedOnly
         ? { items: [makeItem("t1", "text", {}, { title: "Trashed" })], nextCursor: null }
@@ -92,11 +96,12 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
 
     const dialog = await screen.findByRole("dialog", { name: "Trash" });
     await within(dialog).findByText("Trashed");
+    const listItemsCallsBefore = vi.mocked(listItems).mock.calls.length;
     fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
 
     await waitFor(() => expect(restoreItem).toHaveBeenCalledWith("t1"));
     await waitFor(() => expect(within(dialog).getByText(/trash is empty/i)).toBeInTheDocument());
-    await waitFor(() => expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(1));
+    expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
   it("opens the category manager from the navbar, creates a category, and refreshes the picker without reload (T11b B6)", async () => {
@@ -136,7 +141,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     );
   });
 
-  it("edits the deep-linked item from its detail modal and refetches, closing both modals", async () => {
+  it("edits the deep-linked item from its detail modal without refetching the library, closing both modals", async () => {
     window.history.replaceState({}, "", "/?item=a");
     vi.mocked(updateItem).mockResolvedValue({ ...items[0], title: "Renamed" } as never);
     render(<App />);
@@ -158,10 +163,10 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Item A" })).not.toBeInTheDocument(),
     );
-    expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(listItemsCallsBefore);
+    expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
-  it("opens revision history from the detail modal and restores a revision, refetching and closing both modals", async () => {
+  it("opens revision history from the detail modal and restores a revision without refetching, closing both modals", async () => {
     window.history.replaceState({}, "", "/?item=a");
     vi.mocked(listItemRevisions).mockResolvedValue({
       revisions: [
@@ -192,10 +197,10 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Item A" })).not.toBeInTheDocument(),
     );
-    expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(listItemsCallsBefore);
+    expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
-  it("moves the deep-linked item to trash from its detail modal, refetching and closing it", async () => {
+  it("moves the deep-linked item to trash from its detail modal without refetching, closing it", async () => {
     window.history.replaceState({}, "", "/?item=a");
     vi.mocked(deleteItem).mockResolvedValue({
       ...items[0],
@@ -213,7 +218,7 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Item A" })).not.toBeInTheDocument(),
     );
-    expect(vi.mocked(listItems).mock.calls.length).toBeGreaterThan(listItemsCallsBefore);
+    expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
   it.each([

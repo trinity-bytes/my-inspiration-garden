@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultFilterState } from "../../src/filters/filter-state";
 import { makeItem } from "../fixtures/items";
@@ -155,6 +155,7 @@ describe("useGardenItems", () => {
     await waitFor(() => expect(listItems).toHaveBeenCalled());
     expect(listItems).toHaveBeenCalledWith(
       expect.objectContaining({ kind: ["image"], tag: ["ui"], q: "sunset" }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
@@ -189,5 +190,94 @@ describe("useGardenItems", () => {
 
     await waitFor(() => expect(result.current.items.map((item) => item.id)).toEqual(["a", "b"]));
     expect(listItems).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts the in-flight fetch when the filters change before it resolves", async () => {
+    vi.mocked(listItems).mockReturnValueOnce(new Promise(() => {}));
+    vi.mocked(listItems).mockResolvedValue({ items: [makeItem("b")], nextCursor: null });
+
+    const { result, rerender } = renderHook(({ filters }) => useGardenItems(filters), {
+      initialProps: { filters: defaultFilterState() },
+    });
+    await waitFor(() => expect(listItems).toHaveBeenCalledTimes(1));
+    const firstSignal = vi.mocked(listItems).mock.calls[0]?.[1]?.signal;
+    expect(firstSignal?.aborted).toBe(false);
+
+    rerender({ filters: { ...defaultFilterState(), kinds: ["text"] } });
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(firstSignal?.aborted).toBe(true);
+  });
+
+  describe("applySavedItem / removeItem (reflect one write without refetching)", () => {
+    const older = makeItem("a", "text", {}, { createdAt: "2026-01-01T00:00:00.000Z" });
+    const newer = makeItem("b", "text", {}, { createdAt: "2026-02-01T00:00:00.000Z" });
+
+    async function renderLoaded(filters = defaultFilterState()) {
+      vi.mocked(listItems).mockResolvedValue({ items: [newer, older], nextCursor: null });
+      const hook = renderHook(() => useGardenItems(filters));
+      await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+      expect(listItems).toHaveBeenCalledTimes(1);
+      return hook;
+    }
+
+    it("replaces an updated item in place without refetching", async () => {
+      const { result } = await renderLoaded();
+
+      act(() => result.current.applySavedItem({ ...older, title: "Renamed" }));
+
+      expect(result.current.items.map((item) => [item.id, item.title])).toEqual([
+        ["b", "Item b"],
+        ["a", "Renamed"],
+      ]);
+      expect(listItems).toHaveBeenCalledTimes(1);
+    });
+
+    it("inserts a created item respecting created_at desc, id desc ordering", async () => {
+      const { result } = await renderLoaded();
+      const newest = makeItem("c", "text", {}, { createdAt: "2026-03-01T00:00:00.000Z" });
+      const tieWithOlder = makeItem("a2", "text", {}, { createdAt: "2026-01-01T00:00:00.000Z" });
+
+      act(() => result.current.applySavedItem(newest));
+      act(() => result.current.applySavedItem(tieWithOlder));
+
+      expect(result.current.items.map((item) => item.id)).toEqual(["c", "b", "a2", "a"]);
+      expect(listItems).toHaveBeenCalledTimes(1);
+    });
+
+    it("removes a soft-deleted item and resolves to empty once the last one is gone", async () => {
+      const { result } = await renderLoaded();
+
+      act(() => result.current.applySavedItem({ ...older, deletedAt: "2026-04-01T00:00:00.000Z" }));
+      expect(result.current.items.map((item) => item.id)).toEqual(["b"]);
+
+      act(() => result.current.removeItem("b"));
+      expect(result.current.items).toEqual([]);
+      expect(result.current.status).toBe("empty");
+      expect(listItems).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not insert an item that sorts past the end of a truncated (paginated) list", async () => {
+      vi.mocked(listItems).mockResolvedValue({ items: [newer], nextCursor: "more" });
+      // Second page stalls the fetch plan (no new items), leaving the list truncated.
+      vi.mocked(listItems).mockResolvedValueOnce({ items: [newer], nextCursor: "more" });
+      vi.mocked(listItems).mockResolvedValueOnce({ items: [newer], nextCursor: "more-2" });
+      const { result } = renderHook(() => useGardenItems());
+      await waitFor(() => expect(result.current.status).toBe("ready"));
+      const callsAfterLoad = vi.mocked(listItems).mock.calls.length;
+
+      act(() => result.current.applySavedItem(older));
+
+      expect(result.current.items.map((item) => item.id)).toEqual(["b"]);
+      expect(listItems).toHaveBeenCalledTimes(callsAfterLoad);
+    });
+
+    it("falls back to a full refetch while server-side filters are active", async () => {
+      const { result } = await renderLoaded({ ...defaultFilterState(), q: "sunset" });
+
+      act(() => result.current.applySavedItem({ ...older, title: "Renamed" }));
+
+      await waitFor(() => expect(listItems).toHaveBeenCalledTimes(2));
+    });
   });
 });

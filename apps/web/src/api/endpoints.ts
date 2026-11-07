@@ -29,10 +29,19 @@ export interface ListItemsParams {
   deletedOnly?: boolean;
 }
 
+export interface RequestOptions {
+  /** Aborts the request, e.g. when a newer fetch supersedes it. */
+  signal?: AbortSignal;
+}
+
 /** `GET /api/items` — filtered, cursor-paginated item list. Public read. */
-export function listItems(params: ListItemsParams = {}): Promise<ListItemsResult> {
+export function listItems(
+  params: ListItemsParams = {},
+  options: RequestOptions = {},
+): Promise<ListItemsResult> {
   return apiFetch("/api/items", {
     schema: listItemsResultSchema,
+    signal: options.signal,
     searchParams: {
       kind: params.kind,
       tag: params.tag,
