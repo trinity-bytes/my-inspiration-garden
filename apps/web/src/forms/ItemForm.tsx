@@ -1,5 +1,5 @@
 import type { Category, ItemKind } from "@garden/shared";
-import { Check, CircleAlert, Link, Plus, Sparkles, Upload, Video, X } from "lucide-react";
+import { Check, CircleAlert, Plus } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import {
   type StoredMedia,
@@ -7,9 +7,7 @@ import {
   unfurlLink,
   uploadMedia,
 } from "../api/endpoints";
-import { resolveMediaRef } from "../api/media-ref";
 import { Button } from "../components/Button/Button";
-import { IconButton } from "../components/IconButton/IconButton";
 import { Select, type SelectOption } from "../components/Select/Select";
 import { CategoryTree } from "../filters/CategoryTree";
 import { buildCategoryTree } from "../filters/filter-state";
@@ -22,6 +20,13 @@ import {
   type ItemFormState,
 } from "./item-form-state";
 import "./ItemForm.css";
+import { FontFields } from "./fields/FontFields";
+import { ImageFields } from "./fields/ImageFields";
+import { LinkFields } from "./fields/LinkFields";
+import { PaletteFields } from "./fields/PaletteFields";
+import { TextFields } from "./fields/TextFields";
+import type { UpdateKindData } from "./fields/types";
+import { VideoFields } from "./fields/VideoFields";
 import { type ImageUploadResult, uploadImageFile } from "./media-upload";
 import { TagInput } from "./TagInput";
 import { deriveVideoEmbed } from "./video-url";
@@ -29,27 +34,6 @@ import { deriveVideoEmbed } from "./video-url";
 const KIND_OPTIONS: SelectOption<ItemKind>[] = (
   ["image", "link", "text", "video", "palette", "font"] as const
 ).map((kind) => ({ value: kind, label: KIND_LABELS[kind], icon: KIND_ICONS[kind] }));
-
-const VIDEO_PROVIDER_OPTIONS: SelectOption<ItemFormState["video"]["provider"]>[] = [
-  { value: "youtube", label: "YouTube" },
-  { value: "vimeo", label: "Vimeo" },
-  { value: "file", label: "Uploaded file" },
-];
-
-const FONT_PROVIDER_OPTIONS: SelectOption<NonNullable<ItemFormState["font"]["provider"]> | "">[] = [
-  { value: "", label: "—" },
-  { value: "google", label: "Google Fonts" },
-  { value: "fontshare", label: "Fontshare" },
-  { value: "foundry", label: "Foundry" },
-  { value: "other", label: "Other" },
-];
-
-const FONT_LICENSE_OPTIONS: SelectOption<NonNullable<ItemFormState["font"]["license"]> | "">[] = [
-  { value: "", label: "—" },
-  { value: "free", label: "Free" },
-  { value: "commercial", label: "Commercial" },
-  { value: "unknown", label: "Unknown" },
-];
 
 export interface ItemFormProps {
   mode: "create" | "edit";
@@ -100,12 +84,9 @@ export function ItemForm({
     setState((current) => ({ ...current, ...patch }));
   }
 
-  function updateKindData<K extends "text" | "link" | "image" | "video" | "palette" | "font">(
-    key: K,
-    patch: Partial<ItemFormState[K]>,
-  ): void {
+  const updateKindData: UpdateKindData = (key, patch) => {
     setState((current) => ({ ...current, [key]: { ...current[key], ...patch } }));
-  }
+  };
 
   async function handleFetchPreview(): Promise<void> {
     const url = state.url.trim();
@@ -226,25 +207,6 @@ export function ItemForm({
     void onSubmit(result.input as CreateItemFormInput);
   }
 
-  function addPaletteColor(): void {
-    updateKindData("palette", { colors: [...state.palette.colors, { hex: "#000000" }] });
-  }
-
-  function removePaletteColor(index: number): void {
-    updateKindData("palette", { colors: state.palette.colors.filter((_, i) => i !== index) });
-  }
-
-  function updatePaletteColor(
-    index: number,
-    patch: { hex?: string; name?: string; weight?: number },
-  ): void {
-    updateKindData("palette", {
-      colors: state.palette.colors.map((color, i) =>
-        i === index ? { ...color, ...patch } : color,
-      ),
-    });
-  }
-
   const error = validationError ?? submitError;
   // The banner says what's wrong; the image field itself also carries it.
   const imageMissing = state.kind === "image" && validationError !== null && !state.image.r2Key;
@@ -285,379 +247,71 @@ export function ItemForm({
       </label>
 
       {state.kind === "link" && (
-        <label className="item-form__field" htmlFor={`${formId}-url`}>
-          URL
-          <div className="item-form__url-row">
-            <span className="control-with-icon">
-              <Link size={16} aria-hidden="true" />
-              <input
-                id={`${formId}-url`}
-                type="url"
-                value={state.url}
-                onChange={(event) => update({ url: event.target.value })}
-                placeholder="https://"
-              />
-            </span>
-            <Button
-              icon={Sparkles}
-              onClick={handleFetchPreview}
-              disabled={unfurlStatus === "loading" || state.url.trim().length === 0}
-            >
-              Fetch preview
-            </Button>
-          </div>
-          {unfurlStatus === "error" && (
-            <span className="field__error">
-              <CircleAlert size={14} aria-hidden="true" />
-              Could not fetch a preview. Fill in the details by hand.
-            </span>
-          )}
-        </label>
+        <LinkFields
+          formId={formId}
+          url={state.url}
+          link={state.link}
+          unfurlStatus={unfurlStatus}
+          uploadStatus={uploadStatus}
+          pickedFileName={pickedFileName}
+          onUrlChange={(url) => update({ url })}
+          onFetchPreview={handleFetchPreview}
+          onPreviewFileChosen={(file) => {
+            setPickedFileName(file?.name ?? null);
+            void handlePreviewImageFile(file);
+          }}
+          onRemovePreviewImage={removePreviewImage}
+          updateKindData={updateKindData}
+        />
       )}
 
       {state.kind === "text" && (
-        <label className="item-form__field" htmlFor={`${formId}-text-body`}>
-          Body
-          <textarea
-            id={`${formId}-text-body`}
-            value={state.text.body}
-            onChange={(event) => updateKindData("text", { body: event.target.value })}
-          />
-        </label>
-      )}
-
-      {state.kind === "link" && (
-        <>
-          <label className="item-form__field" htmlFor={`${formId}-link-site`}>
-            Site name
-            <input
-              id={`${formId}-link-site`}
-              type="text"
-              value={state.link.siteName ?? ""}
-              onChange={(event) => updateKindData("link", { siteName: event.target.value })}
-            />
-          </label>
-          <label className="item-form__field" htmlFor={`${formId}-link-description`}>
-            Description
-            <textarea
-              id={`${formId}-link-description`}
-              value={state.link.description ?? ""}
-              onChange={(event) => updateKindData("link", { description: event.target.value })}
-            />
-          </label>
-          <div className="item-form__field">
-            <label htmlFor={`${formId}-link-preview-file`}>Preview image</label>
-            {/* A second label: clicking anywhere on the picker opens the file dialog. */}
-            <label className="file-picker" htmlFor={`${formId}-link-preview-file`}>
-              <input
-                id={`${formId}-link-preview-file`}
-                className="visually-hidden"
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  setPickedFileName(file?.name ?? null);
-                  void handlePreviewImageFile(file);
-                }}
-              />
-              <span className="button button--secondary button--sm" aria-hidden="true">
-                <Upload size={16} />
-                Upload image
-              </span>
-              <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
-            </label>
-            <span className="item-form__hint">Or paste a screenshot with Ctrl+V (⌘V on Mac).</span>
-            {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
-            {uploadStatus === "error" && (
-              <span className="field__error">
-                <CircleAlert size={14} aria-hidden="true" />
-                Upload failed.
-              </span>
-            )}
-            {state.link.previewImage && (
-              <div className="item-form__preview-row">
-                <img
-                  className="item-form__preview"
-                  src={resolveMediaRef(state.link.previewImage)}
-                  alt="Link preview"
-                />
-                <IconButton
-                  icon={X}
-                  label="Remove preview image"
-                  tooltipAlign="end"
-                  onClick={removePreviewImage}
-                />
-              </div>
-            )}
-          </div>
-        </>
+        <TextFields formId={formId} text={state.text} updateKindData={updateKindData} />
       )}
 
       {state.kind === "image" && (
-        <div className="item-form__field">
-          <label htmlFor={`${formId}-image-file`}>Image file</label>
-          {/* A second label: clicking anywhere on the picker opens the file dialog. */}
-          <label
-            className="file-picker"
-            htmlFor={`${formId}-image-file`}
-            data-invalid={imageMissing || undefined}
-          >
-            <input
-              id={`${formId}-image-file`}
-              className="visually-hidden"
-              type="file"
-              accept="image/*"
-              aria-invalid={imageMissing || undefined}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                setPickedFileName(file?.name ?? null);
-                void handleImageFileChange(file);
-              }}
-            />
-            <span className="button button--secondary button--sm" aria-hidden="true">
-              <Upload size={16} />
-              Upload image
-            </span>
-            <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
-          </label>
-          <span className="item-form__hint">Or paste a screenshot with Ctrl+V (⌘V on Mac).</span>
-          {imageMissing && (
-            <span className="field__error">
-              <CircleAlert size={14} aria-hidden="true" />
-              Required for image items.
-            </span>
-          )}
-          {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
-          {uploadStatus === "error" && (
-            <span className="field__error">
-              <CircleAlert size={14} aria-hidden="true" />
-              Upload failed.
-            </span>
-          )}
-          {state.image.r2Key && (
-            <img
-              className="item-form__preview"
-              src={`/api/media/${state.image.r2Key}`}
-              alt="Uploaded"
-            />
-          )}
-        </div>
-      )}
-
-      {state.kind === "image" && (
-        <div className="item-form__field">
-          <label htmlFor={`${formId}-image-description`}>Description</label>
-          <textarea
-            id={`${formId}-image-description`}
-            aria-describedby={`${formId}-image-description-hint`}
-            value={state.image.description ?? ""}
-            onChange={(event) => updateKindData("image", { description: event.target.value })}
-          />
-          <span id={`${formId}-image-description-hint`} className="item-form__hint">
-            What the image shows.
-          </span>
-        </div>
+        <ImageFields
+          formId={formId}
+          image={state.image}
+          imageMissing={imageMissing}
+          uploadStatus={uploadStatus}
+          pickedFileName={pickedFileName}
+          onFileChosen={(file) => {
+            setPickedFileName(file?.name ?? null);
+            void handleImageFileChange(file);
+          }}
+          updateKindData={updateKindData}
+        />
       )}
 
       {state.kind === "video" && (
-        <>
-          {(state.video.provider === "youtube" || state.video.provider === "vimeo") && (
-            <label className="item-form__field" htmlFor={`${formId}-video-url`}>
-              Video URL
-              <div className="item-form__url-row">
-                <span className="control-with-icon">
-                  <Video size={16} aria-hidden="true" />
-                  <input
-                    id={`${formId}-video-url`}
-                    type="url"
-                    value={state.url}
-                    onChange={(event) => update({ url: event.target.value })}
-                    placeholder="https://"
-                  />
-                </span>
-                <Button
-                  icon={Sparkles}
-                  onClick={handleFetchVideoPreview}
-                  disabled={unfurlStatus === "loading" || state.url.trim().length === 0}
-                >
-                  Detect video
-                </Button>
-              </div>
-              {unfurlStatus === "loading" && <span className="item-form__hint">Detecting…</span>}
-              {unfurlStatus === "error" && (
-                <span className="item-form__hint">
-                  Doesn't look like a YouTube or Vimeo video URL.
-                </span>
-              )}
-            </label>
-          )}
-          <label className="item-form__field" htmlFor={`${formId}-video-provider`}>
-            Provider
-            <Select
-              id={`${formId}-video-provider`}
-              value={state.video.provider}
-              options={VIDEO_PROVIDER_OPTIONS}
-              onChange={(provider) => updateKindData("video", { provider })}
-            />
-          </label>
-          {(state.video.provider === "youtube" || state.video.provider === "vimeo") && (
-            <label className="item-form__field" htmlFor={`${formId}-video-embed`}>
-              Embed URL
-              <input
-                id={`${formId}-video-embed`}
-                type="url"
-                value={state.video.embedUrl ?? ""}
-                onChange={(event) => updateKindData("video", { embedUrl: event.target.value })}
-              />
-            </label>
-          )}
-          {state.video.provider === "file" && (
-            <div className="item-form__field">
-              <label htmlFor={`${formId}-video-file`}>Video file</label>
-              {/* A second label: clicking anywhere on the picker opens the file dialog. */}
-              <label className="file-picker" htmlFor={`${formId}-video-file`}>
-                <input
-                  id={`${formId}-video-file`}
-                  className="visually-hidden"
-                  type="file"
-                  accept="video/*"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    setPickedFileName(file?.name ?? null);
-                    void handleVideoFileChange(file);
-                  }}
-                />
-                <span className="button button--secondary button--sm" aria-hidden="true">
-                  <Upload size={16} />
-                  Upload video
-                </span>
-                <span className="file-picker__name">{pickedFileName ?? "No file chosen"}</span>
-              </label>
-              {uploadStatus === "loading" && <span className="item-form__hint">Uploading…</span>}
-              {uploadStatus === "error" && <span className="item-form__hint">Upload failed.</span>}
-            </div>
-          )}
-          <label className="item-form__field" htmlFor={`${formId}-video-thumbnail`}>
-            Thumbnail URL
-            <input
-              id={`${formId}-video-thumbnail`}
-              type="url"
-              value={state.video.thumbnail ?? ""}
-              onChange={(event) => updateKindData("video", { thumbnail: event.target.value })}
-            />
-          </label>
-        </>
+        <VideoFields
+          formId={formId}
+          url={state.url}
+          video={state.video}
+          unfurlStatus={unfurlStatus}
+          uploadStatus={uploadStatus}
+          pickedFileName={pickedFileName}
+          onUrlChange={(url) => update({ url })}
+          onDetectVideo={handleFetchVideoPreview}
+          onFileChosen={(file) => {
+            setPickedFileName(file?.name ?? null);
+            void handleVideoFileChange(file);
+          }}
+          updateKindData={updateKindData}
+        />
       )}
 
       {state.kind === "palette" && (
-        <fieldset className="item-form__field item-form__palette">
-          <legend>Colors</legend>
-          {state.palette.colors.map((color, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: palette colors have no stable id; this row's own fields are already keyed by the same position.
-            <div className="item-form__palette-row" key={index}>
-              <label htmlFor={`${formId}-palette-hex-${index}`}>
-                {`Color ${index + 1} hex`}
-                <input
-                  id={`${formId}-palette-hex-${index}`}
-                  type="text"
-                  value={color.hex}
-                  onChange={(event) => updatePaletteColor(index, { hex: event.target.value })}
-                />
-              </label>
-              <label htmlFor={`${formId}-palette-name-${index}`}>
-                {`Color ${index + 1} name`}
-                <input
-                  id={`${formId}-palette-name-${index}`}
-                  type="text"
-                  value={color.name ?? ""}
-                  onChange={(event) => updatePaletteColor(index, { name: event.target.value })}
-                />
-              </label>
-              <label htmlFor={`${formId}-palette-weight-${index}`}>
-                {`Color ${index + 1} weight (%)`}
-                <input
-                  id={`${formId}-palette-weight-${index}`}
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={color.weight ?? ""}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    updatePaletteColor(index, {
-                      weight: raw.trim().length > 0 ? Number(raw) : undefined,
-                    });
-                  }}
-                />
-              </label>
-              <IconButton
-                icon={X}
-                label="Remove color"
-                tooltipAlign="end"
-                onClick={() => removePaletteColor(index)}
-              />
-            </div>
-          ))}
-          <Button size="sm" icon={Plus} onClick={addPaletteColor}>
-            Add color
-          </Button>
-          {state.palette.colors.length > 0 && (
-            <p className="item-form__hint item-form__palette-total">
-              {`Total: ${state.palette.colors.reduce((sum, c) => sum + (c.weight ?? 0), 0)}%`}
-              {" — weights not summing to 100 are normalized proportionally."}
-            </p>
-          )}
-        </fieldset>
+        <PaletteFields
+          formId={formId}
+          colors={state.palette.colors}
+          updateKindData={updateKindData}
+        />
       )}
 
       {state.kind === "font" && (
-        <>
-          <label className="item-form__field" htmlFor={`${formId}-font-family`}>
-            Font family
-            <input
-              id={`${formId}-font-family`}
-              type="text"
-              value={state.font.family}
-              onChange={(event) => updateKindData("font", { family: event.target.value })}
-            />
-          </label>
-          <label className="item-form__field" htmlFor={`${formId}-font-source`}>
-            Source URL
-            <input
-              id={`${formId}-font-source`}
-              type="url"
-              value={state.font.sourceUrl ?? ""}
-              onChange={(event) => updateKindData("font", { sourceUrl: event.target.value })}
-            />
-          </label>
-          <label className="item-form__field" htmlFor={`${formId}-font-provider`}>
-            Provider
-            <Select
-              id={`${formId}-font-provider`}
-              value={state.font.provider ?? ""}
-              options={FONT_PROVIDER_OPTIONS}
-              onChange={(provider) => updateKindData("font", { provider: provider || undefined })}
-            />
-          </label>
-          <label className="item-form__field" htmlFor={`${formId}-font-license`}>
-            License
-            <Select
-              id={`${formId}-font-license`}
-              value={state.font.license ?? ""}
-              options={FONT_LICENSE_OPTIONS}
-              onChange={(license) => updateKindData("font", { license: license || undefined })}
-            />
-          </label>
-          <label className="item-form__field" htmlFor={`${formId}-font-preview-text`}>
-            Preview text
-            <input
-              id={`${formId}-font-preview-text`}
-              type="text"
-              value={state.font.previewText ?? ""}
-              onChange={(event) => updateKindData("font", { previewText: event.target.value })}
-            />
-          </label>
-        </>
+        <FontFields formId={formId} font={state.font} updateKindData={updateKindData} />
       )}
 
       <div className="item-form__field">
