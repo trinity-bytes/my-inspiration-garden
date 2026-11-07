@@ -92,6 +92,34 @@ describe("PATCH /api/items/:id", () => {
     expect(kindMismatch.status).toBe(422);
   });
 
+  it("validates categoryIds on update and reports a missing item before a bad category", async () => {
+    const auth = await writeToken("write-update-cats", "ig_write_update_cats");
+    const catId = "44444444-4444-4444-8444-444444444444";
+    const missingCatId = "55555555-5555-4555-8555-555555555555";
+    await insertCategory(catId, { name: "Update Cat", slug: "update-cat" });
+    const created = await createItem(auth, { kind: "text", source: "web", data: { body: "hi" } });
+    const item = await created.json<{ id: string }>();
+    const patch = (id: string, body: unknown) =>
+      SELF.fetch(`https://example.com/api/items/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...auth },
+        body: JSON.stringify(body),
+      });
+
+    const badCategory = await patch(item.id, { kind: "text", categoryIds: [catId, missingCatId] });
+    expect(badCategory.status).toBe(400);
+    const badBody = await badCategory.json<{ error: { code: string; details?: unknown } }>();
+    expect(JSON.stringify(badBody)).toContain("category_not_found");
+    expect(JSON.stringify(badBody)).toContain(missingCatId);
+
+    const missingItem = await patch("no-such-item", { kind: "text", categoryIds: [missingCatId] });
+    expect(missingItem.status).toBe(404);
+
+    const ok = await patch(item.id, { kind: "text", categoryIds: [catId] });
+    expect(ok.status).toBe(200);
+    expect((await ok.json<{ categoryIds: string[] }>()).categoryIds).toEqual([catId]);
+  });
+
   it("clears title, notes and url when they are sent as null", async () => {
     const auth = await writeToken("write-clear", "ig_write_clear");
     const created = await createItem(auth, {
