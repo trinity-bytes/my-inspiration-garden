@@ -427,10 +427,11 @@ function rowForWorldY(period: ItemPeriod, y: number): number {
  * texture must reload — the same key can resolve to a different item after
  * `setItems` replaces the items array (same slot, different item, since
  * `columnPeriod` depends on `items`). Combining the key with the item id
- * makes that case produce a different assignment key too.
+ * makes that case produce a different assignment key too, and `updatedAt`
+ * does the same when an edit keeps the item in the same slot.
  */
 export function cardAssignmentKey(instance: Pick<CardInstance, "key" | "item">): string {
-  return `${instance.key}::${instance.item.id}`;
+  return `${instance.key}::${instance.item.id}::${instance.item.updatedAt}`;
 }
 
 /** Minimal get/set surface a hot-path caller can plug in to reuse `CardInstance` objects across frames instead of reallocating them every call (see `engine.ts`'s `cardInstanceCache`, an `LruCache`, which already satisfies this shape). */

@@ -393,6 +393,12 @@ describe("cardAssignmentKey", () => {
     const b = cardAssignmentKey({ key: "3,4", item: makeItem("b") });
     expect(a).not.toBe(b);
   });
+
+  it("differs when the same item was edited (new updatedAt), so its card reloads", () => {
+    const a = cardAssignmentKey({ key: "3,4", item: makeItem("a") });
+    const edited = makeItem("a", "text", {}, { updatedAt: "2026-02-01T00:00:00.000Z" });
+    expect(cardAssignmentKey({ key: "3,4", item: edited })).not.toBe(a);
+  });
 });
 
 describe("visibleCardInstances", () => {

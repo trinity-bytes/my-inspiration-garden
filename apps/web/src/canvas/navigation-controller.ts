@@ -2,7 +2,7 @@ import { centerOffsetFor } from "./coords";
 import { deadZoneRadius } from "./deadzone";
 import { type DragSample, decayVelocity, releaseVelocity } from "./drag";
 import { clampDt } from "./dt-clamp";
-import { approachVec2 } from "./inertia";
+import { approach } from "./inertia";
 import {
   directionForKey,
   isTextInputFocused,
@@ -45,6 +45,11 @@ const RELEASE_STOP_EPSILON = 0.05;
 
 type MotionState = "idle" | "dragging" | "releasing";
 
+function setVec(target: Vec2, x: number, y: number): void {
+  target.x = x;
+  target.y = y;
+}
+
 /**
  * Pure(ish), framework-free navigation controller: owns pointer/drag/
  * keyboard listeners and integrates the world offset each frame from
@@ -65,8 +70,11 @@ export class NavigationController {
   /** True while the item detail modal (T9) is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
   private paused = false;
 
-  private worldOffset: Vec2 = { x: 0, y: 0 };
-  private velocity: Vec2 = { x: 0, y: 0 };
+  // Mutated in place (never reassigned): the getters hand these out
+  // read-only so the per-frame engine path allocates nothing.
+  private readonly worldOffset: Vec2 = { x: 0, y: 0 };
+  private readonly velocity: Vec2 = { x: 0, y: 0 };
+  private readonly idleTarget: Vec2 = { x: 0, y: 0 };
   private motionState: MotionState = "idle";
 
   private pointerInWindow = false;
@@ -140,7 +148,7 @@ export class NavigationController {
   setReducedMotion(reduced: boolean): void {
     this.reducedMotion = reduced;
     if (reduced && this.motionState === "releasing") {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
     }
   }
@@ -149,15 +157,16 @@ export class NavigationController {
   setPaused(paused: boolean): void {
     this.paused = paused;
     if (paused) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       if (this.motionState !== "dragging") {
         this.motionState = "idle";
       }
     }
   }
 
-  getWorldOffset(): Vec2 {
-    return { ...this.worldOffset };
+  /** Live, read-only view of the offset: it changes on the next `update`, so copy it to keep a snapshot. */
+  getWorldOffset(): Readonly<Vec2> {
+    return this.worldOffset;
   }
 
   /**
@@ -170,13 +179,15 @@ export class NavigationController {
    * enhancement but out of scope here (see the T8b report's known gaps).
    */
   centerOn(worldPoint: Vec2): void {
-    this.worldOffset = centerOffsetFor(worldPoint, 1);
-    this.velocity = { x: 0, y: 0 };
+    const offset = centerOffsetFor(worldPoint, 1);
+    setVec(this.worldOffset, offset.x, offset.y);
+    setVec(this.velocity, 0, 0);
     this.motionState = "idle";
   }
 
-  getVelocity(): Vec2 {
-    return { ...this.velocity };
+  /** Live, read-only view of the velocity (see `getWorldOffset`). */
+  getVelocity(): Readonly<Vec2> {
+    return this.velocity;
   }
 
   /** Advances the simulation by `dt` seconds (un-clamped; clamped internally). */
@@ -196,20 +207,20 @@ export class NavigationController {
     }
 
     if (this.motionState === "releasing") {
-      this.velocity = decayVelocity(this.velocity, dt, this.dragDecayHalfLife);
-      this.worldOffset = {
-        x: this.worldOffset.x + this.velocity.x * dt,
-        y: this.worldOffset.y + this.velocity.y * dt,
-      };
+      const decayed = decayVelocity(this.velocity, dt, this.dragDecayHalfLife);
+      setVec(this.velocity, decayed.x, decayed.y);
+      this.worldOffset.x += this.velocity.x * dt;
+      this.worldOffset.y += this.velocity.y * dt;
       if (Math.hypot(this.velocity.x, this.velocity.y) < RELEASE_STOP_EPSILON) {
-        this.velocity = { x: 0, y: 0 };
+        setVec(this.velocity, 0, 0);
         this.motionState = "idle";
       }
       return;
     }
 
     const target = this.computeIdleTargetVelocity();
-    this.velocity = approachVec2(this.velocity, target, dt, this.smoothingK);
+    this.velocity.x = approach(this.velocity.x, target.x, dt, this.smoothingK);
+    this.velocity.y = approach(this.velocity.y, target.y, dt, this.smoothingK);
     // Idle-state velocity (drift + keyboard) points toward where you're
     // looking/traveling (computeDriftVelocity/keyboardVelocity, unchanged).
     // The world offset integrates the OPPOSITE way: coords.ts's
@@ -220,15 +231,16 @@ export class NavigationController {
     // correction). Drag (below, "dragging"/"releasing" states) is the
     // opposite interaction — grab-and-move content 1:1 — and is
     // deliberately NOT negated here.
-    this.worldOffset = {
-      x: this.worldOffset.x - this.velocity.x * dt,
-      y: this.worldOffset.y - this.velocity.y * dt,
-    };
+    this.worldOffset.x -= this.velocity.x * dt;
+    this.worldOffset.y -= this.velocity.y * dt;
   }
 
-  private computeIdleTargetVelocity(): Vec2 {
+  /** Writes into a reused scratch vector; read it before the next call. */
+  private computeIdleTargetVelocity(): Readonly<Vec2> {
+    const target = this.idleTarget;
     if (this.paused) {
-      return { x: 0, y: 0 };
+      setVec(target, 0, 0);
+      return target;
     }
 
     const keyboard = keyboardVelocity(this.activeKeyDirections, this.keyboardSpeed);
@@ -254,7 +266,8 @@ export class NavigationController {
       maxSpeed: this.maxSpeed,
     });
 
-    return { x: drift.x + keyboard.x, y: drift.y + keyboard.y };
+    setVec(target, drift.x + keyboard.x, drift.y + keyboard.y);
+    return target;
   }
 
   private updatePointerPosition(clientX: number, clientY: number): void {
@@ -314,7 +327,7 @@ export class NavigationController {
     }
     const dx = event.clientX - this.dragPointerStart.x;
     const dy = event.clientY - this.dragPointerStart.y;
-    this.worldOffset = { x: this.dragStart.x + dx, y: this.dragStart.y + dy };
+    setVec(this.worldOffset, this.dragStart.x + dx, this.dragStart.y + dy);
     this.dragSamples.push({ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 });
     if (this.dragSamples.length > 5) {
       this.dragSamples.shift();
@@ -329,7 +342,7 @@ export class NavigationController {
     this.dragPointerId = null;
 
     if (this.reducedMotion) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
       this.dragSamples = [];
       return;
@@ -338,11 +351,11 @@ export class NavigationController {
     const velocity = releaseVelocity(this.dragSamples);
     this.dragSamples = [];
     if (Math.hypot(velocity.x, velocity.y) < RELEASE_STOP_EPSILON) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
       return;
     }
-    this.velocity = velocity;
+    setVec(this.velocity, velocity.x, velocity.y);
     this.motionState = "releasing";
   };
 

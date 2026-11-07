@@ -34,7 +34,7 @@ it("opens uploaded-video details without canvas playback and preserves other ite
   engine.activateCardKey("b");
   expect(open).toHaveBeenLastCalledWith("file");
   expect(video.play).not.toHaveBeenCalled();
-  engine.openCardDetails("b");
+  engine.activateCardKey("b");
   expect(open).toHaveBeenLastCalledWith("file");
   engine.activateCardKey("c");
   expect(open).toHaveBeenLastCalledWith("youtube");

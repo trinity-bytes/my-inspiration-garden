@@ -1,7 +1,7 @@
 import type { Item } from "@garden/shared";
 import * as THREE from "three";
-import { cardEntryProgress, cardOpacity, cardScreenRect } from "../card-fade";
-import { cardHoverStyle } from "../card-hover";
+import { type CardScreenRect, cardEntryProgress, cardOpacity } from "../card-fade";
+import { type CardHoverStyle, cardHoverStyle } from "../card-hover";
 import { paintItemCardCanvas, paintPhotoCanvas } from "../card-painters";
 import { isStaleLoadCallback } from "../card-texture-token";
 import { type CardInstance, cardAssignmentKey } from "../item-layout";
@@ -40,6 +40,32 @@ export interface CardFrame {
 
 const CORNER_RADIUS_FRACTION = 0.08;
 
+/** Painted size suffix for texture cache keys: a texture is only valid at the size it was painted at. */
+function sizeSuffix(widthPx: number, heightPx: number): string {
+  return `@${widthPx}x${heightPx}`;
+}
+
+/**
+ * Pool assignment identity: the cell/item/revision (`cardAssignmentKey`) plus
+ * the painted size, so a resize (same cell, same item, new column width)
+ * repaints instead of stretching the old texture. Memoized per instance
+ * because the engine reuses immutable `CardInstance`s across frames
+ * (`cardInstanceCache`) and this runs for every visible card every frame.
+ */
+const assignmentKeyCache = new WeakMap<CardInstance, string>();
+function layerAssignmentKey(instance: CardInstance): string {
+  let key = assignmentKeyCache.get(instance);
+  if (key === undefined) {
+    key =
+      cardAssignmentKey(instance) + sizeSuffix(instance.worldRect.width, instance.worldRect.height);
+    assignmentKeyCache.set(instance, key);
+  }
+  return key;
+}
+
+/** Reused by `placeEntry`; consumed synchronously, never stored. */
+const scratchScreenRect: CardScreenRect = { center: { x: 0, y: 0 }, halfWidth: 0, halfHeight: 0 };
+
 interface CardUniforms {
   u_videoAspect: { value: number };
   u_map: { value: THREE.Texture | null };
@@ -58,7 +84,7 @@ interface PoolEntry {
   mesh: THREE.Mesh;
   material: THREE.ShaderMaterial;
   uniforms: CardUniforms;
-  /** `cardAssignmentKey` of the instance this entry currently renders — reload triggers when this changes, not just the cell key (see `item-layout.ts`). */
+  /** `layerAssignmentKey` of the instance this entry currently renders — reload triggers when this changes, not just the cell key (see `item-layout.ts`). */
   assignedKey: string | null;
   /** The texture cache key this entry currently holds a pin on (see `texture-registry.ts`), or `null` before its first assignment. Tracked separately from `assignedKey` because on a thumbnail load failure the entry re-pins to the placeholder key while keeping the same `assignedKey`. */
   pinnedTextureKey: string | null;
@@ -204,7 +230,11 @@ export class CardLayer {
     heightPx: number,
   ): void {
     const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
-    const cacheKey = thumbnailUrl ?? `placeholder:${item.id}`;
+    // The media URL already changes when the file is replaced (new R2 key), so
+    // a metadata-only edit keeps reusing the decoded photo.
+    const size = sizeSuffix(widthPx, heightPx);
+    const placeholderKey = `placeholder:${item.id}:${item.updatedAt}${size}`;
+    const cacheKey = thumbnailUrl ? `photo:${thumbnailUrl}${size}` : placeholderKey;
     const token = entry.loadToken;
 
     this.pinEntryTexture(entry, cacheKey);
@@ -241,10 +271,9 @@ export class CardLayer {
         if (isStaleLoadCallback(entry.loadToken, token)) {
           return;
         }
-        const fallbackKey = `placeholder:${item.id}`;
-        this.pinEntryTexture(entry, fallbackKey);
+        this.pinEntryTexture(entry, placeholderKey);
         this.textures.load(
-          fallbackKey,
+          placeholderKey,
           (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
           (texture) => {
             if (!isStaleLoadCallback(entry.loadToken, token)) {
@@ -272,7 +301,7 @@ export class CardLayer {
     widthPx: number,
     heightPx: number,
   ): void {
-    const cacheKey = `composed:${item.kind}:${item.id}`;
+    const cacheKey = `composed:${item.kind}:${item.id}:${item.updatedAt}${sizeSuffix(widthPx, heightPx)}`;
     const token = entry.loadToken;
 
     this.pinEntryTexture(entry, cacheKey);
@@ -300,9 +329,14 @@ export class CardLayer {
     entry: PoolEntry,
     instance: CardInstance,
     frame: CardFrame,
-    hover: ReturnType<typeof cardHoverStyle>,
+    hover: Readonly<CardHoverStyle>,
   ): void {
-    const screenRect = cardScreenRect(instance.worldRect, frame.worldOffset, 1);
+    // Same as `cardScreenRect(worldRect, worldOffset, 1)`, without a per-card allocation.
+    const screenRect = scratchScreenRect;
+    screenRect.center.x = instance.worldRect.x + frame.worldOffset.x;
+    screenRect.center.y = instance.worldRect.y + frame.worldOffset.y;
+    screenRect.halfWidth = instance.worldRect.width / 2;
+    screenRect.halfHeight = instance.worldRect.height / 2;
     const progress = cardEntryProgress(screenRect, frame.viewportWidth, frame.viewportHeight);
     const width = instance.worldRect.width * hover.scale;
     const height = instance.worldRect.height * hover.scale;
@@ -392,7 +426,7 @@ export class CardLayer {
     this.ensurePoolSize(wanted);
     this.assignmentKeys.length = wanted;
     for (let i = 0; i < wanted; i++) {
-      this.assignmentKeys[i] = cardAssignmentKey(instances[i] as CardInstance);
+      this.assignmentKeys[i] = layerAssignmentKey(instances[i] as CardInstance);
     }
     this.alignPool(this.assignmentKeys, wanted);
     // Retire departing cells before new loads can trigger texture eviction.

@@ -29,3 +29,11 @@ describe("visibleHoverKey", () => {
     expect(visibleHoverKey(null, { x: 0, y: 0 })).toBe(null);
   });
 });
+
+describe("cardHoverStyle allocation", () => {
+  it("returns shared frozen styles, so per-frame callers never allocate", () => {
+    expect(cardHoverStyle(true)).toBe(cardHoverStyle(true));
+    expect(cardHoverStyle(false)).toBe(cardHoverStyle(false));
+    expect(Object.isFrozen(cardHoverStyle(true))).toBe(true);
+  });
+});

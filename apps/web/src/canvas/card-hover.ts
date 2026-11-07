@@ -12,8 +12,12 @@ export interface CardHoverStyle {
 
 const HOVER_SCALE = 1.035;
 
-export function cardHoverStyle(isHovered: boolean): CardHoverStyle {
-  return isHovered ? { scale: HOVER_SCALE, highlight: 1 } : { scale: 1, highlight: 0 };
+const HOVERED_STYLE: Readonly<CardHoverStyle> = Object.freeze({ scale: HOVER_SCALE, highlight: 1 });
+const RESTING_STYLE: Readonly<CardHoverStyle> = Object.freeze({ scale: 1, highlight: 0 });
+
+/** Returns one of two shared frozen styles: it runs for every card every frame. */
+export function cardHoverStyle(isHovered: boolean): Readonly<CardHoverStyle> {
+  return isHovered ? HOVERED_STYLE : RESTING_STYLE;
 }
 
 /**
