@@ -260,6 +260,49 @@ describe("GET /api/media/*key", () => {
     expect(bytes).toEqual(PNG_BYTES);
   });
 
+  it.each([
+    ["bytes=2-5", 206, [2, 3, 4, 5], "bytes 2-5/10"],
+    ["bytes=7-", 206, [7, 8, 9], "bytes 7-9/10"],
+    ["bytes=-3", 206, [7, 8, 9], "bytes 7-9/10"],
+    ["bytes=8-100", 206, [8, 9], "bytes 8-9/10"],
+    ["bytes=-100", 206, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], "bytes 0-9/10"],
+    ["bytes=10-", 416, [], "bytes */10"],
+    ["bytes=-0", 416, [], "bytes */10"],
+    ["bytes=999999999999999999999999-", 416, [], "bytes */10"],
+    ["bytes=broken", 200, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], null],
+    ["bytes=5-2", 200, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], null],
+    ["bytes=0-1,4-5", 200, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], null],
+    ["items=0-1", 200, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], null],
+  ])("serves Range %s safely", async (range, status, bytes, contentRange) => {
+    const stored = await env.MEDIA.put(
+      "media/video.mp4",
+      new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+      {
+        httpMetadata: { contentType: "video/mp4" },
+      },
+    );
+    const res = await SELF.fetch("https://example.com/api/media/media/video.mp4", {
+      headers: { Range: range },
+    });
+    expect(res.status).toBe(status);
+    expect(res.headers.get("Content-Range")).toBe(contentRange);
+    expect(res.headers.get("Content-Length")).toBe(String(bytes.length));
+    expect(res.headers.get("Accept-Ranges")).toBe("bytes");
+    expect(res.headers.get("Content-Type")).toBe("video/mp4");
+    expect(res.headers.get("ETag")).toBe(stored.httpEtag);
+    expect(res.headers.get("Cache-Control")).toBe("public, max-age=31536000, immutable");
+    expect([...new Uint8Array(await res.arrayBuffer())]).toEqual(bytes);
+  });
+
+  it("ignores a range when If-Range does not match the current ETag", async () => {
+    await env.MEDIA.put("media/video.mp4", new Uint8Array([0, 1, 2]));
+    const res = await SELF.fetch("https://example.com/api/media/media/video.mp4", {
+      headers: { Range: "bytes=0-0", "If-Range": '\"old\"' },
+    });
+    expect(res.status).toBe(200);
+    expect([...new Uint8Array(await res.arrayBuffer())]).toEqual([0, 1, 2]);
+  });
+
   it("404s for a missing key", async () => {
     const res = await SELF.fetch("https://example.com/api/media/media/2026/01/missing.png");
     expect(res.status).toBe(404);

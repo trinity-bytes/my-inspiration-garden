@@ -82,7 +82,13 @@ visitors can browse and filter.
   under `media/<yyyy>/<mm>/<uuid>.<ext>`. Returns `{ r2Key, mime, size }`.
 - `GET /api/media/*key` — public, no auth. Streams the object from R2 with
   `Cache-Control: public, max-age=31536000, immutable` and an `ETag`; 404 if
-  the key doesn't exist.
+  the key doesn't exist. Advertises `Accept-Ranges: bytes` and `Content-Length`.
+  Single byte ranges (`bytes=start-end`, `bytes=start-`, `bytes=-suffix`) return
+  `206` with `Content-Range` and the selected bytes, enabling video metadata
+  decoding and seeking without downloading the entire file. Unsatisfiable ranges
+  return `416` with `Content-Range: bytes */size`. Malformed, unsupported-unit,
+  and multipart ranges are ignored (full `200` response). `If-Range` only permits
+  a range for a matching strong ETag; other validators receive the full object.
 - `POST /api/media/import { url }` — fetches a remote image on the server's
   behalf and stores it the same way as a direct upload (used to persist link
   preview images so they survive the source page disappearing). `url` must
