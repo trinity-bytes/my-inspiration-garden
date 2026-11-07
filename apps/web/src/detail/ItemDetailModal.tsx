@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveMediaRef } from "../api/media-ref";
 import { contrastTextColor } from "../color-contrast";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
+import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import { IconButton } from "../components/IconButton/IconButton";
 import { useLoadedFontFamily } from "./useLoadedFontFamily";
 import "../components/Button/Button.css";
@@ -21,9 +22,6 @@ export interface ItemDetailModalProps {
   onOpenHistory?: () => void;
   onDelete?: () => void;
 }
-
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function prefersReducedMotion(): boolean {
   if (typeof window.matchMedia !== "function") {
@@ -303,68 +301,14 @@ export function ItemDetailModal({
   onDelete,
 }: ItemDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const titleId = `item-detail-title-${item.id}`;
   const reducedMotion = prefersReducedMotion();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  useEffect(() => {
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const dialog = dialogRef.current;
-    // Close first, not the first header button: landing on Edit or Move to
-    // trash would make an accidental Enter destructive.
-    const focusTarget =
-      dialog?.querySelector<HTMLElement>(".item-detail__close") ??
-      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
-      dialog ??
-      undefined;
-    focusTarget?.focus();
-
-    return () => {
-      previouslyFocusedRef.current?.focus?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      // While the confirm-delete dialog is open, it owns Escape (see its own
-      // useDialogFocusTrap) — this modal must not also close underneath it.
-      if (event.key === "Escape" && !confirmingDelete) {
-        onClose();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, confirmingDelete]);
-
-  const handleTabKey = useCallback(
-    (event: React.KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      // The nested confirm dialog owns its own Tab trap while open.
-      if (confirmingDelete) return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0] as HTMLElement;
-      const last = focusable[focusable.length - 1] as HTMLElement;
-      const active = document.activeElement;
-
-      if (event.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialog.contains(active)) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-    [confirmingDelete],
-  );
+  // The nested confirm-delete dialog owns Escape and Tab while it is open.
+  const { handleTabKey } = useDialogFocusTrap(dialogRef, onClose, {
+    suspended: confirmingDelete,
+  });
 
   const handleBackdropClick = useCallback(() => {
     onClose();
@@ -417,6 +361,9 @@ export function ItemDetailModal({
             icon={X}
             label="Close"
             className="item-detail__close"
+            // Close first, not the first header button: landing on Edit or
+            // Move to trash would make an accidental Enter destructive.
+            data-autofocus
             tooltipAlign="end"
             onClick={onClose}
           />
