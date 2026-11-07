@@ -23,7 +23,7 @@ export function cardHoverStyle(isHovered: boolean): Readonly<CardHoverStyle> {
 /**
  * Pan speed (world px/s) at and above which hover feedback is hidden. While the canvas sweeps
  * fast, cards cross the cursor in a few frames each; lifting and tinting every one of them reads
- * as a stutter instead of feedback (owner feedback, 2026-10-29). Below this speed the user can
+ * as a stutter instead of feedback. Below this speed the user can
  * still aim at a card while drifting slowly.
  */
 export const HOVER_MAX_PAN_SPEED = 240;

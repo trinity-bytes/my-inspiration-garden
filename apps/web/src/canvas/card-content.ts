@@ -71,7 +71,7 @@ export function textCardContent(item: TextItem): TextCardContent {
 export interface PaletteCardContent {
   name: string;
   /**
-   * Normalized via the shared `normalizePalette` (T11b B5): weights always
+   * Normalized via the shared `normalizePalette`: weights always
    * sum to 1, so canvas band widths (and the detail view's swatch widths)
    * can multiply directly by `weight` without renormalizing themselves.
    */

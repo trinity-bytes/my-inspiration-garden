@@ -13,7 +13,7 @@ export interface UseItemDetailResult {
 
 /**
  * Owns the item detail modal's open/closed selection AND its `?item=<id>`
- * deep link (T9 scope B): reads the id from `location.search` on mount,
+ * deep link: reads the id from `location.search` on mount,
  * keeps the URL in sync via `history.pushState` as items open/close (so the
  * browser back button closes it — `popstate` re-syncs from the URL without
  * pushing a duplicate entry), and fetches the item by id via the API when

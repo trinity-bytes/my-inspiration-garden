@@ -74,7 +74,7 @@ export const itemRevisions = sqliteTable(
  * Hierarchical category tree, unlimited depth via self-referencing `parent_id`.
  *
  * FK delete behavior: `ON DELETE SET NULL`, a safety net for a raw delete
- * that bypasses the repository. `CategoriesRepository.delete` (T11b B6) is
+ * that bypasses the repository. `CategoriesRepository.delete` is
  * the intended path: it re-parents direct children to the deleted
  * category's own parent (its `parent_id`, possibly `null`) before removing
  * the row, so those children keep their place one level up the tree
@@ -139,7 +139,7 @@ export const itemTags = sqliteTable(
 
 /**
  * Denormalized per-item color weights, populated by palette-extraction
- * ingestion (T6) to power color filtering without re-decoding images.
+ * ingestion to power color filtering without re-decoding images.
  */
 export const itemColors = sqliteTable(
   "item_colors",

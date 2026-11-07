@@ -51,12 +51,12 @@ function selfAndDescendantIds(node: CategoryTreeNode): Set<string> {
 }
 
 /**
- * Owner-only category manager (T11b B6), opened from the Navbar's owner
+ * Owner-only category manager, opened from the Navbar's owner
  * controls. Shows the full tree (via the same `buildCategoryTree` the
  * filter panel and quick-add/edit forms use) with per-node rename, add
  * child, move, and delete, plus a "new top-level category" action. Every
  * successful mutation calls `invalidateCategories()` so the filter panel,
- * forms, and detail view refetch without a page reload (T11b B6 item 4).
+ * forms, and detail view refetch without a page reload.
  */
 export function CategoryManagerModal({
   categories,
@@ -70,7 +70,7 @@ export function CategoryManagerModal({
   // While the nested delete ConfirmDialog is open, this dialog's own
   // Escape-to-close and Tab trap must stand down so only the ConfirmDialog's
   // own `useDialogFocusTrap` instance handles them (same nested-dialog
-  // Escape bug as ItemDetailModal's trash confirm, T11b B2).
+  // Escape bug as ItemDetailModal's trash confirm).
   const { handleTabKey } = useDialogFocusTrap(dialogRef, () => {
     if (deletingId === null) onClose();
   });

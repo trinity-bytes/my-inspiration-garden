@@ -203,7 +203,7 @@ export class CardLayer {
     this.textures.pin(key);
   }
 
-  /** Dispatches to the raw full-bleed photo path (`image` — "no chrome", see `odd/tasks/garden-mvp.md`'s T9 scope) or the composed per-kind painted path (every other kind, `card-painters.ts`). */
+  /** Dispatches to the raw full-bleed photo path (`image` — "no chrome") or the composed per-kind painted path (every other kind, `card-painters.ts`). */
   private assignTexture(entry: PoolEntry, item: Item, widthPx: number, heightPx: number): void {
     if (item.kind === "image") {
       this.assignPhotoTexture(entry, item, widthPx, heightPx);

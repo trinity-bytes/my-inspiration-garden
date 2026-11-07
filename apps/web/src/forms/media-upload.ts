@@ -40,7 +40,7 @@ function extractPaletteFromBitmap(bitmap: ImageBitmap): PaletteColor[] | undefin
 /**
  * Uploads an image file to R2 (`POST /api/media`) and derives the rest of
  * `imageDataSchema` client-side: dimensions via `createImageBitmap`, palette
- * via median-cut over the decoded pixels (T6 decision: Workers can't decode
+ * via median-cut over the decoded pixels (Workers can't decode
  * images cheaply). Palette extraction is best-effort/non-fatal.
  */
 export async function uploadImageFile(file: File): Promise<ImageUploadResult> {

@@ -51,7 +51,7 @@ export interface ItemFormProps {
 }
 
 /**
- * Owner-only form for quick-add and edit (T11), shared by both modals. Field
+ * Owner-only form for quick-add and edit, shared by both modals. Field
  * validation is delegated to the pure `item-form-state` builders — this
  * component only renders inputs, wires per-kind async side effects (link
  * unfurl, image/video upload) and reports the validated payload to the

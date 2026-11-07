@@ -17,7 +17,7 @@ export interface EditItemModalProps {
   updateItem?: (id: string, input: UpdateItemInput) => Promise<Item>;
 }
 
-/** Owner-only edit dialog (T11): a solid cartoon-style modal wrapping `ItemForm` in edit mode. */
+/** Owner-only edit dialog: a solid cartoon-style modal wrapping `ItemForm` in edit mode. */
 export function EditItemModal({
   item,
   categories,

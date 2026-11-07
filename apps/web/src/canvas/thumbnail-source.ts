@@ -3,9 +3,8 @@ import { resolveMediaRef } from "../api/media-ref";
 
 /**
  * The URL of an image-like representation of `item`, or `null` when none
- * exists (per-kind rich rendering is T9; T8b only needs to know whether to
- * load a thumbnail texture or fall back to a generated placeholder — see
- * `layers/cards.ts`). `image` items are served from R2 via `GET
+ * exists — decides whether to load a thumbnail texture or fall back to a
+ * generated placeholder (see `layers/cards.ts`). `image` items are served from R2 via `GET
  * /api/media/*key` (`docs/api.md`); `link`/`video` items use whatever
  * preview ingestion already resolved into their `data` (a link `previewImage`
  * is an R2 key, or a legacy remote URL).

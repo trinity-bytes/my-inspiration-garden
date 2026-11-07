@@ -122,7 +122,7 @@ export class CategoriesRepository {
    * category's own parent (its `parentId`, possibly `null` when the deleted
    * category was itself top-level) rather than promoted all the way to root
    * — removing a middle node in the tree shouldn't flatten its whole
-   * subtree (T11b B6 owner decision). Items only lose the `item_categories`
+   * subtree. Items only lose the `item_categories`
    * link to the deleted category, via the table's `ON DELETE CASCADE`;
    * nothing else about them changes.
    *

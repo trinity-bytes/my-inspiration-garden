@@ -178,10 +178,10 @@ async function upsertTagsByName(db: Db, names: string[]): Promise<{ id: string; 
  * `packages/shared/src/palette.ts`); `palette` items index `data.colors`
  * directly so color filtering also finds standalone palette items. Every
  * other kind has no colors. Both kinds go through the same shared
- * `normalizePalette` (T11b B5, owner decision 2026-09-26): an explicit
+ * `normalizePalette`: an explicit
  * per-color `weight` is normalized proportionally against the others (it
  * need not sum to 1 or 100), and a color missing a weight falls back to an
- * even share — which is also what keeps pre-B5 items (with no `weight`
+ * even share — which is also what keeps legacy items (with no `weight`
  * field at all) indexing exactly as before.
  */
 function deriveItemColors(kind: string, data: unknown): PaletteColor[] {

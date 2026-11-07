@@ -2,10 +2,8 @@
  * Pure word-wrap + ellipsis-truncation, measured through an injected
  * `measure` function (so callers — every per-kind card painter,
  * `card-painters.ts` — pass `(text) => ctx.measureText(text).width` and the
- * logic itself stays unit-testable without a real 2D canvas). Replaces
- * `placeholder-texture.ts`'s old inline word-wrap, which silently
- * hard-clipped overflow with no ellipsis (T9: "titles are hard-clipped
- * like 'Longer text item to chec'" bug).
+ * logic itself stays unit-testable without a real 2D canvas). Overflow is
+ * always ellipsis-truncated, never silently hard-clipped mid-word.
  */
 
 export interface WrapTextResult {
@@ -54,12 +52,6 @@ function withEllipsis(line: string, measure: (text: string) => number, maxWidth:
 }
 
 /**
- * Wraps `text` to fit within `maxWidth` (per `measure`), capped at
- * `maxLines`. When the full text does not fit, the last kept line is
- * ellipsis-truncated at a word (then, if still needed, character) boundary
- * and `truncated` is `true`.
- */
-/**
  * Average glyph width as a fraction of font size, per weight bucket. Not
  * calibrated per font family (impossible without a real canvas) — just
  * separates "regular" from "heavier" text enough to make wrapped-line-count
@@ -83,6 +75,12 @@ export function approxMeasure(text: string, fontSizePx: number, weight = 400): n
   return text.length * fontSizePx * approxCharWidthFraction(weight);
 }
 
+/**
+ * Wraps `text` to fit within `maxWidth` (per `measure`), capped at
+ * `maxLines`. When the full text does not fit, the last kept line is
+ * ellipsis-truncated at a word (then, if still needed, character) boundary
+ * and `truncated` is `true`.
+ */
 export function wrapText(
   measure: (text: string) => number,
   text: string,

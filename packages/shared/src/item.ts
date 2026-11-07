@@ -76,12 +76,11 @@ export const paletteColorSchema = z.looseObject({
   hex: hexColorSchema,
   name: z.string().optional(),
   /**
-   * Relative proportion of this color within the palette (T11b B5, owner
-   * decision 2026-09-26): any positive number, not required to sum to 1 or
+   * Relative proportion of this color within the palette: any positive number, not required to sum to 1 or
    * 100 across the palette's colors — `normalizePalette`
    * (`packages/shared/src/palette.ts`) rescales proportionally against
    * whatever the other colors carry. Omitted for backward compatibility with
-   * pre-B5 items, which fall back to an even split.
+   * legacy items, which fall back to an even split.
    */
   weight: z.number().positive().optional(),
 });
@@ -244,7 +243,7 @@ export const itemListQuerySchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(40),
   includeDeleted: z.preprocess(toOptionalBoolean, z.boolean().optional()),
-  /** T11: lists exclusively soft-deleted items (the trash view). Gated the same as `includeDeleted`. */
+  /** Lists exclusively soft-deleted items (the trash view). Gated the same as `includeDeleted`. */
   deletedOnly: z.preprocess(toOptionalBoolean, z.boolean().optional()),
 });
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;

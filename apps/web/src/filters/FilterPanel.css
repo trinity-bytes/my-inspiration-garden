@@ -128,7 +128,7 @@
 /* Phone (Figma Proposals `39:831`): a sheet sized to its content, floating
    just above the bottom navbar (48px row) so the bar stays visible. No
    scrim, so the canvas keeps showing the results while filters apply live
-   (owner decision L7); the Filters button in the bar closes it. */
+   (an owner decision); the Filters button in the bar closes it. */
 @media (max-width: 480px) {
   .filter-panel {
     position: fixed;

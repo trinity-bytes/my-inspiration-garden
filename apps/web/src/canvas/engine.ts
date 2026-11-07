@@ -237,8 +237,7 @@ export class CanvasEngine {
     this.canvas = canvas;
     this.renderer = renderer;
     // SRGBColorSpace is the only valid renderer.outputColorSpace (NoColorSpace
-    // throws inside three.js's internal drawing-buffer lookup — confirmed via
-    // a headless-chromium repro, see the T8a QA-correction commit). It is
+    // throws inside three.js's internal drawing-buffer lookup). It is
     // also a harmless default: a canvas's drawing buffer is sRGB either way,
     // and this setting only matters to three.js's built-in materials'
     // `<colorspace_fragment>` chunk, which our custom ShaderMaterials never
@@ -365,13 +364,13 @@ export class CanvasEngine {
     this.navigation?.setReducedMotion(reduced);
   }
 
-  /** Pauses (or resumes) canvas navigation (T9: the item detail modal). */
+  /** Pauses (or resumes) canvas navigation (e.g. while the item detail modal is open). */
   setPaused(paused: boolean): void {
     if (paused) this.playback.stop();
     this.navigation?.setPaused(paused);
   }
 
-  /** Minimal read-only state T8b needs: world offset, viewport size, distortion params. */
+  /** Minimal read-only world state: world offset, viewport size, distortion params. */
   getWorldState(): WorldState {
     const viewport = this.getViewportSize();
     return {

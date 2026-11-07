@@ -35,8 +35,7 @@ export const DEFAULT_MAX_SPEED = 1710;
 export const DEFAULT_KEYBOARD_SPEED = 1890;
 /**
  * Marks UI that floats over the canvas (the navbar) where cursor drift must
- * stop: the pointer is there to use the UI, not to travel (owner feedback,
- * 2026-10-04). Keyboard panning and drag are unaffected.
+ * stop: the pointer is there to use the UI, not to travel. Keyboard panning and drag are unaffected.
  */
 export const NAVIGATION_BLOCKER_ATTRIBUTE = "data-navigation-blocker";
 const DEFAULT_SMOOTHING_K = 6;
@@ -67,7 +66,7 @@ export class NavigationController {
 
   private mounted = false;
   private disposed = false;
-  /** True while the item detail modal (T9) is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
+  /** True while the item detail modal is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
   private paused = false;
 
   // Mutated in place (never reassigned): the getters hand these out
@@ -153,7 +152,7 @@ export class NavigationController {
     }
   }
 
-  /** Pauses (or resumes) all ambient/direct navigation input — drift and keyboard panning stop immediately, with any in-flight velocity zeroed (T9: the item detail modal pauses canvas navigation while open). */
+  /** Pauses (or resumes) all ambient/direct navigation input — drift and keyboard panning stop immediately, with any in-flight velocity zeroed (e.g. while the item detail modal is open). */
   setPaused(paused: boolean): void {
     this.paused = paused;
     if (paused) {
@@ -175,8 +174,7 @@ export class NavigationController {
    * center, and stops any in-flight drift/release motion. Used by the
    * parallel DOM/ARIA layer (`components/CanvasHost/CanvasHost.tsx`) when a
    * card gains keyboard focus. Instant rather than eased: a smooth animated
-   * pan needs its own time-based tween state, which is a reasonable future
-   * enhancement but out of scope here (see the T8b report's known gaps).
+   * pan would need its own time-based tween state.
    */
   centerOn(worldPoint: Vec2): void {
     const offset = centerOffsetFor(worldPoint, 1);
@@ -227,8 +225,8 @@ export class NavigationController {
     // worldToScreen(world, offset, parallax) = world + offset*parallax, and
     // "you travel toward the pointer" must make the ambient world recede
     // from you (content scrolls opposite your travel direction — the
-    // standard camera-dolly effect; see the T8a "Y axis inverted"
-    // correction). Drag (below, "dragging"/"releasing" states) is the
+    // standard camera-dolly effect; see `coords.ts` for the y-DOWN
+    // convention). Drag (below, "dragging"/"releasing" states) is the
     // opposite interaction — grab-and-move content 1:1 — and is
     // deliberately NOT negated here.
     this.worldOffset.x -= this.velocity.x * dt;

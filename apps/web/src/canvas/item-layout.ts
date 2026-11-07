@@ -19,10 +19,9 @@ import type { Vec2 } from "./types";
 import { approxMeasure, wrapText } from "./wrap-text";
 
 /**
- * Ordered, responsive masonry layout of items (owner feedback, T8b:
- * replaced the original jittered per-cell hash grid — messy, irregular
- * vertical gaps, and poor hash distribution repeated the same item too
- * often in one frame). World space is divided into equal-width, infinite
+ * Ordered, responsive masonry layout of items (rather than a jittered
+ * per-cell hash grid, which gave irregular vertical gaps and repeated the
+ * same item too often in one frame). World space is divided into equal-width, infinite
  * vertical columns (`column-layout.ts`'s `columnLayoutFor`); each column is
  * an infinite periodic stack of the input items (period = item count), so
  * the same items array always produces the same layout, items repeat to
@@ -49,7 +48,7 @@ import { approxMeasure, wrapText } from "./wrap-text";
 export const CARD_ASPECT_MIN = 0.5;
 export const CARD_ASPECT_MAX = 2;
 export const DEFAULT_MAX_CARD_POOL_SIZE = 240;
-/** Extra world px rendered beyond the viewport so cards exist before they reach the viewport edge, where `card-fade.ts` ramps them in. Chosen to comfortably exceed one column's worth of content, matching the old per-cell grid's `1 cell` margin convention. */
+/** Extra world px rendered beyond the viewport so cards exist before they reach the viewport edge, where `card-fade.ts` ramps them in. Chosen to comfortably exceed one column's worth of content. */
 export const DEFAULT_CARD_MARGIN_PX = 340;
 
 export interface CardWorldRect {
@@ -114,8 +113,8 @@ const TEXT_CARD_MAX_FIT_BODY_LINES = 30;
  * at `columnWidth`, using the SAME padding/font-scale fractions
  * `card-painters.ts`'s `paintTextCard` draws with (imported from there, one
  * source of truth) so the painted card stays consistent with the size this
- * layout reserves for it — no clipped text, no extra empty space (T9b,
- * owner feedback: short text cards were too tall). Pure/deterministic:
+ * layout reserves for it — no clipped text, no extra empty space.
+ * Pure/deterministic:
  * measured via `wrapText` + `approxMeasure` (a canvas-free approximation of
  * `ctx.measureText`), since layout can't depend on an async/real canvas.
  */
@@ -169,10 +168,9 @@ function linkCardContentFitHeight(columnWidth: number, title: string): number {
 
 /**
  * The card's aspect ratio (width / height), clamped to [CARD_ASPECT_MIN,
- * CARD_ASPECT_MAX]. Per-kind rich rendering is T9; this layout only needs a
- * stable aspect — real image dimensions when known, content-fit sizing for
- * text (and a link without a preview image, T9b owner feedback: short text
- * cards were too tall with empty space) when `columnWidth` is supplied, a
+ * CARD_ASPECT_MAX]. This layout only needs a stable aspect — real image
+ * dimensions when known, content-fit sizing for text (and a link without a
+ * preview image, so short text never leaves a tall, empty card) when `columnWidth` is supplied, a
  * sane per-kind default otherwise. `columnWidth` is optional so existing
  * callers that only need a default (or an image's own aspect) keep working
  * unchanged.
@@ -196,7 +194,7 @@ export function cardAspectForItem(item: Item, columnWidth?: number): number {
   return clamp(KIND_DEFAULT_ASPECT[item.kind], CARD_ASPECT_MIN, CARD_ASPECT_MAX);
 }
 
-/** A card's world-px height for a given column width: card width is always exactly `columnWidth` (owner feedback: no jitter, no random size scaling), so height is fully determined by the item's aspect ratio (content-fit for text/typographic-link, see `cardAspectForItem`). */
+/** A card's world-px height for a given column width: card width is always exactly `columnWidth` (no jitter, no random size scaling), so height is fully determined by the item's aspect ratio (content-fit for text/typographic-link, see `cardAspectForItem`). */
 export function cardHeightForItem(item: Item, columnWidth: number): number {
   return columnWidth / cardAspectForItem(item, columnWidth);
 }
@@ -308,7 +306,7 @@ export class LayoutPeriodCache extends LruCache<ItemPeriod> {
   }
 }
 
-/** The cache key `columnPeriod` memoizes under: T9 carried follow-up — a column's period depends on all three of `columnIndex`, `columnWidth` (a resize changes card heights) and `itemCount` (a shorter/longer items array changes the whole permutation), so all three must be part of the key. */
+/** The cache key `columnPeriod` memoizes under: a column's period depends on all three of `columnIndex`, `columnWidth` (a resize changes card heights) and `itemCount` (a shorter/longer items array changes the whole permutation), so all three must be part of the key. */
 function columnPeriodCacheKey(
   columnIndex: number,
   columnWidth: number,
@@ -324,9 +322,9 @@ function columnPeriodCacheKey(
  * cumulative heights `rowForWorldY`'s binary search needs. Pure —
  * `columnIndex` (and `items`/`columnWidth`) fully determine the result, so
  * two calls with the same arguments are `toEqual`. `cache`, when supplied,
- * memoizes by `(columnIndex, columnWidth, itemCount)` (T9 carried
- * follow-up) — every visible column's period was previously recomputed
- * from scratch every frame in `visibleCardInstances`'s hot path.
+ * memoizes by `(columnIndex, columnWidth, itemCount)` so
+ * `visibleCardInstances`'s hot path doesn't recompute every visible
+ * column's period from scratch each frame.
  */
 export function columnPeriod(
   items: readonly Item[],

@@ -74,7 +74,7 @@ async function readErrorCode(response: Response): Promise<string | undefined> {
 export async function apiFetch<T>(path: string, options: ApiFetchOptions<T>): Promise<T> {
   const url = buildRequestUrl(resolveApiBaseUrl(), path, options.searchParams);
   const hasBody = options.body !== undefined;
-  // A `FormData` body (media upload, T11) is sent as-is: the browser sets its
+  // A `FormData` body (media upload) is sent as-is: the browser sets its
   // own multipart Content-Type (with boundary) — setting one here or
   // JSON.stringify-ing the body would both break the request.
   const isFormData = options.body instanceof FormData;

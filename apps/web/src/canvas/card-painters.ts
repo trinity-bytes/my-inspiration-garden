@@ -13,7 +13,7 @@ import { loadVideoFrame } from "./video-preview";
 import { wrapText } from "./wrap-text";
 
 /**
- * Per-kind canvas card painters (T9). The `image` kind is NOT painted here
+ * Per-kind canvas card painters. The `image` kind is NOT painted here
  * — it stays a raw, full-bleed photo texture (see `layers/cards.ts`'s
  * `assignPhotoTexture`), which is exactly what "no chrome" means for an
  * image card. Every other kind composes a photo (when one is available)
@@ -32,7 +32,7 @@ const FOREGROUND_HEX = "#2a2140"; // --garden-ink
 const ACCENT_HEX = "#f29a6b"; // --garden-accent
 /**
  * Exported (not just a local const) so `item-layout.ts`'s pure content-fit
- * sizing (T9b, owner feedback: short text cards were too tall) can derive a
+ * sizing can derive a
  * card's height using the SAME padding/font-scale fractions this painter
  * actually draws with — a single source of truth, so the computed layout
  * size and the painted content never drift apart.
@@ -328,7 +328,7 @@ function paintPaletteCard(item: PaletteItem, widthPx: number, heightPx: number):
   const content = paletteCardContent(item);
   // `content.colors` weights already sum to 1 (normalized in `paletteCardContent`),
   // so each band's width is just its share of the canvas — no per-band
-  // renormalization needed here (T11b B5).
+  // renormalization needed here.
   let x = 0;
   content.colors.forEach((color) => {
     const bandWidth = color.weight * canvas.width;

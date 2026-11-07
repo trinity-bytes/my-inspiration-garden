@@ -10,13 +10,13 @@ import "../forms/FormModal.css";
 
 export interface TrashModalProps {
   onClose: () => void;
-  /** Called after a successful restore, so the caller can refetch the canvas (T11). */
+  /** Called after a successful restore, so the caller can refetch the canvas. */
   onRestored: () => void;
   listItems?: (params: { deletedOnly: boolean; limit: number }) => Promise<{ items: Item[] }>;
   restoreItem?: (id: string) => Promise<Item>;
 }
 
-/** Owner-only trash dialog (T11): lists soft-deleted items and restores them. */
+/** Owner-only trash dialog: lists soft-deleted items and restores them. */
 export function TrashModal({
   onClose,
   onRestored,

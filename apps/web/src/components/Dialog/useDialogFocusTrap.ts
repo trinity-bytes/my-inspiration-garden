@@ -10,12 +10,12 @@ export interface UseDialogFocusTrapResult {
 }
 
 /**
- * Shared dialog accessibility behavior (T11): focuses the element marked
+ * Shared dialog accessibility behavior: focuses the element marked
  * `data-autofocus` (else the first focusable element) on mount, restores focus to whatever was focused before on
  * unmount, closes on Escape, and traps Tab/Shift+Tab within the dialog.
- * Extracted from `ItemDetailModal` (T9) so the T11 quick-add/edit/history/
- * trash dialogs don't each re-implement it; `ItemDetailModal` itself is left
- * as-is to avoid touching already-shipped, tested behavior.
+ * Shared so the quick-add/edit/history/trash dialogs don't each
+ * re-implement it. `ItemDetailModal` still carries its own copy of this
+ * logic rather than using the hook.
  */
 export function useDialogFocusTrap(
   dialogRef: RefObject<HTMLElement | null>,

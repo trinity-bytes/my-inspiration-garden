@@ -31,11 +31,11 @@ const COLOR_PRESETS: { name: string; hex: string }[] = [
 ];
 
 /**
- * Filter panel (T10): category tree, tags, kinds and color, opened from the
+ * Filter panel: category tree, tags, kinds and color, opened from the
  * navbar's Filters button. Search lives in the navbar's own search box
  * (`FilterState.q`) and isn't duplicated here. Semantics: OR within the
- * `kinds`/`categoryIds` facets, AND within `tags` (existing API decision,
- * T4/T5 — unrevisited here), AND across facets, single-select `color`.
+ * `kinds`/`categoryIds` facets, AND within `tags` (existing API decision),
+ * AND across facets, single-select `color`.
  */
 export function FilterPanel({
   isOpen,

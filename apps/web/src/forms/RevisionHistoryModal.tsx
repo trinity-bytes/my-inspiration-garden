@@ -28,7 +28,7 @@ function formatTimestamp(iso: string): string {
   }
 }
 
-/** Owner-only revision history + restore dialog (T11). */
+/** Owner-only revision history + restore dialog. */
 export function RevisionHistoryModal({
   item,
   onClose,

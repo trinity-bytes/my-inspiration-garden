@@ -25,7 +25,7 @@ export function createApp(deps: AppDeps = {}): Hono<AppEnv> {
 
   app.get("/api/health", (c) => {
     // Reports placeholder values that survived from wrangler.jsonc into a real
-    // deploy (T13). Computed per request, never at module scope, so a bad
+    // deploy. Computed per request, never at module scope, so a bad
     // config can never stop the Worker from starting. Deliberately still
     // HTTP 200: a misconfigured value is not a server fault, and a 503 would
     // read as "the Worker is down" rather than "the Worker is misconfigured".

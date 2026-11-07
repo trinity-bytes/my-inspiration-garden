@@ -15,7 +15,7 @@ export interface FilterOptions {
  * or tag load leaves that list empty rather than breaking the other one or
  * throwing (matches `useCategoryNames`'s established convention). The
  * category list refetches whenever the category manager modal changes a
- * category (T11b B6), via the shared `useCategoriesVersion` invalidation
+ * category, via the shared `useCategoriesVersion` invalidation
  * signal; tags are unaffected and stay on their own one-shot load.
  */
 export function useFilterOptions(): FilterOptions {

@@ -16,7 +16,7 @@ export interface CategoryTreeProps {
 /**
  * Recursive category tree checkboxes. Checking a node selects only that
  * node's id — the API already expands descendants server-side
- * (`getCategoryDescendantIds`, T4), so a checked parent implicitly covers
+ * (`getCategoryDescendantIds`), so a checked parent implicitly covers
  * every child without the UI needing to select them too. An unchecked
  * parent with a selected descendant shows the mixed state (Figma Checkbox
  * v2); it is purely visual, clicking still selects that parent.
