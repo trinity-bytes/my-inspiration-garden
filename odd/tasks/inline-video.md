@@ -1,12 +1,12 @@
 # Inline uploaded-video playback
-Objective: Fix uploaded-video canvas previews and play uploaded video in the activated canvas card.
+Objective: Keep uploaded-video cards static and play videos inside the clicked-card detail modal.
 Branch: feat/inline-video; delivery: ask-on-risk; forecast: 650 authored lines; runner: mise exec -- pnpm test.
 
 ## Specs
 S1. "aparece pero no en la card de previsualizacion." Fix uploaded-video previews; verify poster decoding and serving.
 S2. "ademas, aprovechando que esta subido en internet seria interesante que permita ver el video desde el mismo card".
-S3. "si, tipo algo similar a lo de un video de youtube que se piede ver desde ahi por la previsualizacion". Clarification: playback inside the canvas card, without opening the detail modal. Existing other-kind activation remains unchanged.
-Assumption: only one uploaded video plays at once; activating its card toggles playback. Existing external YouTube/Vimeo embeds remain unchanged.
+S3. Superseded by the owner correction: "me equivoqué, cuando pedi la orevisualizacion dle video me referia a que pase en el modal que se abre al hscerncoick en la csrd no ennla card misma. podriamosncorregir eso?" Playback belongs in the detail modal; cards retain static previews. Existing other-kind activation remains unchanged.
+Current behavior: activating a video card opens its detail modal, which provides native controls for uploaded files and direct MP4 URLs. Existing external YouTube/Vimeo embeds remain unchanged.
 
 ## Tasks
 T1 — S1 — delegated (independent media serving unit, disjoint API/docs surfaces) — implemented; 26 focused tests pass — commit 2da48f3. Risk: item 3 (shared media HTTP contract).
@@ -26,3 +26,9 @@ L7. Real-browser/GPU/Safari proof UNAVAILABLE: CUA inventory returned no browser
 L8. User authorized publication for production testing: "si", answering "¿Publico una nueva release para que lo pruebes en producción?". Delivery follows the explicit release path, not a PR chain. Keep API and client in separate Conventional Commits; real-browser proof remains pending owner QA.
 
 L9. Code committed: 2da48f3 API (120 changed lines), 1f281cf inline playback (551 changed lines; lifecycle/integration tests kept together). RDD disabled/unmanaged. Release preflight spot check4 files/12 tests passes. main equals origin/main before publication. Publishing v0.15.0 for owner browser QA.
+
+L10. 2026-11-07: Owner corrected playback placement (S3) and authorized release, main/develop synchronization, and cleanup only after production checks. Remote v0.15.0 was ahead of the initial local checkout; fast-forwarded before final verification. Reopened T2/T3 for the correction.
+L11. Corrected shared card activation to open details for uploaded videos; removed canvas playback controls and toggle semantics. Preserved poster generation and media range handling. Detail modal handles stored video media and direct HTTP(S) MP4 URLs for link/video items, with native controls, inline playback, and no autoplay. New requested behavior reproduced RED before implementation.
+L12. Independent verifier: no blockers; 44 focused tests, 10 scratch probes and 9 baseline comparisons passed. Actual browser decoding remains unverified. RDD globally disabled/unmanaged; no native review started. Release target v0.15.1.
+
+L13. Final checks on corrected v0.15.0 base: shared 83 and API 228 tests pass; full web suite, web typecheck and production build pass. API tests required local-port access outside sandbox. Lint passes with 3 pre-existing warnings; build retains the existing chunk-size warning. Parent spot check32 tests passes. No visual-browser proof available.

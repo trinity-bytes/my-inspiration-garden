@@ -162,11 +162,7 @@ export class CanvasEngine {
   activateCardKey(key: string): void {
     const card = this.lastCardInstances.find((candidate) => candidate.key === key);
     if (!card) return;
-    if (card.item.kind === "video" && card.item.data.provider === "file" && card.item.data.r2Key) {
-      this.playback.toggle(key, `${resolveApiBaseUrl()}/api/media/${card.item.data.r2Key}`);
-    } else {
-      this.options.onItemOpen?.(card.item.id);
-    }
+    this.options.onItemOpen?.(card.item.id);
   }
 
   openCardDetails(key: string): void {

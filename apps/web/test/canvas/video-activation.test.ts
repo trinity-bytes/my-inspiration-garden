@@ -5,7 +5,7 @@ import type { CardInstance } from "../../src/canvas/item-layout";
 
 afterEach(() => vi.restoreAllMocks());
 
-it("routes uploaded-video pointer/keyboard activation by cell while preserving other item details", async () => {
+it("opens uploaded-video details without canvas playback and preserves other item details", async () => {
   const video = document.createElement("video");
   vi.spyOn(document, "createElement").mockReturnValue(video);
   vi.spyOn(video, "load").mockImplementation(() => {});
@@ -29,19 +29,20 @@ it("routes uploaded-video pointer/keyboard activation by cell while preserving o
     ] as CardInstance[]),
   );
   engine.activateCardKey("a");
-  expect(change).toHaveBeenLastCalledWith("a", undefined);
-  expect(open).not.toHaveBeenCalled();
+  expect(open).toHaveBeenLastCalledWith("file");
+  expect(video.play).not.toHaveBeenCalled();
   engine.activateCardKey("b");
-  expect(change).toHaveBeenLastCalledWith("b", undefined);
+  expect(open).toHaveBeenLastCalledWith("file");
+  expect(video.play).not.toHaveBeenCalled();
   engine.openCardDetails("b");
   expect(open).toHaveBeenLastCalledWith("file");
   engine.activateCardKey("c");
   expect(open).toHaveBeenLastCalledWith("youtube");
   engine.setPaused(true);
-  expect(change).toHaveBeenLastCalledWith(null, undefined);
+  expect(change).not.toHaveBeenCalled();
   engine.activateCardKey("a");
   engine.setItems([]);
-  expect(change).toHaveBeenLastCalledWith(null, undefined);
+  expect(change).not.toHaveBeenCalled();
   engine.dispose();
   await Promise.resolve();
 });

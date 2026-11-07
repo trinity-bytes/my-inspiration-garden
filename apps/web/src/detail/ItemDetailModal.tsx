@@ -168,6 +168,48 @@ function PreviewLink({ href, src }: { href: string; src: string }) {
 }
 
 function ItemDetailBody({ item }: { item: Item }) {
+  // Direct MP4 links need a native player, not an iframe or an image preview.
+  let directVideoUrl: string | undefined;
+  if ((item.kind === "link" || item.kind === "video") && item.url) {
+    try {
+      const url = new URL(item.url);
+      if (/^https?:$/.test(url.protocol) && /\.mp4$/i.test(url.pathname)) {
+        directVideoUrl = item.url;
+      }
+    } catch {
+      // Preserve the existing fallback for unrecognized URLs.
+    }
+  }
+  if (item.kind === "video" && item.data.provider === "file" && item.data.r2Key) {
+    directVideoUrl = resolveMediaRef(item.data.r2Key);
+  }
+  if (directVideoUrl) {
+    return (
+      <div className="item-detail__link">
+        <div className="item-detail__media item-detail__media--video">
+          {/* biome-ignore lint/a11y/useMediaCaption: External MP4 items do not provide caption tracks; do not invent captions. */}
+          <video
+            src={directVideoUrl}
+            aria-label={item.title?.trim() || "Video"}
+            controls
+            playsInline
+            preload="metadata"
+          />
+        </div>
+        {item.kind === "link" && item.data.description && (
+          <p className="item-detail__description">{item.data.description}</p>
+        )}
+        <a
+          className="button button--accent item-detail__open-link"
+          href={directVideoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open link ↗
+        </a>
+      </div>
+    );
+  }
   switch (item.kind) {
     case "image":
       return (

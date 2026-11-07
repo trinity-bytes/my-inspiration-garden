@@ -9,6 +9,36 @@ describe("ItemDetailModal", () => {
     vi.restoreAllMocks();
   });
 
+  it.each(["link", "video"] as const)("plays a direct MP4 %s inside the modal", (kind) => {
+    const url =
+      "https://cdn.dribbble.com/userupload/45696737/file/2119624a786f057b75cdaf66c6f638cb.mp4";
+    const item = makeItem("direct-video", kind, {}, { url, title: "Motion study" });
+    const { container, unmount } = render(
+      <ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />,
+    );
+    const video = container.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", url);
+    expect(video).toHaveAttribute("controls");
+    expect(video).toHaveAttribute("playsinline");
+    expect(video).not.toHaveAttribute("autoplay");
+    expect(screen.getByRole("link", { name: /Open link/ })).toHaveAttribute("href", url);
+    expect(container.querySelector("iframe")).toBeNull();
+    unmount();
+    expect(container.querySelector("video")).toBeNull();
+  });
+
+  it("plays uploaded video from stored media in the detail modal", () => {
+    const item = makeItem("uploaded", "video", { provider: "file", r2Key: "media/clip.mp4" });
+    const { container } = render(
+      <ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />,
+    );
+    const video = container.querySelector("video");
+    expect(video).toHaveAttribute("src", "/api/media/media/clip.mp4");
+    expect(video).toHaveAttribute("controls");
+    expect(video).not.toHaveAttribute("autoplay");
+  });
+
   it("renders as a labelled dialog", () => {
     const item = makeItem("i1", "text", { body: "hello" }, { title: "My note" });
     render(<ItemDetailModal item={item} onClose={() => {}} categoryNames={{}} />);
