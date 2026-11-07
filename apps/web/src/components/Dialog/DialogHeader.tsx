@@ -9,7 +9,7 @@ export interface DialogHeaderProps {
 
 /**
  * Modals v2 header (Figma Proposals `33:1016`): the title, then Close as an ✕
- * icon button on the right. Replaces the old footer "Close" button.
+ * icon button on the right.
  */
 export function DialogHeader({ titleId, title, onClose }: DialogHeaderProps) {
   return (

@@ -2,8 +2,8 @@ import type { Category, ItemKind } from "@garden/shared";
 import type { ListItemsParams } from "../api/endpoints";
 
 /**
- * The filter panel's UI state (T10). Semantics match the API's existing,
- * already-shipped `ItemListQuery` (T4/T5): OR across values within the
+ * The filter panel's UI state. Semantics match the API's `ItemListQuery`:
+ * OR across values within the
  * `categoryId`/`kind` facets (any selected category or kind matches), AND
  * across values within the `tag` facet (an item must carry every selected
  * tag — an existing repository decision, not revisited here), AND across

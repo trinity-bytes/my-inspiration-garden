@@ -2,7 +2,7 @@ import { centerOffsetFor } from "./coords";
 import { deadZoneRadius } from "./deadzone";
 import { type DragSample, decayVelocity, releaseVelocity } from "./drag";
 import { clampDt } from "./dt-clamp";
-import { approachVec2 } from "./inertia";
+import { approach } from "./inertia";
 import {
   directionForKey,
   isTextInputFocused,
@@ -35,8 +35,7 @@ export const DEFAULT_MAX_SPEED = 1710;
 export const DEFAULT_KEYBOARD_SPEED = 1890;
 /**
  * Marks UI that floats over the canvas (the navbar) where cursor drift must
- * stop: the pointer is there to use the UI, not to travel (owner feedback,
- * 2026-10-04). Keyboard panning and drag are unaffected.
+ * stop: the pointer is there to use the UI, not to travel. Keyboard panning and drag are unaffected.
  */
 export const NAVIGATION_BLOCKER_ATTRIBUTE = "data-navigation-blocker";
 const DEFAULT_SMOOTHING_K = 6;
@@ -44,6 +43,11 @@ const DEFAULT_DRAG_DECAY_HALF_LIFE = 0.35;
 const RELEASE_STOP_EPSILON = 0.05;
 
 type MotionState = "idle" | "dragging" | "releasing";
+
+function setVec(target: Vec2, x: number, y: number): void {
+  target.x = x;
+  target.y = y;
+}
 
 /**
  * Pure(ish), framework-free navigation controller: owns pointer/drag/
@@ -62,11 +66,14 @@ export class NavigationController {
 
   private mounted = false;
   private disposed = false;
-  /** True while the item detail modal (T9) is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
+  /** True while the item detail modal is open — suppresses drift and keyboard panning entirely (drag/direct input can't reach the canvas anyway, since the modal overlay sits above it, but this stays explicit rather than relying on that). */
   private paused = false;
 
-  private worldOffset: Vec2 = { x: 0, y: 0 };
-  private velocity: Vec2 = { x: 0, y: 0 };
+  // Mutated in place (never reassigned): the getters hand these out
+  // read-only so the per-frame engine path allocates nothing.
+  private readonly worldOffset: Vec2 = { x: 0, y: 0 };
+  private readonly velocity: Vec2 = { x: 0, y: 0 };
+  private readonly idleTarget: Vec2 = { x: 0, y: 0 };
   private motionState: MotionState = "idle";
 
   private pointerInWindow = false;
@@ -140,24 +147,25 @@ export class NavigationController {
   setReducedMotion(reduced: boolean): void {
     this.reducedMotion = reduced;
     if (reduced && this.motionState === "releasing") {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
     }
   }
 
-  /** Pauses (or resumes) all ambient/direct navigation input — drift and keyboard panning stop immediately, with any in-flight velocity zeroed (T9: the item detail modal pauses canvas navigation while open). */
+  /** Pauses (or resumes) all ambient/direct navigation input — drift and keyboard panning stop immediately, with any in-flight velocity zeroed (e.g. while the item detail modal is open). */
   setPaused(paused: boolean): void {
     this.paused = paused;
     if (paused) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       if (this.motionState !== "dragging") {
         this.motionState = "idle";
       }
     }
   }
 
-  getWorldOffset(): Vec2 {
-    return { ...this.worldOffset };
+  /** Live, read-only view of the offset: it changes on the next `update`, so copy it to keep a snapshot. */
+  getWorldOffset(): Readonly<Vec2> {
+    return this.worldOffset;
   }
 
   /**
@@ -166,17 +174,18 @@ export class NavigationController {
    * center, and stops any in-flight drift/release motion. Used by the
    * parallel DOM/ARIA layer (`components/CanvasHost/CanvasHost.tsx`) when a
    * card gains keyboard focus. Instant rather than eased: a smooth animated
-   * pan needs its own time-based tween state, which is a reasonable future
-   * enhancement but out of scope here (see the T8b report's known gaps).
+   * pan would need its own time-based tween state.
    */
   centerOn(worldPoint: Vec2): void {
-    this.worldOffset = centerOffsetFor(worldPoint, 1);
-    this.velocity = { x: 0, y: 0 };
+    const offset = centerOffsetFor(worldPoint, 1);
+    setVec(this.worldOffset, offset.x, offset.y);
+    setVec(this.velocity, 0, 0);
     this.motionState = "idle";
   }
 
-  getVelocity(): Vec2 {
-    return { ...this.velocity };
+  /** Live, read-only view of the velocity (see `getWorldOffset`). */
+  getVelocity(): Readonly<Vec2> {
+    return this.velocity;
   }
 
   /** Advances the simulation by `dt` seconds (un-clamped; clamped internally). */
@@ -196,39 +205,40 @@ export class NavigationController {
     }
 
     if (this.motionState === "releasing") {
-      this.velocity = decayVelocity(this.velocity, dt, this.dragDecayHalfLife);
-      this.worldOffset = {
-        x: this.worldOffset.x + this.velocity.x * dt,
-        y: this.worldOffset.y + this.velocity.y * dt,
-      };
+      const decayed = decayVelocity(this.velocity, dt, this.dragDecayHalfLife);
+      setVec(this.velocity, decayed.x, decayed.y);
+      this.worldOffset.x += this.velocity.x * dt;
+      this.worldOffset.y += this.velocity.y * dt;
       if (Math.hypot(this.velocity.x, this.velocity.y) < RELEASE_STOP_EPSILON) {
-        this.velocity = { x: 0, y: 0 };
+        setVec(this.velocity, 0, 0);
         this.motionState = "idle";
       }
       return;
     }
 
     const target = this.computeIdleTargetVelocity();
-    this.velocity = approachVec2(this.velocity, target, dt, this.smoothingK);
+    this.velocity.x = approach(this.velocity.x, target.x, dt, this.smoothingK);
+    this.velocity.y = approach(this.velocity.y, target.y, dt, this.smoothingK);
     // Idle-state velocity (drift + keyboard) points toward where you're
     // looking/traveling (computeDriftVelocity/keyboardVelocity, unchanged).
     // The world offset integrates the OPPOSITE way: coords.ts's
     // worldToScreen(world, offset, parallax) = world + offset*parallax, and
     // "you travel toward the pointer" must make the ambient world recede
     // from you (content scrolls opposite your travel direction — the
-    // standard camera-dolly effect; see the T8a "Y axis inverted"
-    // correction). Drag (below, "dragging"/"releasing" states) is the
+    // standard camera-dolly effect; see `coords.ts` for the y-DOWN
+    // convention). Drag (below, "dragging"/"releasing" states) is the
     // opposite interaction — grab-and-move content 1:1 — and is
     // deliberately NOT negated here.
-    this.worldOffset = {
-      x: this.worldOffset.x - this.velocity.x * dt,
-      y: this.worldOffset.y - this.velocity.y * dt,
-    };
+    this.worldOffset.x -= this.velocity.x * dt;
+    this.worldOffset.y -= this.velocity.y * dt;
   }
 
-  private computeIdleTargetVelocity(): Vec2 {
+  /** Writes into a reused scratch vector; read it before the next call. */
+  private computeIdleTargetVelocity(): Readonly<Vec2> {
+    const target = this.idleTarget;
     if (this.paused) {
-      return { x: 0, y: 0 };
+      setVec(target, 0, 0);
+      return target;
     }
 
     const keyboard = keyboardVelocity(this.activeKeyDirections, this.keyboardSpeed);
@@ -254,7 +264,8 @@ export class NavigationController {
       maxSpeed: this.maxSpeed,
     });
 
-    return { x: drift.x + keyboard.x, y: drift.y + keyboard.y };
+    setVec(target, drift.x + keyboard.x, drift.y + keyboard.y);
+    return target;
   }
 
   private updatePointerPosition(clientX: number, clientY: number): void {
@@ -314,7 +325,7 @@ export class NavigationController {
     }
     const dx = event.clientX - this.dragPointerStart.x;
     const dy = event.clientY - this.dragPointerStart.y;
-    this.worldOffset = { x: this.dragStart.x + dx, y: this.dragStart.y + dy };
+    setVec(this.worldOffset, this.dragStart.x + dx, this.dragStart.y + dy);
     this.dragSamples.push({ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 });
     if (this.dragSamples.length > 5) {
       this.dragSamples.shift();
@@ -329,7 +340,7 @@ export class NavigationController {
     this.dragPointerId = null;
 
     if (this.reducedMotion) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
       this.dragSamples = [];
       return;
@@ -338,11 +349,11 @@ export class NavigationController {
     const velocity = releaseVelocity(this.dragSamples);
     this.dragSamples = [];
     if (Math.hypot(velocity.x, velocity.y) < RELEASE_STOP_EPSILON) {
-      this.velocity = { x: 0, y: 0 };
+      setVec(this.velocity, 0, 0);
       this.motionState = "idle";
       return;
     }
-    this.velocity = velocity;
+    setVec(this.velocity, velocity.x, velocity.y);
     this.motionState = "releasing";
   };
 

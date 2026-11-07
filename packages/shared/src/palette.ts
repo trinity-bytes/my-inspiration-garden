@@ -1,7 +1,7 @@
 /**
  * Client-side palette extraction. Workers can't decode images cheaply, so
  * this runs in the browser (or any environment that can hand us decoded
- * pixel data) — see T6 progress notes. `extractPalette` is a pure, seedless
+ * pixel data). `extractPalette` is a pure, seedless
  * median-cut quantizer: no RNG is involved, so it is deterministic by
  * construction for a given input (unlike k-means, which needs a fixed seed
  * to be reproducible).
@@ -163,11 +163,11 @@ export function extractPalette(
  * / `paletteDataSchema.colors`) into uniform `PaletteColor[]` whose weights
  * always sum to 1 — the one shared normalization function used everywhere a
  * palette's per-color proportions matter (item indexing, canvas card bands,
- * the detail view's swatches; T11b B5, owner decision 2026-09-26).
+ * the detail view's swatches).
  *
  * Any entry missing a weight (or carrying a non-positive one) falls back to
  * an even share of the palette (`1 / entries.length`) *before* normalization
- * — this is what keeps pre-B5 items (which never had a `weight` field at
+ * — this is what keeps legacy items (which never had a `weight` field at
  * all) rendering exactly as before: when no entry has a weight, every
  * fallback share is equal, so normalizing changes nothing. When some entries
  * do carry an explicit weight (which need not sum to 1, or to 100 — a

@@ -21,21 +21,21 @@ export interface NavbarProps {
   /** Shows a discreet "Sign out" link when true. No public sign-in button
    * is shown either way — the owner reaches `/auth/login` directly. */
   isOwner?: boolean;
-  /** Current filter/search state (T10). Defaults to no filters when omitted. */
+  /** Current filter/search state. Defaults to no filters when omitted. */
   filters?: FilterState;
   /** Called with the next filter state on every search or filter-panel change. */
   onFiltersChange?: (next: FilterState) => void;
-  /** Called whenever the filter panel's own open/closed state changes (T10 owner QA: the
+  /** Called whenever the filter panel's own open/closed state changes (the
    * canvas's cursor-drift navigation must pause while the panel is open — see `App`, which
    * feeds this into `CanvasHost`'s `paused` prop). */
   onFilterPanelOpenChange?: (isOpen: boolean) => void;
-  /** T11: opens the owner-only quick-add modal. Only rendered when `isOwner` and this is provided. */
+  /** Opens the owner-only quick-add modal. Only rendered when `isOwner` and this is provided. */
   onAddClick?: () => void;
-  /** T11: opens the owner-only trash modal. Only rendered when `isOwner` and this is provided. */
+  /** Opens the owner-only trash modal. Only rendered when `isOwner` and this is provided. */
   onTrashClick?: () => void;
-  /** T11b B6: opens the owner-only category manager modal. Only rendered when `isOwner` and this is provided. */
+  /** Opens the owner-only category manager modal. Only rendered when `isOwner` and this is provided. */
   onCategoriesClick?: () => void;
-  /** T12: opens the owner-only API tokens modal. Only rendered when `isOwner` and this is provided. */
+  /** Opens the owner-only API tokens modal. Only rendered when `isOwner` and this is provided. */
   onTokensClick?: () => void;
 }
 

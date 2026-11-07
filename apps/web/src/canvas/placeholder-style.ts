@@ -3,7 +3,7 @@ import type { Item, ItemKind } from "@garden/shared";
 /**
  * Colors/text for a generic placeholder card (item kinds with no thumbnail —
  * see `thumbnail-source.ts` — or whose thumbnail failed to load). Per-kind
- * rich rendering is T9; this is the one generic look, using the design
+ * rich rendering lives in `card-painters.ts`; this is the one generic look, using the design
  * tokens' lavender/ink palette (`styles/tokens.css`) hardcoded as hex since
  * the placeholder is painted on a 2D `<canvas>` (`placeholder-texture.ts`),
  * which cannot read CSS custom properties.

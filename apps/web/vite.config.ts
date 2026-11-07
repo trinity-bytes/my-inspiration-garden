@@ -11,6 +11,20 @@ const API_DEV_SERVER = "http://localhost:8787";
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // The three.js vendor chunk alone is ~520 kB minified; the limit still
+    // flags app chunks that grow past it.
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        // three.js changes far less often than app code; a separate chunk
+        // stays in the browser cache across app deploys.
+        codeSplitting: {
+          groups: [{ name: "three", test: /node_modules[\\/]three[\\/]/ }],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       "/api": API_DEV_SERVER,

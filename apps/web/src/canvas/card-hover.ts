@@ -12,14 +12,18 @@ export interface CardHoverStyle {
 
 const HOVER_SCALE = 1.035;
 
-export function cardHoverStyle(isHovered: boolean): CardHoverStyle {
-  return isHovered ? { scale: HOVER_SCALE, highlight: 1 } : { scale: 1, highlight: 0 };
+const HOVERED_STYLE: Readonly<CardHoverStyle> = Object.freeze({ scale: HOVER_SCALE, highlight: 1 });
+const RESTING_STYLE: Readonly<CardHoverStyle> = Object.freeze({ scale: 1, highlight: 0 });
+
+/** Returns one of two shared frozen styles: it runs for every card every frame. */
+export function cardHoverStyle(isHovered: boolean): Readonly<CardHoverStyle> {
+  return isHovered ? HOVERED_STYLE : RESTING_STYLE;
 }
 
 /**
  * Pan speed (world px/s) at and above which hover feedback is hidden. While the canvas sweeps
  * fast, cards cross the cursor in a few frames each; lifting and tinting every one of them reads
- * as a stutter instead of feedback (owner feedback, 2026-10-29). Below this speed the user can
+ * as a stutter instead of feedback. Below this speed the user can
  * still aim at a card while drifting slowly.
  */
 export const HOVER_MAX_PAN_SPEED = 240;

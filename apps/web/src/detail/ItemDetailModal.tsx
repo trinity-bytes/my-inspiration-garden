@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveMediaRef } from "../api/media-ref";
 import { contrastTextColor } from "../color-contrast";
 import { ConfirmDialog } from "../components/Dialog/ConfirmDialog";
+import { useDialogFocusTrap } from "../components/Dialog/useDialogFocusTrap";
 import { IconButton } from "../components/IconButton/IconButton";
 import { useLoadedFontFamily } from "./useLoadedFontFamily";
 import "../components/Button/Button.css";
@@ -13,17 +14,14 @@ import "./ItemDetailModal.css";
 export interface ItemDetailModalProps {
   item: Item;
   onClose: () => void;
-  /** `categoryIds` -> display name, resolved by the caller (T10 owns the full category tree UI — this modal only reads names it's given). A missing id falls back to showing the raw id (documented gap: the API's item detail response only carries `categoryIds`, not names). */
+  /** `categoryIds` -> display name, resolved by the caller (this modal only reads names it's given). A missing id falls back to showing the raw id (the API's item detail response only carries `categoryIds`, not names). */
   categoryNames: Record<string, string>;
-  /** T11: shows the owner-only action row (Edit/History/Move to trash) when true. Defaults to false (visitor view, unchanged from T9). */
+  /** Shows the owner-only action row (Edit/History/Move to trash) when true. Defaults to false (visitor view). */
   isOwner?: boolean;
   onEdit?: () => void;
   onOpenHistory?: () => void;
   onDelete?: () => void;
 }
-
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function prefersReducedMotion(): boolean {
   if (typeof window.matchMedia !== "function") {
@@ -64,7 +62,7 @@ function PaletteSwatches({
 }) {
   const [copiedHex, setCopiedHex] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Normalized once for the whole palette (T11b B5): weights always sum to
+  // Normalized once for the whole palette: weights always sum to
   // 1, so each swatch's size and shown percentage stay proportional and
   // consistent with the canvas card's bands (`paletteCardContent`) and the
   // API's `item_colors` indexing (`deriveItemColors`) — all three go through
@@ -285,10 +283,10 @@ function ItemDetailBody({ item }: { item: Item }) {
 }
 
 /**
- * Solid cartoon-style modal overlay showing an item's full detail (T9 scope B).
+ * Solid cartoon-style modal overlay showing an item's full detail.
  * `role="dialog"` + `aria-modal`, labelled by the item's title; traps Tab
  * focus within itself, closes on Esc or a backdrop click, and returns
- * focus to whatever was focused before it opened. Owner-only editing (T11):
+ * focus to whatever was focused before it opened. Owner-only editing:
  * when `isOwner` is true, an Edit/History/Move to trash action row appears;
  * each button only renders once its callback prop is provided, so partial
  * wiring degrades gracefully instead of throwing.
@@ -303,68 +301,14 @@ export function ItemDetailModal({
   onDelete,
 }: ItemDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const titleId = `item-detail-title-${item.id}`;
   const reducedMotion = prefersReducedMotion();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  useEffect(() => {
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const dialog = dialogRef.current;
-    // Close first, not the first header button: landing on Edit or Move to
-    // trash would make an accidental Enter destructive.
-    const focusTarget =
-      dialog?.querySelector<HTMLElement>(".item-detail__close") ??
-      dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR) ??
-      dialog ??
-      undefined;
-    focusTarget?.focus();
-
-    return () => {
-      previouslyFocusedRef.current?.focus?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      // While the confirm-delete dialog is open, it owns Escape (see its own
-      // useDialogFocusTrap) — this modal must not also close underneath it.
-      if (event.key === "Escape" && !confirmingDelete) {
-        onClose();
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, confirmingDelete]);
-
-  const handleTabKey = useCallback(
-    (event: React.KeyboardEvent) => {
-      if (event.key !== "Tab") return;
-      // The nested confirm dialog owns its own Tab trap while open.
-      if (confirmingDelete) return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-      if (focusable.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0] as HTMLElement;
-      const last = focusable[focusable.length - 1] as HTMLElement;
-      const active = document.activeElement;
-
-      if (event.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialog.contains(active)) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-    [confirmingDelete],
-  );
+  // The nested confirm-delete dialog owns Escape and Tab while it is open.
+  const { handleTabKey } = useDialogFocusTrap(dialogRef, onClose, {
+    suspended: confirmingDelete,
+  });
 
   const handleBackdropClick = useCallback(() => {
     onClose();
@@ -417,6 +361,9 @@ export function ItemDetailModal({
             icon={X}
             label="Close"
             className="item-detail__close"
+            // Close first, not the first header button: landing on Edit or
+            // Move to trash would make an accidental Enter destructive.
+            data-autofocus
             tooltipAlign="end"
             onClick={onClose}
           />

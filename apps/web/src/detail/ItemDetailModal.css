@@ -185,7 +185,7 @@
 
 .item-detail__palette-grid > li {
   /* `flex-basis` is set inline per-swatch, proportional to its normalized
-     weight (T11b B5) — `min-width` keeps a thin sliver still readable. */
+     weight — `min-width` keeps a thin sliver still readable. */
   flex-grow: 1;
   min-width: 100px;
 }

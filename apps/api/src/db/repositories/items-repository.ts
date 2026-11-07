@@ -7,13 +7,14 @@ import type {
   UpdateItemInput,
 } from "@garden/shared";
 import { normalizePalette } from "@garden/shared";
-import { and, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
-import { isColorMatch } from "../../lib/color";
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or, type SQL, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
+import { COLOR_DISTANCE_THRESHOLD, hexToRgb, type Rgb } from "../../lib/color";
 import { decodeCursor, encodeCursor } from "../../lib/cursor";
 import { AppError } from "../../lib/errors";
 import { sanitizeFtsQuery } from "../../lib/fts";
 import type { Db } from "../client";
-import { getCategoryDescendantIds } from "../queries";
+import { itemIdsInCategorySubtreesSql } from "../queries";
 import {
   categories,
   itemCategories,
@@ -72,37 +73,90 @@ function rowToItem(row: ItemRow, categoryIds: string[], itemTagNames: string[]):
   } as Item;
 }
 
-/** Bulk-loads categoryIds/tags for a set of item ids in two queries (no N+1). */
-async function bulkFetchRelations(
-  db: Db,
-  itemIds: string[],
-): Promise<{ categoriesByItem: Map<string, string[]>; tagsByItem: Map<string, string[]> }> {
+/**
+ * Relation queries for a set of item ids, meant to run inside one `db.batch`
+ * together with whatever else the caller reads. `itemIds` is bounded by the
+ * list page size (max 100), so binding the ids stays within D1's limit.
+ */
+function relationQueries(db: Db, itemIds: string[]) {
+  return [
+    db
+      .select({ itemId: itemCategories.itemId, categoryId: itemCategories.categoryId })
+      .from(itemCategories)
+      .where(inArray(itemCategories.itemId, itemIds)),
+    db
+      .select({ itemId: itemTags.itemId, name: tags.name })
+      .from(itemTags)
+      .innerJoin(tags, eq(itemTags.tagId, tags.id))
+      .where(inArray(itemTags.itemId, itemIds)),
+  ] as const;
+}
+
+function groupRelations(
+  categoryRows: { itemId: string; categoryId: string }[],
+  tagRows: { itemId: string; name: string }[],
+): { categoriesByItem: Map<string, string[]>; tagsByItem: Map<string, string[]> } {
   const categoriesByItem = new Map<string, string[]>();
   const tagsByItem = new Map<string, string[]>();
-  if (itemIds.length === 0) return { categoriesByItem, tagsByItem };
-
-  const categoryRows = await db
-    .select({ itemId: itemCategories.itemId, categoryId: itemCategories.categoryId })
-    .from(itemCategories)
-    .where(inArray(itemCategories.itemId, itemIds));
   for (const row of categoryRows) {
     const list = categoriesByItem.get(row.itemId) ?? [];
     list.push(row.categoryId);
     categoriesByItem.set(row.itemId, list);
   }
-
-  const tagRows = await db
-    .select({ itemId: itemTags.itemId, name: tags.name })
-    .from(itemTags)
-    .innerJoin(tags, eq(itemTags.tagId, tags.id))
-    .where(inArray(itemTags.itemId, itemIds));
   for (const row of tagRows) {
     const list = tagsByItem.get(row.itemId) ?? [];
     list.push(row.name);
     tagsByItem.set(row.itemId, list);
   }
-
   return { categoriesByItem, tagsByItem };
+}
+
+/** Bulk-loads categoryIds/tags for a set of item ids in one batched round trip (no N+1). */
+async function bulkFetchRelations(
+  db: Db,
+  itemIds: string[],
+): Promise<{ categoriesByItem: Map<string, string[]>; tagsByItem: Map<string, string[]> }> {
+  if (itemIds.length === 0) return groupRelations([], []);
+  const [categoryRows, tagRows] = await db.batch(relationQueries(db, itemIds));
+  return groupRelations(categoryRows, tagRows);
+}
+
+/** Item row + relation queries for one id; pair with `assembleItem` on the batch results. */
+function itemByIdQueries(db: Db, id: string, includeDeleted: boolean) {
+  const condition = includeDeleted
+    ? eq(items.id, id)
+    : and(eq(items.id, id), isNull(items.deletedAt));
+  return [db.select().from(items).where(condition).limit(1), ...relationQueries(db, [id])] as const;
+}
+
+function assembleItem(
+  rows: ItemRow[],
+  categoryRows: { itemId: string; categoryId: string }[],
+  tagRows: { itemId: string; name: string }[],
+): Item | null {
+  const row = rows[0];
+  if (!row) return null;
+  return rowToItem(
+    row,
+    categoryRows.map((r) => r.categoryId),
+    tagRows.map((r) => r.name),
+  );
+}
+
+/**
+ * Squared RGB distance between a stored `item_colors.hex` and a target,
+ * computed in SQL so the color filter never ships the whole table to the
+ * Worker. Stored hexes are validated `#RRGGBB` (either case) on write, so
+ * decoding each nibble with `instr` over a lowercase digit table is exact and
+ * mirrors `isColorMatch` in `lib/color.ts`.
+ */
+function colorDistanceSquaredSql(target: Rgb): SQL {
+  const channel = (offset: number) =>
+    sql.raw(
+      `((instr('0123456789abcdef', lower(substr(hex, ${offset}, 1))) - 1) * 16 + ` +
+        `(instr('0123456789abcdef', lower(substr(hex, ${offset + 1}, 1))) - 1))`,
+    );
+  return sql`((${channel(2)} - ${target.r}) * (${channel(2)} - ${target.r}) + (${channel(4)} - ${target.g}) * (${channel(4)} - ${target.g}) + (${channel(6)} - ${target.b}) * (${channel(6)} - ${target.b}))`;
 }
 
 /** Upserts tags by normalized name; returns id rows for every requested name (existing + newly inserted). */
@@ -124,10 +178,10 @@ async function upsertTagsByName(db: Db, names: string[]): Promise<{ id: string; 
  * `packages/shared/src/palette.ts`); `palette` items index `data.colors`
  * directly so color filtering also finds standalone palette items. Every
  * other kind has no colors. Both kinds go through the same shared
- * `normalizePalette` (T11b B5, owner decision 2026-09-26): an explicit
+ * `normalizePalette`: an explicit
  * per-color `weight` is normalized proportionally against the others (it
  * need not sum to 1 or 100), and a color missing a weight falls back to an
- * even share — which is also what keeps pre-B5 items (with no `weight`
+ * even share — which is also what keeps legacy items (with no `weight`
  * field at all) indexing exactly as before.
  */
 function deriveItemColors(kind: string, data: unknown): PaletteColor[] {
@@ -147,27 +201,79 @@ function deriveItemColors(kind: string, data: unknown): PaletteColor[] {
   return [];
 }
 
+function insertItemColorsStatements(db: Db, itemId: string, colors: PaletteColor[]) {
+  return colors.length > 0
+    ? [db.insert(itemColors).values(colors.map((c) => ({ itemId, hex: c.hex, weight: c.weight })))]
+    : [];
+}
+
 function replaceItemColorsStatements(db: Db, itemId: string, colors: PaletteColor[]) {
   return [
     db.delete(itemColors).where(eq(itemColors.itemId, itemId)),
-    ...(colors.length > 0
-      ? [
-          db
-            .insert(itemColors)
-            .values(colors.map((c) => ({ itemId, hex: c.hex, weight: c.weight }))),
-        ]
-      : []),
+    ...insertItemColorsStatements(db, itemId, colors),
   ];
 }
 
-async function assertCategoriesExist(db: Db, categoryIds: string[]): Promise<void> {
-  if (categoryIds.length === 0) return;
-  const rows = await db
+function insertItemCategoriesStatements(db: Db, itemId: string, categoryIds: string[]) {
+  return categoryIds.length > 0
+    ? [db.insert(itemCategories).values(categoryIds.map((categoryId) => ({ itemId, categoryId })))]
+    : [];
+}
+
+function replaceItemCategoriesStatements(db: Db, itemId: string, categoryIds: string[]) {
+  return [
+    db.delete(itemCategories).where(eq(itemCategories.itemId, itemId)),
+    ...insertItemCategoriesStatements(db, itemId, categoryIds),
+  ];
+}
+
+function insertItemTagsStatements(db: Db, itemId: string, tagRows: { id: string }[]) {
+  return tagRows.length > 0
+    ? [db.insert(itemTags).values(tagRows.map((t) => ({ itemId, tagId: t.id })))]
+    : [];
+}
+
+function replaceItemTagsStatements(db: Db, itemId: string, tagRows: { id: string }[]) {
+  return [
+    db.delete(itemTags).where(eq(itemTags.itemId, itemId)),
+    ...insertItemTagsStatements(db, itemId, tagRows),
+  ];
+}
+
+function insertRevisionStatement(
+  db: Db,
+  itemId: string,
+  snapshot: Item,
+  actor: string,
+  createdAt: string,
+) {
+  return db.insert(itemRevisions).values({
+    id: crypto.randomUUID(),
+    itemId,
+    snapshot,
+    actor,
+    createdAt,
+  });
+}
+
+/**
+ * Runs write statements assembled from conditional helpers. The spreads widen
+ * the array past drizzle's non-empty tuple type, so the cast lives here once.
+ */
+async function runWriteBatch(db: Db, statements: BatchItem<"sqlite">[]): Promise<void> {
+  await db.batch(statements as unknown as Parameters<Db["batch"]>[0]);
+}
+
+function categoriesByIdQuery(db: Db, categoryIds: string[]) {
+  return db
     .select({ id: categories.id })
     .from(categories)
     .where(inArray(categories.id, categoryIds));
-  const found = new Set(rows.map((r) => r.id));
-  const missing = categoryIds.filter((id) => !found.has(id));
+}
+
+function assertNoMissingCategories(categoryIds: string[], found: { id: string }[]): void {
+  const foundIds = new Set(found.map((r) => r.id));
+  const missing = categoryIds.filter((id) => !foundIds.has(id));
   if (missing.length > 0) {
     throw AppError.badRequest("category_not_found", "one or more categoryIds do not exist", {
       missing,
@@ -175,11 +281,18 @@ async function assertCategoriesExist(db: Db, categoryIds: string[]): Promise<voi
   }
 }
 
+async function assertCategoriesExist(db: Db, categoryIds: string[]): Promise<void> {
+  if (categoryIds.length === 0) return;
+  assertNoMissingCategories(categoryIds, await categoriesByIdQuery(db, categoryIds));
+}
+
 export class ItemsRepository {
   constructor(private readonly db: Db) {}
 
   async list(query: ItemListQuery): Promise<ListItemsResult> {
-    const conditions = [];
+    // Every filter is a subquery so the statement binds a constant number of
+    // parameters no matter how many items match (D1 caps bound parameters).
+    const conditions: SQL[] = [];
     if (query.deletedOnly) {
       conditions.push(isNotNull(items.deletedAt));
     } else if (!query.includeDeleted) {
@@ -188,67 +301,48 @@ export class ItemsRepository {
     if (query.kind.length > 0) conditions.push(inArray(items.kind, query.kind));
 
     if (query.tag.length > 0) {
-      const rows = await this.db
-        .select({ itemId: itemTags.itemId, name: tags.name })
-        .from(itemTags)
-        .innerJoin(tags, eq(itemTags.tagId, tags.id))
-        .where(inArray(tags.name, query.tag));
-      const namesByItem = new Map<string, Set<string>>();
-      for (const row of rows) {
-        const set = namesByItem.get(row.itemId) ?? new Set<string>();
-        set.add(row.name);
-        namesByItem.set(row.itemId, set);
-      }
-      const matchingIds = [...namesByItem.entries()]
-        .filter(([, names]) => query.tag.every((tag) => names.has(tag)))
-        .map(([itemId]) => itemId);
-      if (matchingIds.length === 0) return { items: [], nextCursor: null };
-      conditions.push(inArray(items.id, matchingIds));
+      // AND semantics: the item must carry every requested tag.
+      const tagNames = [...new Set(query.tag)];
+      conditions.push(
+        inArray(
+          items.id,
+          this.db
+            .select({ itemId: itemTags.itemId })
+            .from(itemTags)
+            .innerJoin(tags, eq(itemTags.tagId, tags.id))
+            .where(inArray(tags.name, tagNames))
+            .groupBy(itemTags.itemId)
+            .having(sql`count(distinct ${tags.name}) = ${tagNames.length}`),
+        ),
+      );
     }
 
     if (query.categoryId.length > 0) {
-      const expandedIds = await getCategoryDescendantIds(this.db, query.categoryId);
-      if (expandedIds.length === 0) return { items: [], nextCursor: null };
-      const rows = await this.db
-        .select({ itemId: itemCategories.itemId })
-        .from(itemCategories)
-        .where(inArray(itemCategories.categoryId, expandedIds));
-      const matchingIds = [...new Set(rows.map((r) => r.itemId))];
-      if (matchingIds.length === 0) return { items: [], nextCursor: null };
-      conditions.push(inArray(items.id, matchingIds));
+      conditions.push(sql`${items.id} IN (${itemIdsInCategorySubtreesSql(query.categoryId)})`);
     }
 
     if (query.color) {
-      const target = query.color;
-      const colorRows = await this.db
-        .select({ itemId: itemColors.itemId, hex: itemColors.hex })
-        .from(itemColors);
-      const matchingIds = [
-        ...new Set(colorRows.filter((r) => isColorMatch(r.hex, target)).map((r) => r.itemId)),
-      ];
-      if (matchingIds.length === 0) return { items: [], nextCursor: null };
-      conditions.push(inArray(items.id, matchingIds));
+      conditions.push(
+        sql`${items.id} IN (SELECT item_id FROM item_colors WHERE ${colorDistanceSquaredSql(
+          hexToRgb(query.color),
+        )} <= ${COLOR_DISTANCE_THRESHOLD * COLOR_DISTANCE_THRESHOLD})`,
+      );
     }
 
     if (query.q) {
-      const ftsQuery = sanitizeFtsQuery(query.q);
-      const rows = await this.db.all<{ id: string }>(
-        sql`SELECT id FROM items_fts WHERE items_fts MATCH ${ftsQuery}`,
+      conditions.push(
+        sql`${items.id} IN (SELECT id FROM items_fts WHERE items_fts MATCH ${sanitizeFtsQuery(query.q)})`,
       );
-      const matchingIds = rows.map((r) => r.id);
-      if (matchingIds.length === 0) return { items: [], nextCursor: null };
-      conditions.push(inArray(items.id, matchingIds));
     }
 
     if (query.cursor) {
       const cursor = decodeCursor(query.cursor);
       if (!cursor) throw AppError.badRequest("invalid_cursor", "cursor is malformed");
-      conditions.push(
-        or(
-          lt(items.createdAt, cursor.createdAt),
-          and(eq(items.createdAt, cursor.createdAt), lt(items.id, cursor.id)),
-        ),
+      const cursorCondition = or(
+        lt(items.createdAt, cursor.createdAt),
+        and(eq(items.createdAt, cursor.createdAt), lt(items.id, cursor.id)),
       );
+      if (cursorCondition) conditions.push(cursorCondition);
     }
 
     const rows = (await this.db
@@ -278,18 +372,10 @@ export class ItemsRepository {
   }
 
   async getById(id: string, includeDeleted: boolean): Promise<Item | null> {
-    const conditions = [eq(items.id, id)];
-    if (!includeDeleted)
-      conditions.push(isNull(items.deletedAt) as unknown as ReturnType<typeof eq>);
-    const rows = (await this.db
-      .select()
-      .from(items)
-      .where(and(...conditions))
-      .limit(1)) as ItemRow[];
-    const row = rows[0];
-    if (!row) return null;
-    const { categoriesByItem, tagsByItem } = await bulkFetchRelations(this.db, [row.id]);
-    return rowToItem(row, categoriesByItem.get(row.id) ?? [], tagsByItem.get(row.id) ?? []);
+    const [rows, categoryRows, tagRows] = await this.db.batch(
+      itemByIdQueries(this.db, id, includeDeleted),
+    );
+    return assembleItem(rows as ItemRow[], categoryRows, tagRows);
   }
 
   async create(input: CreateItemInput, actor: string): Promise<Item> {
@@ -316,51 +402,36 @@ export class ItemsRepository {
     const item = rowToItem(row, input.categoryIds, input.tags);
     const colors = deriveItemColors(input.kind, input.data);
 
-    await this.db.batch([
+    await runWriteBatch(this.db, [
       this.db.insert(items).values(row),
-      ...(input.categoryIds.length > 0
-        ? [
-            this.db
-              .insert(itemCategories)
-              .values(input.categoryIds.map((categoryId) => ({ itemId: id, categoryId }))),
-          ]
-        : []),
-      ...(tagRows.length > 0
-        ? [this.db.insert(itemTags).values(tagRows.map((t) => ({ itemId: id, tagId: t.id })))]
-        : []),
-      ...(colors.length > 0
-        ? [
-            this.db
-              .insert(itemColors)
-              .values(colors.map((c) => ({ itemId: id, hex: c.hex, weight: c.weight }))),
-          ]
-        : []),
-      this.db.insert(itemRevisions).values({
-        id: crypto.randomUUID(),
-        itemId: id,
-        snapshot: item,
-        actor,
-        createdAt: timestamp,
-      }),
-    ] as Parameters<Db["batch"]>[0]);
+      ...insertItemCategoriesStatements(this.db, id, input.categoryIds),
+      ...insertItemTagsStatements(this.db, id, tagRows),
+      ...insertItemColorsStatements(this.db, id, colors),
+      insertRevisionStatement(this.db, id, item, actor, timestamp),
+    ]);
 
     return item;
   }
 
   async update(id: string, input: UpdateItemInput, actor: string): Promise<Item> {
-    const existing = await this.getById(id, false);
+    const categoryIdsProvided = input.categoryIds !== undefined;
+    const requestedCategoryIds = categoryIdsProvided ? (input.categoryIds as string[]) : [];
+    // The category existence check rides in the same round trip as the item
+    // read; errors are still raised in the original order below.
+    const [rows, categoryRows, tagRelationRows, foundCategories] = await this.db.batch([
+      ...itemByIdQueries(this.db, id, false),
+      categoriesByIdQuery(this.db, requestedCategoryIds),
+    ]);
+    const existing = assembleItem(rows as ItemRow[], categoryRows, tagRelationRows);
     if (!existing) throw AppError.notFound("item not found");
     if (input.kind !== existing.kind) {
       throw AppError.unprocessable("kind_immutable", "an item's kind cannot be changed");
     }
 
-    const categoryIdsProvided = input.categoryIds !== undefined;
     const tagsProvided = input.tags !== undefined;
-    if (categoryIdsProvided) await assertCategoriesExist(this.db, input.categoryIds as string[]);
+    if (categoryIdsProvided) assertNoMissingCategories(requestedCategoryIds, foundCategories);
 
-    const nextCategoryIds = categoryIdsProvided
-      ? (input.categoryIds as string[])
-      : existing.categoryIds;
+    const nextCategoryIds = categoryIdsProvided ? requestedCategoryIds : existing.categoryIds;
     const nextTags = tagsProvided ? (input.tags as string[]) : existing.tags;
     const tagRows = tagsProvided ? await upsertTagsByName(this.db, nextTags) : [];
 
@@ -395,37 +466,13 @@ export class ItemsRepository {
     if (tagsProvided) setValues.searchText = row.searchText;
     const colors = deriveItemColors(existing.kind, row.data);
 
-    await this.db.batch([
+    await runWriteBatch(this.db, [
       this.db.update(items).set(setValues).where(eq(items.id, id)),
       ...replaceItemColorsStatements(this.db, id, colors),
-      ...(categoryIdsProvided
-        ? [
-            this.db.delete(itemCategories).where(eq(itemCategories.itemId, id)),
-            ...(nextCategoryIds.length > 0
-              ? [
-                  this.db
-                    .insert(itemCategories)
-                    .values(nextCategoryIds.map((categoryId) => ({ itemId: id, categoryId }))),
-                ]
-              : []),
-          ]
-        : []),
-      ...(tagsProvided
-        ? [
-            this.db.delete(itemTags).where(eq(itemTags.itemId, id)),
-            ...(tagRows.length > 0
-              ? [this.db.insert(itemTags).values(tagRows.map((t) => ({ itemId: id, tagId: t.id })))]
-              : []),
-          ]
-        : []),
-      this.db.insert(itemRevisions).values({
-        id: crypto.randomUUID(),
-        itemId: id,
-        snapshot: merged,
-        actor,
-        createdAt: timestamp,
-      }),
-    ] as Parameters<Db["batch"]>[0]);
+      ...(categoryIdsProvided ? replaceItemCategoriesStatements(this.db, id, nextCategoryIds) : []),
+      ...(tagsProvided ? replaceItemTagsStatements(this.db, id, tagRows) : []),
+      insertRevisionStatement(this.db, id, merged, actor, timestamp),
+    ]);
 
     return merged;
   }
@@ -436,19 +483,13 @@ export class ItemsRepository {
     const timestamp = now();
     const snapshot: Item = { ...existing, deletedAt: timestamp, updatedAt: timestamp } as Item;
 
-    await this.db.batch([
+    await runWriteBatch(this.db, [
       this.db
         .update(items)
         .set({ deletedAt: timestamp, updatedAt: timestamp })
         .where(eq(items.id, id)),
-      this.db.insert(itemRevisions).values({
-        id: crypto.randomUUID(),
-        itemId: id,
-        snapshot,
-        actor,
-        createdAt: timestamp,
-      }),
-    ] as Parameters<Db["batch"]>[0]);
+      insertRevisionStatement(this.db, id, snapshot, actor, timestamp),
+    ]);
 
     return snapshot;
   }
@@ -460,28 +501,25 @@ export class ItemsRepository {
     const timestamp = now();
     const snapshot: Item = { ...existing, deletedAt: undefined, updatedAt: timestamp } as Item;
 
-    await this.db.batch([
+    await runWriteBatch(this.db, [
       this.db.update(items).set({ deletedAt: null, updatedAt: timestamp }).where(eq(items.id, id)),
-      this.db.insert(itemRevisions).values({
-        id: crypto.randomUUID(),
-        itemId: id,
-        snapshot,
-        actor,
-        createdAt: timestamp,
-      }),
-    ] as Parameters<Db["batch"]>[0]);
+      insertRevisionStatement(this.db, id, snapshot, actor, timestamp),
+    ]);
 
     return snapshot;
   }
 
   async listRevisions(id: string): Promise<ItemRevision[]> {
-    const existing = await this.getById(id, true);
-    if (!existing) throw AppError.notFound("item not found");
-    const rows = await this.db
-      .select()
-      .from(itemRevisions)
-      .where(eq(itemRevisions.itemId, id))
-      .orderBy(desc(itemRevisions.createdAt));
+    // Only existence matters here, so skip the relation reads getById would do.
+    const [existingRows, rows] = await this.db.batch([
+      this.db.select({ id: items.id }).from(items).where(eq(items.id, id)).limit(1),
+      this.db
+        .select()
+        .from(itemRevisions)
+        .where(eq(itemRevisions.itemId, id))
+        .orderBy(desc(itemRevisions.createdAt)),
+    ]);
+    if (existingRows.length === 0) throw AppError.notFound("item not found");
     return rows.map((row) => ({
       id: row.id,
       itemId: row.itemId,
@@ -492,26 +530,24 @@ export class ItemsRepository {
   }
 
   async restoreRevision(id: string, revisionId: string, actor: string): Promise<Item> {
-    const existing = await this.getById(id, true);
-    if (!existing) throw AppError.notFound("item not found");
-    const revisionRows = await this.db
-      .select()
-      .from(itemRevisions)
-      .where(and(eq(itemRevisions.id, revisionId), eq(itemRevisions.itemId, id)))
-      .limit(1);
+    // Only existence of the item matters; the restored state comes from the revision.
+    const [existingRows, revisionRows] = await this.db.batch([
+      this.db.select({ id: items.id }).from(items).where(eq(items.id, id)).limit(1),
+      this.db
+        .select()
+        .from(itemRevisions)
+        .where(and(eq(itemRevisions.id, revisionId), eq(itemRevisions.itemId, id)))
+        .limit(1),
+    ]);
+    if (existingRows.length === 0) throw AppError.notFound("item not found");
     const revisionRow = revisionRows[0];
     if (!revisionRow) throw AppError.notFound("revision not found");
     const snapshot = revisionRow.snapshot as Item;
 
-    const existingCategories = await this.db
-      .select({ id: categories.id })
-      .from(categories)
-      .where(
-        inArray(
-          categories.id,
-          snapshot.categoryIds.length > 0 ? snapshot.categoryIds : ["__none__"],
-        ),
-      );
+    const existingCategories =
+      snapshot.categoryIds.length > 0
+        ? await categoriesByIdQuery(this.db, snapshot.categoryIds)
+        : [];
     const validCategoryIds = snapshot.categoryIds.filter((cid) =>
       existingCategories.some((c) => c.id === cid),
     );
@@ -526,7 +562,7 @@ export class ItemsRepository {
       deletedAt: undefined,
     } as Item;
 
-    await this.db.batch([
+    await runWriteBatch(this.db, [
       this.db
         .update(items)
         .set({
@@ -540,26 +576,10 @@ export class ItemsRepository {
         })
         .where(eq(items.id, id)),
       ...replaceItemColorsStatements(this.db, id, deriveItemColors(restored.kind, restored.data)),
-      this.db.delete(itemCategories).where(eq(itemCategories.itemId, id)),
-      ...(validCategoryIds.length > 0
-        ? [
-            this.db
-              .insert(itemCategories)
-              .values(validCategoryIds.map((categoryId) => ({ itemId: id, categoryId }))),
-          ]
-        : []),
-      this.db.delete(itemTags).where(eq(itemTags.itemId, id)),
-      ...(tagRows.length > 0
-        ? [this.db.insert(itemTags).values(tagRows.map((t) => ({ itemId: id, tagId: t.id })))]
-        : []),
-      this.db.insert(itemRevisions).values({
-        id: crypto.randomUUID(),
-        itemId: id,
-        snapshot: restored,
-        actor,
-        createdAt: timestamp,
-      }),
-    ] as Parameters<Db["batch"]>[0]);
+      ...replaceItemCategoriesStatements(this.db, id, validCategoryIds),
+      ...replaceItemTagsStatements(this.db, id, tagRows),
+      insertRevisionStatement(this.db, id, restored, actor, timestamp),
+    ]);
 
     return restored;
   }

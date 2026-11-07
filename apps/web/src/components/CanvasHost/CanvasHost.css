@@ -20,7 +20,7 @@
 }
 
 /* Keyboard focus cue, desktop only: a faint accent hairline instead of the
-   full-strength frame that read as an orange screen border (owner feedback).
+   full-strength frame that read as an orange screen border.
    `:focus-visible` keeps it to keyboard activation, so pointer focus and
    touch never paint it. Phones get no cue at all. */
 @media (min-width: 481px) {
@@ -30,7 +30,7 @@
   }
 }
 
-/* Empty/fetch-error state (T8b): the canvas still renders behind this. Top
+/* Empty/fetch-error state: the canvas still renders behind this. Top
    edge, clear of the bottom navbar. */
 .canvas-host__message {
   position: absolute;
@@ -39,42 +39,4 @@
   transform: translateX(-50%);
   max-width: calc(100vw - var(--space-4) * 2);
   pointer-events: none;
-}
-
-.canvas-host__playback {
-  position: absolute;
-  top: calc(var(--space-4) + env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: calc(100vw - var(--space-4) * 2);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: 12px;
-  font-size: 0.875rem;
-}
-
-.canvas-host__playback button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  padding: var(--space-2);
-  color: inherit;
-  background: transparent;
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.canvas-host__playback button:hover {
-  background: var(--color-surface-raised);
-}
-
-.canvas-host__playback button:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }

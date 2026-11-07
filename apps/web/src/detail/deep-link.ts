@@ -1,5 +1,5 @@
 /**
- * Pure `?item=<id>` deep-link parsing/building (T9 scope B) — kept
+ * Pure `?item=<id>` deep-link parsing/building — kept
  * framework-free so `App.tsx`'s `location.search`/`history.pushState`
  * wiring stays a thin, mostly-untestable-by-necessity integration layer
  * around this unit-tested logic.

@@ -60,6 +60,18 @@ describe("migrations", () => {
   });
 });
 
+describe("items list index", () => {
+  it("serves the active-items page query in index order without a sort step", async () => {
+    const { results } = await env.DB.prepare(
+      `EXPLAIN QUERY PLAN SELECT * FROM items WHERE deleted_at IS NULL
+       ORDER BY created_at DESC, id DESC LIMIT 41`,
+    ).all<{ detail: string }>();
+    const plan = results.map((r) => r.detail).join("\n");
+    expect(plan).toContain("items_deleted_at_created_at_id_idx");
+    expect(plan).not.toContain("TEMP B-TREE");
+  });
+});
+
 describe("items_fts", () => {
   it("finds an inserted item by title", async () => {
     await insertItem("item-fts-title", {

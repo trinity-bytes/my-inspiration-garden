@@ -4,12 +4,12 @@ import { getCategoryTree } from "../api/endpoints";
 import { useCategoriesVersion } from "../categories/useCategoriesVersion";
 
 /**
- * Flat category list for the quick-add/edit forms (T11), which build their
+ * Flat category list for the quick-add/edit forms, which build their
  * own tree via `buildCategoryTree`. Fails soft: a fetch error leaves the
  * list empty rather than throwing (matches `useCategoryNames`'s and
  * `useFilterOptions`'s established convention). Refetches whenever the
- * category manager modal creates, renames, moves, or deletes a category
- * (T11b B6), via the shared `useCategoriesVersion` invalidation signal.
+ * category manager modal creates, renames, moves, or deletes a category,
+ * via the shared `useCategoriesVersion` invalidation signal.
  */
 export function useCategories(): Category[] {
   const [categories, setCategories] = useState<Category[]>([]);

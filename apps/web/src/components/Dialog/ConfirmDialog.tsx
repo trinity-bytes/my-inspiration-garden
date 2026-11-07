@@ -20,7 +20,7 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * Small reusable confirmation dialog (T11b B2; Modals v2 "Confirm ·
+ * Small reusable confirmation dialog (Modals v2 "Confirm ·
  * destructive", Figma `33:1185`: a danger icon tile shows the risk before
  * the text is read), used before an owner-only
  * destructive action such as "Move to trash". Reuses the shared modal

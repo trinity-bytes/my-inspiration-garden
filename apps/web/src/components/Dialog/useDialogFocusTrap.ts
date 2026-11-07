@@ -10,16 +10,22 @@ export interface UseDialogFocusTrapResult {
 }
 
 /**
- * Shared dialog accessibility behavior (T11): focuses the element marked
+ * Shared dialog accessibility behavior: focuses the element marked
  * `data-autofocus` (else the first focusable element) on mount, restores focus to whatever was focused before on
  * unmount, closes on Escape, and traps Tab/Shift+Tab within the dialog.
- * Extracted from `ItemDetailModal` (T9) so the T11 quick-add/edit/history/
- * trash dialogs don't each re-implement it; `ItemDetailModal` itself is left
- * as-is to avoid touching already-shipped, tested behavior.
+ * Shared by every app dialog so none re-implements it.
+ *
+ * `suspended` hands Escape and Tab to a nested dialog (e.g. a confirm step)
+ * while it is open, so the outer dialog neither closes nor traps underneath it.
  */
+export interface UseDialogFocusTrapOptions {
+  suspended?: boolean;
+}
+
 export function useDialogFocusTrap(
   dialogRef: RefObject<HTMLElement | null>,
   onClose: () => void,
+  { suspended = false }: UseDialogFocusTrapOptions = {},
 ): UseDialogFocusTrapResult {
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
@@ -41,38 +47,41 @@ export function useDialogFocusTrap(
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !suspended) {
         onClose();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, suspended]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: dialogRef has stable identity, see above.
-  const handleTabKey = useCallback((event: React.KeyboardEvent) => {
-    if (event.key !== "Tab") return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0] as HTMLElement;
-    const last = focusable[focusable.length - 1] as HTMLElement;
-    const active = document.activeElement;
-
-    if (event.shiftKey) {
-      if (active === first || !dialog.contains(active)) {
+  const handleTabKey = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key !== "Tab" || suspended) return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
         event.preventDefault();
-        last.focus();
+        return;
       }
-    } else if (active === last || !dialog.contains(active)) {
-      event.preventDefault();
-      first.focus();
-    }
-  }, []);
+      const first = focusable[0] as HTMLElement;
+      const last = focusable[focusable.length - 1] as HTMLElement;
+      const active = document.activeElement;
+
+      if (event.shiftKey) {
+        if (active === first || !dialog.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !dialog.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    [suspended],
+  );
 
   return { handleTabKey };
 }

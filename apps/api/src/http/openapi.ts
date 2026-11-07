@@ -17,7 +17,7 @@ import { z } from "zod";
 import { renameTagInputSchema } from "./routes/tags";
 
 /**
- * OpenAPI 3.1 document generator for agents (T12). Every request/response
+ * OpenAPI 3.1 document generator for agents. Every request/response
  * body schema below is generated from the same shared Zod schemas the API
  * itself validates against, via Zod 4's native `z.toJSONSchema` — nothing is
  * hand-duplicated for the pieces that already have a shared schema. A few
@@ -208,8 +208,8 @@ function errorResponses(...codes: number[]): Record<number, ResponseSpec> {
 }
 
 // ---------------------------------------------------------------------------
-// Route table — one entry per registered `/api/*` route (T12: kept in sync
-// with `createApp`'s route registration; the drift test fails loudly if a
+// Route table — one entry per registered `/api/*` route, kept in sync
+// with `createApp`'s route registration (the drift test fails loudly if a
 // route is ever added/removed here without a matching app change or vice
 // versa).
 //

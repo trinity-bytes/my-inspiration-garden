@@ -43,7 +43,7 @@ export interface VideoFormData {
 export interface PaletteColorInput {
   hex: string;
   name?: string;
-  /** Relative proportion of this color (T11b B5) — see `paletteColorSchema` in `packages/shared/src/item.ts`. */
+  /** Relative proportion of this color — see `paletteColorSchema` in `packages/shared/src/item.ts`. */
   weight?: number;
 }
 
@@ -60,7 +60,7 @@ export interface FontFormData {
 }
 
 /**
- * One form state shape shared by quick-add and edit (T11): a field per kind
+ * One form state shape shared by quick-add and edit: a field per kind
  * plus the common title/url/notes/tags/categories. Only the block matching
  * `kind` is read by {@link buildCreateItemInput}/{@link buildUpdateItemInput}
  * — the others are kept around so switching the kind selector in the quick-add
@@ -100,7 +100,7 @@ export function createEmptyFormState(kind: ItemKind): ItemFormState {
   };
 }
 
-/** Prefills a form state from an existing item, for the edit modal (T11). */
+/** Prefills a form state from an existing item, for the edit modal. */
 export function formStateFromItem(item: Item): ItemFormState {
   const state = createEmptyFormState(item.kind);
   state.title = item.title ?? "";
@@ -233,7 +233,7 @@ export function buildCreateItemInput(
   }
 }
 
-/** Builds an update-item payload from form state, keeping `kind` immutable (T11 edit). */
+/** Builds an update-item payload from form state, keeping `kind` immutable. */
 export function buildUpdateItemInput(state: ItemFormState): BuildItemInputResult<UpdateItemInput> {
   const created = buildCreateItemInput(state);
   if (!created.ok) return created;

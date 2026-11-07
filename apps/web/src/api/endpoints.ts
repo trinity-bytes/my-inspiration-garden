@@ -25,14 +25,23 @@ export interface ListItemsParams {
   cursor?: string;
   limit?: number;
   includeDeleted?: boolean;
-  /** T11: lists exclusively soft-deleted items (the owner's trash view). */
+  /** Lists exclusively soft-deleted items (the owner's trash view). */
   deletedOnly?: boolean;
 }
 
+export interface RequestOptions {
+  /** Aborts the request, e.g. when a newer fetch supersedes it. */
+  signal?: AbortSignal;
+}
+
 /** `GET /api/items` — filtered, cursor-paginated item list. Public read. */
-export function listItems(params: ListItemsParams = {}): Promise<ListItemsResult> {
+export function listItems(
+  params: ListItemsParams = {},
+  options: RequestOptions = {},
+): Promise<ListItemsResult> {
   return apiFetch("/api/items", {
     schema: listItemsResultSchema,
+    signal: options.signal,
     searchParams: {
       kind: params.kind,
       tag: params.tag,
@@ -48,7 +57,7 @@ export function listItems(params: ListItemsParams = {}): Promise<ListItemsResult
 }
 
 /**
- * `POST /api/items` — owner-only quick-add (T11). The server assigns `id`,
+ * `POST /api/items` — owner-only quick-add. The server assigns `id`,
  * `createdAt`, `updatedAt`; `source` is computed server-side from the
  * actor/`X-Garden-Client`, so it is never sent by the web client.
  */
@@ -58,7 +67,7 @@ export function createItem(
   return apiFetch("/api/items", { schema: itemSchema, method: "POST", body: input });
 }
 
-/** `PATCH /api/items/:id` — owner-only edit (T11): fields, tags, categories. */
+/** `PATCH /api/items/:id` — owner-only edit: fields, tags, categories. */
 export function updateItem(
   id: string,
   input: UpdateItemInput,
@@ -70,12 +79,12 @@ export function updateItem(
   });
 }
 
-/** `DELETE /api/items/:id` — owner-only soft delete (T11 trash). Returns the trashed item. */
+/** `DELETE /api/items/:id` — owner-only soft delete (trash). Returns the trashed item. */
 export function deleteItem(id: string): Promise<z.infer<typeof itemSchema>> {
   return apiFetch(`/api/items/${encodeURIComponent(id)}`, { schema: itemSchema, method: "DELETE" });
 }
 
-/** `POST /api/items/:id/restore` — owner-only trash restore (T11). */
+/** `POST /api/items/:id/restore` — owner-only trash restore. */
 export function restoreItem(id: string): Promise<z.infer<typeof itemSchema>> {
   return apiFetch(`/api/items/${encodeURIComponent(id)}/restore`, {
     schema: itemSchema,
@@ -93,14 +102,14 @@ const itemRevisionSchema = z.object({
 export type ItemRevision = z.infer<typeof itemRevisionSchema>;
 const listItemRevisionsResultSchema = z.object({ revisions: z.array(itemRevisionSchema) });
 
-/** `GET /api/items/:id/revisions` — owner-only revision history (T11). */
+/** `GET /api/items/:id/revisions` — owner-only revision history. */
 export function listItemRevisions(id: string): Promise<{ revisions: ItemRevision[] }> {
   return apiFetch(`/api/items/${encodeURIComponent(id)}/revisions`, {
     schema: listItemRevisionsResultSchema,
   });
 }
 
-/** `POST /api/items/:id/revisions/:revisionId/restore` — owner-only revision restore (T11). */
+/** `POST /api/items/:id/revisions/:revisionId/restore` — owner-only revision restore. */
 export function restoreItemRevision(
   id: string,
   revisionId: string,
@@ -124,7 +133,7 @@ const unfurlMetadataSchema = z.object({
 });
 export type UnfurlMetadataResult = z.infer<typeof unfurlMetadataSchema>;
 
-/** `POST /api/unfurl` — owner-only link preview for quick-add (T11). */
+/** `POST /api/unfurl` — owner-only link preview for quick-add. */
 export function unfurlLink(url: string): Promise<UnfurlMetadataResult> {
   return apiFetch("/api/unfurl", { schema: unfurlMetadataSchema, method: "POST", body: { url } });
 }
@@ -132,14 +141,14 @@ export function unfurlLink(url: string): Promise<UnfurlMetadataResult> {
 const storedMediaSchema = z.object({ r2Key: z.string(), mime: z.string(), size: z.number() });
 export type StoredMedia = z.infer<typeof storedMediaSchema>;
 
-/** `POST /api/media` — owner-only image/video upload for quick-add (T11), multipart. */
+/** `POST /api/media` — owner-only image/video upload for quick-add, multipart. */
 export function uploadMedia(file: File): Promise<StoredMedia> {
   const formData = new FormData();
   formData.set("file", file);
   return apiFetch("/api/media", { schema: storedMediaSchema, method: "POST", body: formData });
 }
 
-/** `POST /api/media/import` — owner-only remote-image import for quick-add (T11). */
+/** `POST /api/media/import` — owner-only remote-image import for quick-add. */
 export function importMedia(url: string): Promise<StoredMedia> {
   return apiFetch("/api/media/import", {
     schema: storedMediaSchema,
@@ -164,14 +173,14 @@ export function getCategoryTree(): Promise<CategoryTreeResult> {
   return apiFetch("/api/categories", { schema: categoryTreeResultSchema });
 }
 
-/** `POST /api/categories` — owner-only category creation (T11b B6 manager). */
+/** `POST /api/categories` — owner-only category creation (category manager). */
 export function createCategory(input: CreateCategoryInput): Promise<Category> {
   return apiFetch("/api/categories", { schema: categorySchema, method: "POST", body: input });
 }
 
 /**
  * `PATCH /api/categories/:id` — owner-only rename and/or move (via
- * `parentId`; `null` moves to top level) (T11b B6 manager).
+ * `parentId`; `null` moves to top level).
  */
 export function updateCategory(id: string, input: UpdateCategoryInput): Promise<Category> {
   return apiFetch(`/api/categories/${encodeURIComponent(id)}`, {
@@ -182,8 +191,7 @@ export function updateCategory(id: string, input: UpdateCategoryInput): Promise<
 }
 
 /**
- * `DELETE /api/categories/:id` — owner-only category delete (T11b B6
- * manager). Direct children are re-parented server-side; the response body
+ * `DELETE /api/categories/:id` — owner-only category delete. Direct children are re-parented server-side; the response body
  * is empty (204).
  */
 export function deleteCategory(id: string): Promise<void> {
@@ -217,7 +225,7 @@ export function getSession(): Promise<SessionResult> {
 const tokensResultSchema = z.object({ tokens: z.array(apiTokenPublicSchema) });
 export type TokensResult = z.infer<typeof tokensResultSchema>;
 
-/** `GET /api/tokens` — owner-only (T12). Never includes a token's plaintext secret or hash. */
+/** `GET /api/tokens` — owner-only. Never includes a token's plaintext secret or hash. */
 export function listTokens(): Promise<TokensResult> {
   return apiFetch("/api/tokens", { schema: tokensResultSchema });
 }
@@ -226,14 +234,14 @@ const createdApiTokenSchema = apiTokenPublicSchema.extend({ token: z.string() })
 export type CreatedApiToken = z.infer<typeof createdApiTokenSchema>;
 
 /**
- * `POST /api/tokens` — owner-only (T12). The response's `token` field is the
+ * `POST /api/tokens` — owner-only. The response's `token` field is the
  * plaintext secret; it is returned exactly once and never retrievable again.
  */
 export function createToken(input: CreateApiTokenInput): Promise<CreatedApiToken> {
   return apiFetch("/api/tokens", { schema: createdApiTokenSchema, method: "POST", body: input });
 }
 
-/** `DELETE /api/tokens/:id` — owner-only (T12). Revokes the token immediately. */
+/** `DELETE /api/tokens/:id` — owner-only. Revokes the token immediately. */
 export function revokeToken(id: string): Promise<void> {
   return apiFetch(`/api/tokens/${encodeURIComponent(id)}`, { schema: z.void(), method: "DELETE" });
 }

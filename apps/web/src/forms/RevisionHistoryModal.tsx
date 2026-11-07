@@ -14,8 +14,8 @@ import "./FormModal.css";
 export interface RevisionHistoryModalProps {
   item: Item;
   onClose: () => void;
-  /** Called after a successful restore, so the caller can refetch the canvas (T11). */
-  onRestored: () => void;
+  /** Called with the restored item after a successful restore, so the caller can update the canvas. */
+  onRestored: (item: Item) => void;
   listItemRevisions?: (id: string) => Promise<{ revisions: ItemRevision[] }>;
   restoreItemRevision?: (id: string, revisionId: string) => Promise<Item>;
 }
@@ -28,7 +28,7 @@ function formatTimestamp(iso: string): string {
   }
 }
 
-/** Owner-only revision history + restore dialog (T11). */
+/** Owner-only revision history + restore dialog. */
 export function RevisionHistoryModal({
   item,
   onClose,
@@ -64,8 +64,8 @@ export function RevisionHistoryModal({
     setRestoringId(revisionId);
     setError(null);
     try {
-      await restoreItemRevision(item.id, revisionId);
-      onRestored();
+      const restored = await restoreItemRevision(item.id, revisionId);
+      onRestored(restored);
       onClose();
     } catch {
       setError("Could not restore this revision.");

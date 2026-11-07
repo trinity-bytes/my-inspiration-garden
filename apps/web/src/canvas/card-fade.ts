@@ -33,8 +33,7 @@ export function cardScreenRect(
 }
 
 /**
- * On phones the ramp is capped to this many visible px (owner feedback,
- * 2026-10-29): with only ~2 columns on screen,
+ * On phones the ramp is capped to this many visible px: with only ~2 columns on screen,
  * a shrinking, fading frame read as "the canvas ends here". A short fade
  * lets cards be cut by the screen edge, which reads as "it keeps going".
  */
