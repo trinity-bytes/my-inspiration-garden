@@ -112,7 +112,8 @@ export function registerMediaRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void
   });
 
   app.get("/api/thumbs/:width/*", async (c) => {
-    const width = Number(c.req.param("width"));
+    const widthParam = c.req.param("width");
+    const width = /^\d+$/.test(widthParam) ? Number(widthParam) : Number.NaN;
     if (!isThumbnailWidth(width)) {
       throw AppError.badRequest(
         "invalid_width",
@@ -148,7 +149,10 @@ export function registerMediaRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void
       // (quota, binding outage) is retried later instead of pinned for a year.
       return new Response(null, {
         status: 307,
-        headers: { Location: `/api/media/${key}`, "Cache-Control": "public, max-age=300" },
+        headers: {
+          Location: `/api/media/${key.split("/").map(encodeURIComponent).join("/")}`,
+          "Cache-Control": "public, max-age=300",
+        },
       });
     }
 

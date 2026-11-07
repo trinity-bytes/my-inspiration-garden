@@ -104,6 +104,35 @@ describe("GET /api/thumbs/:width/*", () => {
     expect(thumbnailer).not.toHaveBeenCalled();
   });
 
+  it("rejects non-canonical width spellings", async () => {
+    await putOriginal();
+    const thumbnailer = fakeThumbnailer();
+    const app = createApp({ thumbnailer });
+
+    const hex = await app.request(`https://example.com/api/thumbs/0x180/${ORIGINAL_KEY}`, {}, env);
+
+    expect(hex.status).toBe(400);
+    expect(thumbnailer).not.toHaveBeenCalled();
+  });
+
+  it("percent-encodes the original key in the fallback redirect", async () => {
+    await putOriginal("media/2026/11/a b.png");
+    const app = createApp({
+      thumbnailer: vi.fn(async () => {
+        throw new Error("fail");
+      }),
+    });
+
+    const res = await app.request(
+      "https://example.com/api/thumbs/384/media/2026/11/a%20b.png",
+      {},
+      env,
+    );
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("Location")).toBe("/api/media/media/2026/11/a%20b.png");
+  });
+
   it("returns 404 for a missing original", async () => {
     const thumbnailer = fakeThumbnailer();
     const app = createApp({ thumbnailer });
