@@ -8,6 +8,7 @@ import { type CardInstance, cardAssignmentKey } from "../item-layout";
 import {
   createCardCanvasTexture,
   createPlaceholderTexture,
+  deviceTextureSize,
   paintPlaceholderCanvas,
 } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
@@ -210,7 +211,8 @@ export class CardLayer {
     widthPx: number,
     heightPx: number,
   ): void {
-    const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
+    const paintedWidth = deviceTextureSize(widthPx, heightPx).width;
+    const thumbnailUrl = thumbnailUrlForItem(item, paintedWidth, this.options.apiBaseUrl);
     // The media URL already changes when the file is replaced (new R2 key), so
     // a metadata-only edit keeps reusing the decoded photo.
     const size = sizeSuffix(widthPx, heightPx);

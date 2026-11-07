@@ -13,6 +13,7 @@ vi.mock("../../src/canvas/card-painters", () => ({
 vi.mock("../../src/canvas/placeholder-texture", () => ({
   createCardCanvasTexture: () => new THREE.Texture(),
   createPlaceholderTexture: () => new THREE.Texture(),
+  deviceTextureSize: (width: number, height: number) => ({ width, height }),
   paintPlaceholderCanvas: () => document.createElement("canvas"),
 }));
 
@@ -129,6 +130,6 @@ it("reloads a photo card whose image was replaced", async () => {
   cards.update([instance(replaced)], frame, null);
   await settle();
   expect(paintPhotoCanvas).toHaveBeenCalledTimes(2);
-  expect(vi.mocked(paintPhotoCanvas).mock.calls[1]?.[0]).toBe("/api/media/media/new.png");
+  expect(vi.mocked(paintPhotoCanvas).mock.calls[1]?.[0]).toBe("/api/thumbs/384/media/new.png");
   cards.dispose();
 });

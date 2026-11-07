@@ -1,4 +1,4 @@
-import { isSafeFetchUrl } from "@garden/shared";
+import { isSafeFetchUrl, isThumbnailWidth, THUMBNAIL_WIDTHS } from "@garden/shared";
 import type { Hono } from "hono";
 import { AppError } from "../../lib/errors";
 import { IMAGE_MIME_TYPES, sniffMime, VIDEO_MIME_TYPES } from "../../lib/magic-bytes";
@@ -7,9 +7,7 @@ import { CACHE_CONTROL_IMMUTABLE, importRemoteImage, storeMedia } from "../../li
 import {
   imagesBindingThumbnailer,
   isThumbnailSourceKey,
-  isThumbnailWidth,
   THUMBNAIL_MIME,
-  THUMBNAIL_WIDTHS,
   thumbnailKeyFor,
 } from "../../lib/thumbnails";
 import { requireAuth } from "../middleware/require";

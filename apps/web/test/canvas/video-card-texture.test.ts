@@ -13,6 +13,7 @@ vi.mock("../../src/canvas/card-painters", () => ({
 vi.mock("../../src/canvas/placeholder-texture", () => ({
   createCardCanvasTexture: () => new THREE.Texture(),
   createPlaceholderTexture: () => new THREE.Texture(),
+  deviceTextureSize: (width: number, height: number) => ({ width, height }),
   paintPlaceholderCanvas: () => document.createElement("canvas"),
 }));
 

@@ -35,11 +35,24 @@ export function createDeviceCanvas(
   dpr: number = window.devicePixelRatio || 1,
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
+  const size = deviceTextureSize(widthPx, heightPx, dpr);
+  canvas.width = size.width;
+  canvas.height = size.height;
+  return canvas;
+}
+
+/** The device-pixel size `createDeviceCanvas` paints a `widthPx` x `heightPx` CSS card at. */
+export function deviceTextureSize(
+  widthPx: number,
+  heightPx: number,
+  dpr: number = window.devicePixelRatio || 1,
+): { width: number; height: number } {
   const longEdge = Math.max(widthPx, heightPx, 1);
   const scale = Math.min(Math.max(dpr, 1), MAX_TEXTURE_DPR, MAX_TEXTURE_EDGE_PX / longEdge);
-  canvas.width = Math.max(1, Math.round(widthPx * scale));
-  canvas.height = Math.max(1, Math.round(heightPx * scale));
-  return canvas;
+  return {
+    width: Math.max(1, Math.round(widthPx * scale)),
+    height: Math.max(1, Math.round(heightPx * scale)),
+  };
 }
 
 export function paintPlaceholderCanvas(
