@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadVideoFrame } from "../../src/canvas/video-preview";
+import { loadVideoFrame } from "../../src/forms/video-frame";
 
 afterEach(() => vi.restoreAllMocks());
 
