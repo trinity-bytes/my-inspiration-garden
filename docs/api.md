@@ -164,6 +164,23 @@ GARDEN_API_URL=https://garden.example.com GARDEN_API_TOKEN=ig_xxx \
   node apps/api/scripts/backfill-link-previews.mjs --dry-run
 ```
 
+## Video posters
+
+Uploaded videos (`provider: "file"`) carry a poster frame in
+`data.thumbnail` (an R2 key). The web app captures it from the local file at
+upload time; canvas cards paint from its thumbnail and never download the
+video, and the detail player shows it with `preload="none"`, so the video loads
+only on play.
+
+One-off backfill for uploaded videos saved before posters existed (needs
+`ffmpeg` on PATH and a write-scope token; `--dry-run` lists them and needs no
+token):
+
+```sh
+GARDEN_API_URL=https://garden.example.com GARDEN_API_TOKEN=ig_xxx \
+  node apps/api/scripts/backfill-video-posters.mjs --dry-run
+```
+
 ## Deploy notes (T13)
 
 Cloudflare setup this feature's auth model depends on (do at deploy time,
