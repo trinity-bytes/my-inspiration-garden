@@ -9,7 +9,6 @@ import {
 } from "./card-content";
 import { createDeviceCanvas, paintPlaceholderCanvas } from "./placeholder-texture";
 import { thumbnailUrlForItem } from "./thumbnail-source";
-import { loadVideoFrame } from "./video-preview";
 import { wrapText } from "./wrap-text";
 
 /**
@@ -177,13 +176,14 @@ async function paintLinkCard(
   item: LinkItem,
   widthPx: number,
   heightPx: number,
+  apiBaseUrl = "",
 ): Promise<HTMLCanvasElement> {
   const canvas = createDeviceCanvas(widthPx, heightPx);
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
   const content = linkCardContent(item);
-  const previewUrl = thumbnailUrlForItem(item);
+  const previewUrl = thumbnailUrlForItem(item, canvas.width, apiBaseUrl);
   const photo = previewUrl ? await loadImage(previewUrl, IMAGE_LOAD_TIMEOUT_MS) : null;
   const padding = canvas.width * PADDING_FRACTION;
 
@@ -232,16 +232,10 @@ async function paintVideoCard(
   if (!ctx) return canvas;
 
   const content = videoCardContent(item);
-  const thumbnailUrl = thumbnailUrlForItem(item, apiBaseUrl);
-  const thumbnail = thumbnailUrl
-    ? await loadImage(thumbnailUrl, IMAGE_LOAD_TIMEOUT_MS)
-    : item.data.provider === "file" && item.data.r2Key
-      ? await loadVideoFrame(
-          `${apiBaseUrl}/api/media/${item.data.r2Key}`,
-          canvas.width,
-          canvas.height,
-        )
-      : null;
+  // Uploaded videos show the poster captured at upload; the card never
+  // downloads the video file (it loads only when played in the detail view).
+  const thumbnailUrl = thumbnailUrlForItem(item, canvas.width, apiBaseUrl);
+  const thumbnail = thumbnailUrl ? await loadImage(thumbnailUrl, IMAGE_LOAD_TIMEOUT_MS) : null;
   const padding = canvas.width * PADDING_FRACTION;
 
   if (thumbnail) {
@@ -436,7 +430,7 @@ export async function paintItemCardCanvas(
   try {
     switch (item.kind) {
       case "link":
-        return await paintLinkCard(item, widthPx, heightPx);
+        return await paintLinkCard(item, widthPx, heightPx, options.apiBaseUrl);
       case "video":
         return await paintVideoCard(item, widthPx, heightPx, options.apiBaseUrl);
       case "text":

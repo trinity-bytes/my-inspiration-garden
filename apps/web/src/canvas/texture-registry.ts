@@ -44,7 +44,7 @@ interface PendingLoad<V> {
  *   actually in flight.
  */
 export class TextureRegistry<V> {
-  private readonly maxSize: number;
+  private maxSize: number;
   private readonly disposeValue: (value: V) => void;
   private readonly entries = new Map<string, V>();
   private readonly pins = new Map<string, number>();
@@ -54,6 +54,12 @@ export class TextureRegistry<V> {
   constructor(options: TextureRegistryOptions<V>) {
     this.maxSize = options.maxSize;
     this.disposeValue = options.dispose;
+  }
+
+  /** Changes the soft capacity; shrinking evicts least-recently-used unpinned entries right away. */
+  setMaxSize(maxSize: number): void {
+    this.maxSize = maxSize;
+    this.evictOverCapacity(null);
   }
 
   has(key: string): boolean {
@@ -100,7 +106,7 @@ export class TextureRegistry<V> {
    * trade-off (see class doc): residency for in-use textures wins over the
    * soft size target.
    */
-  private evictOverCapacity(justSetKey: string): void {
+  private evictOverCapacity(justSetKey: string | null): void {
     if (this.entries.size <= this.maxSize) {
       return;
     }

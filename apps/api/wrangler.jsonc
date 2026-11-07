@@ -48,6 +48,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Card thumbnails (GET /api/thumbs/:width/*, src/lib/thumbnails.ts). Billed
+  // per unique transformation; 5,000/month free, and each image is transformed
+  // at most once per variant because results are stored in R2.
+  "images": {
+    "binding": "IMAGES"
+  },
   "r2_buckets": [
     {
       "binding": "MEDIA",

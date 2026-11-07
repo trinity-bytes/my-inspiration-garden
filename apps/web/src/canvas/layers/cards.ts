@@ -8,6 +8,7 @@ import { type CardInstance, cardAssignmentKey } from "../item-layout";
 import {
   createCardCanvasTexture,
   createPlaceholderTexture,
+  deviceTextureSize,
   paintPlaceholderCanvas,
 } from "../placeholder-texture";
 import { CARD_FRAGMENT_GLSL, CARD_VERTEX_GLSL } from "../shaders/card";
@@ -39,6 +40,21 @@ export interface CardFrame {
 }
 
 const CORNER_RADIUS_FRACTION = 0.08;
+
+/**
+ * A texture that finished loading is uploaded to the GPU the first frame it is
+ * drawn. A fast fling lands many loads together, and uploading them all in one
+ * frame was a visible hitch, so newly loaded textures are applied a couple per
+ * frame (cards fade in anyway). Cached textures are already on the GPU and
+ * apply immediately, so panning back never waits.
+ */
+const MAX_TEXTURE_APPLIES_PER_FRAME = 2;
+
+interface PendingApply {
+  entry: PoolEntry;
+  token: number;
+  texture: THREE.Texture;
+}
 
 /**
  * Size component of texture/assignment keys, bucketed so a window drag does
@@ -113,6 +129,9 @@ export class CardLayer {
   private readonly pool: PoolEntry[] = [];
   private readonly assignmentKeys: string[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
+  private readonly pendingApplies: PendingApply[] = [];
+  /** True while `update` runs: a texture delivered then came synchronously from the cache. */
+  private updating = false;
 
   constructor(options: CardLayerOptions) {
     this.options = options;
@@ -172,6 +191,36 @@ export class CardLayer {
     entry.textureReady = true;
   }
 
+  /** Applies a cache hit at once and queues a fresh load for the per-frame budget; drops stale deliveries. */
+  private deliverTexture(entry: PoolEntry, token: number, texture: THREE.Texture): void {
+    if (isStaleLoadCallback(entry.loadToken, token)) {
+      return;
+    }
+    if (this.updating) {
+      this.applyTexture(entry, texture);
+      return;
+    }
+    this.pendingApplies.push({ entry, token, texture });
+  }
+
+  private applyPendingTextures(): void {
+    let applied = 0;
+    while (applied < MAX_TEXTURE_APPLIES_PER_FRAME && this.pendingApplies.length > 0) {
+      const next = this.pendingApplies.shift() as PendingApply;
+      // The entry may have moved on to another card since the load landed.
+      if (isStaleLoadCallback(next.entry.loadToken, next.token)) {
+        continue;
+      }
+      this.applyTexture(next.entry, next.texture);
+      applied++;
+    }
+  }
+
+  /** See `texture-budget.ts`; shrinking evicts unpinned textures right away. */
+  setTextureCacheSize(size: number): void {
+    this.textures.setMaxSize(size);
+  }
+
   /** Pins `entry` to `key` in the texture registry (protecting it from eviction while assigned), unpinning whatever key it held before. A no-op if already pinned to `key`. */
   private pinEntryTexture(entry: PoolEntry, key: string): void {
     if (entry.pinnedTextureKey === key) {
@@ -210,7 +259,8 @@ export class CardLayer {
     widthPx: number,
     heightPx: number,
   ): void {
-    const thumbnailUrl = thumbnailUrlForItem(item, this.options.apiBaseUrl);
+    const paintedWidth = deviceTextureSize(widthPx, heightPx).width;
+    const thumbnailUrl = thumbnailUrlForItem(item, paintedWidth, this.options.apiBaseUrl);
     // The media URL already changes when the file is replaced (new R2 key), so
     // a metadata-only edit keeps reusing the decoded photo.
     const size = sizeSuffix(widthPx, heightPx);
@@ -232,11 +282,7 @@ export class CardLayer {
           reject,
         );
       },
-      (texture) => {
-        if (!isStaleLoadCallback(entry.loadToken, token)) {
-          this.applyTexture(entry, texture);
-        }
-      },
+      (texture) => this.deliverTexture(entry, token, texture),
       () => {
         // Thumbnail failed to load (broken URL, network) — fall back to the
         // generic placeholder rather than leaving the card blank. Bail out
@@ -256,11 +302,7 @@ export class CardLayer {
         this.textures.load(
           placeholderKey,
           (resolveFallback) => resolveFallback(createPlaceholderTexture(item, widthPx, heightPx)),
-          (texture) => {
-            if (!isStaleLoadCallback(entry.loadToken, token)) {
-              this.applyTexture(entry, texture);
-            }
-          },
+          (texture) => this.deliverTexture(entry, token, texture),
           () => {},
         );
       },
@@ -296,11 +338,7 @@ export class CardLayer {
             resolve(createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx))),
           );
       },
-      (texture) => {
-        if (!isStaleLoadCallback(entry.loadToken, token)) {
-          this.applyTexture(entry, texture);
-        }
-      },
+      (texture) => this.deliverTexture(entry, token, texture),
       () => {},
     );
   }
@@ -402,6 +440,20 @@ export class CardLayer {
    * a cached texture arrives synchronously, so panning never fades.
    */
   update(instances: readonly CardInstance[], frame: CardFrame, hoveredKey: string | null): void {
+    this.updating = true;
+    try {
+      this.updateCards(instances, frame, hoveredKey);
+    } finally {
+      this.updating = false;
+    }
+  }
+
+  private updateCards(
+    instances: readonly CardInstance[],
+    frame: CardFrame,
+    hoveredKey: string | null,
+  ): void {
+    this.applyPendingTextures();
     const wanted = Math.min(instances.length, this.options.maxPoolSize);
     this.ensurePoolSize(wanted);
     this.assignmentKeys.length = wanted;
@@ -471,6 +523,7 @@ export class CardLayer {
     }
     this.pool.length = 0;
     this.assignmentKeys.length = 0;
+    this.pendingApplies.length = 0;
     this.textures.clear();
   }
 }

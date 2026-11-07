@@ -50,11 +50,9 @@ function schemaOf(zodSchema: z.core.$ZodType): JsonSchema {
 
 /** Converts a Hono route path to an OpenAPI path template. Exported so the drift test uses the exact same conversion as the document itself. */
 export function honoPathToOpenApiPath(honoPath: string): string {
-  if (honoPath.endsWith("/*")) {
-    // Only `/api/media/*` uses a trailing wildcard today, for the R2 key.
-    return `${honoPath.slice(0, -2)}/{key}`;
-  }
-  return honoPath.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
+  // A trailing wildcard is always an R2 key (`/api/media/*`, `/api/thumbs/:width/*`).
+  const withKey = honoPath.endsWith("/*") ? `${honoPath.slice(0, -2)}/{key}` : honoPath;
+  return withKey.replace(/:([A-Za-z0-9_]+)/g, "{$1}");
 }
 
 // ---------------------------------------------------------------------------
@@ -580,6 +578,36 @@ function buildRoutes(): RouteSpec[] {
       responses: {
         200: { description: "The media object's bytes.", contentType: "*/*" },
         ...errorResponses(404),
+      },
+    },
+    {
+      method: "get",
+      path: "/api/thumbs/:width/*",
+      summary: "Stream a card thumbnail of a stored image",
+      description:
+        "A WebP no wider than `width`, generated on first request with Cloudflare Images and stored in R2. Redirects (307) to the original when the thumbnail cannot be generated.",
+      tags: ["media"],
+      security: "public",
+      parameters: [
+        {
+          name: "width",
+          in: "path",
+          required: true,
+          description: "Variant width in px: 384 or 768.",
+          schema: { type: "integer", enum: [384, 768] },
+        },
+        {
+          name: "key",
+          in: "path",
+          required: true,
+          description: "The original image's R2 key (`media/...`).",
+          schema: { type: "string" },
+        },
+      ],
+      responses: {
+        200: { description: "The WebP thumbnail.", contentType: "image/webp" },
+        307: { description: "Thumbnail unavailable; redirect to the original." },
+        ...errorResponses(400, 404),
       },
     },
     {

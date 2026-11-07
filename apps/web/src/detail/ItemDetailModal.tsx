@@ -178,8 +178,12 @@ function ItemDetailBody({ item }: { item: Item }) {
       // Preserve the existing fallback for unrecognized URLs.
     }
   }
+  // An uploaded video's poster (captured at upload) stands in until playback,
+  // so the video itself downloads only when the viewer presses play.
+  let posterUrl: string | undefined;
   if (item.kind === "video" && item.data.provider === "file" && item.data.r2Key) {
     directVideoUrl = resolveMediaRef(item.data.r2Key);
+    posterUrl = item.data.thumbnail ? resolveMediaRef(item.data.thumbnail) : undefined;
   }
   if (directVideoUrl) {
     return (
@@ -191,7 +195,8 @@ function ItemDetailBody({ item }: { item: Item }) {
             aria-label={item.title?.trim() || "Video"}
             controls
             playsInline
-            preload="metadata"
+            poster={posterUrl}
+            preload={posterUrl ? "none" : "metadata"}
           />
         </div>
         {item.kind === "link" && item.data.description && (

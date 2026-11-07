@@ -13,6 +13,7 @@ vi.mock("../../src/canvas/card-painters", () => ({
 vi.mock("../../src/canvas/placeholder-texture", () => ({
   createCardCanvasTexture: () => new THREE.Texture(),
   createPlaceholderTexture: () => new THREE.Texture(),
+  deviceTextureSize: (width: number, height: number) => ({ width, height }),
   paintPlaceholderCanvas: () => document.createElement("canvas"),
 }));
 
@@ -55,6 +56,8 @@ it("repaints a composed card after its item is edited, even in the same cell", a
   const original = makeItem("edited", "text", { body: "before" });
   cards.update([instance(original)], frame, null);
   await settle();
+  // Fresh loads apply on the next frame (per-frame upload budget).
+  cards.update([instance(original)], frame, null);
   const before = mapOf(cards);
   const edited = makeItem(
     "edited",
@@ -64,6 +67,7 @@ it("repaints a composed card after its item is edited, even in the same cell", a
   );
   cards.update([instance(edited)], frame, null);
   await settle();
+  cards.update([instance(edited)], frame, null);
   expect(paintItemCardCanvas).toHaveBeenCalledTimes(2);
   expect(vi.mocked(paintItemCardCanvas).mock.calls[1]?.[0]).toBe(edited);
   expect(mapOf(cards)).not.toBe(before);
@@ -129,6 +133,6 @@ it("reloads a photo card whose image was replaced", async () => {
   cards.update([instance(replaced)], frame, null);
   await settle();
   expect(paintPhotoCanvas).toHaveBeenCalledTimes(2);
-  expect(vi.mocked(paintPhotoCanvas).mock.calls[1]?.[0]).toBe("/api/media/media/new.png");
+  expect(vi.mocked(paintPhotoCanvas).mock.calls[1]?.[0]).toBe("/api/thumbs/384/media/new.png");
   cards.dispose();
 });

@@ -343,6 +343,81 @@ describe("ItemForm — video kind", () => {
     await waitFor(() => expect(uploadVideoFile).toHaveBeenCalledWith(file));
   });
 
+  function renderFileVideoForm(uploadVideoPoster: (file: File) => Promise<unknown>) {
+    const onSubmit = vi.fn();
+    const uploadVideoFile = vi
+      .fn()
+      .mockResolvedValue({ r2Key: "media/2026/11/clip.mp4", mime: "video/mp4", size: 1 });
+    render(
+      <ItemForm
+        mode="create"
+        initialState={{ ...createEmptyFormState("video"), title: "Clip" }}
+        categories={categories}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        uploadVideoFile={uploadVideoFile}
+        uploadVideoPoster={uploadVideoPoster as never}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Provider"));
+    fireEvent.click(screen.getByRole("option", { name: "Uploaded file" }));
+    const file = new File(["abc"], "clip.mp4", { type: "video/mp4" });
+    fireEvent.change(screen.getByLabelText("Video file"), { target: { files: [file] } });
+    return { onSubmit, uploadVideoFile, file };
+  }
+
+  it("captures a poster from an uploaded video and saves it as the card thumbnail", async () => {
+    const uploadVideoPoster = vi
+      .fn()
+      .mockResolvedValue({ r2Key: "media/2026/11/poster.webp", mime: "image/webp", size: 1 });
+    const { onSubmit, uploadVideoFile, file } = renderFileVideoForm(uploadVideoPoster);
+
+    await waitFor(() => expect(uploadVideoPoster).toHaveBeenCalledWith(file));
+    await waitFor(() => expect(uploadVideoFile).toHaveBeenCalledWith(file));
+    await waitFor(() => expect(screen.getByText("Cover frame saved.")).toBeInTheDocument());
+    // The poster is an R2 key, not a URL: no URL field for an uploaded video.
+    expect(screen.queryByLabelText("Thumbnail URL")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0]?.[0]).toMatchObject({
+      kind: "video",
+      data: {
+        provider: "file",
+        r2Key: "media/2026/11/clip.mp4",
+        thumbnail: "media/2026/11/poster.webp",
+      },
+    });
+  });
+
+  it("still saves an uploaded video when its poster cannot be captured", async () => {
+    const uploadVideoPoster = vi.fn().mockResolvedValue(null);
+    const { onSubmit } = renderFileVideoForm(uploadVideoPoster);
+
+    await waitFor(() => expect(uploadVideoPoster).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByText("Uploading…")).not.toBeInTheDocument());
+    expect(screen.queryByText("Upload failed.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add item|save/i }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const submitted = onSubmit.mock.calls[0]?.[0];
+    expect(submitted.data.r2Key).toBe("media/2026/11/clip.mp4");
+    expect(submitted.data.thumbnail).toBeUndefined();
+  });
+
+  it("drops an uploaded poster key when switching to an embed provider", async () => {
+    const uploadVideoPoster = vi
+      .fn()
+      .mockResolvedValue({ r2Key: "media/2026/11/poster.webp", mime: "image/webp", size: 1 });
+    renderFileVideoForm(uploadVideoPoster);
+    await waitFor(() => expect(screen.getByText("Cover frame saved.")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByLabelText("Provider"));
+    fireEvent.click(screen.getByRole("option", { name: "YouTube" }));
+
+    expect(screen.getByLabelText("Thumbnail URL")).toHaveValue("");
+  });
+
   it("detects provider/embed URL from a pasted YouTube URL and fills empty title + thumbnail via unfurl", async () => {
     const unfurl = vi.fn().mockResolvedValue({
       url: "https://www.youtube.com/watch?v=abc123",

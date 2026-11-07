@@ -1,4 +1,5 @@
 import type { TokenScope } from "@garden/shared";
+import type { Thumbnailer } from "../lib/thumbnails";
 import type { VerifyAccessJwt } from "./auth/access-jwt";
 
 export type Actor =
@@ -16,6 +17,8 @@ export type Actor =
 export interface AppBindings {
   DB: D1Database;
   MEDIA: R2Bucket;
+  /** Cloudflare Images binding for card thumbnails; optional so a deployment without it serves originals. */
+  IMAGES?: ImagesBinding;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_AUD?: string;
   OWNER_EMAIL?: string;
@@ -36,4 +39,6 @@ export interface AppDeps {
   verifyAccessJwt?: VerifyAccessJwt;
   /** Fetch implementation used for remote image import and link unfurl; tests inject fixtures. */
   fetchImpl?: typeof fetch;
+  /** Thumbnail generator; defaults to the `IMAGES` binding. Tests inject a fake. */
+  thumbnailer?: Thumbnailer;
 }
