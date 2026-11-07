@@ -42,6 +42,17 @@ describe("loadVideoFrame", () => {
     expect(video.pause).toHaveBeenCalled();
   });
 
+  it("seeks beyond a black opening frame before capturing", async () => {
+    const { video, canvas, drawImage } = setup();
+    Object.defineProperty(video, "duration", { value: 8 });
+    const result = loadVideoFrame("/clip.mp4", 320, 180);
+    video.dispatchEvent(new Event("loadedmetadata"));
+    expect(video.currentTime).toBe(1);
+    expect(drawImage).not.toHaveBeenCalled();
+    video.dispatchEvent(new Event("seeked"));
+    expect(await result).toBe(canvas);
+  });
+
   it("falls back and releases resources on decode failure", async () => {
     const { video, drawImage } = setup();
     const result = loadVideoFrame("/api/media/broken.webm", 320, 180);

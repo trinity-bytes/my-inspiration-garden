@@ -41,6 +41,7 @@ export interface CardFrame {
 const CORNER_RADIUS_FRACTION = 0.08;
 
 interface CardUniforms {
+  u_videoAspect: { value: number };
   u_map: { value: THREE.Texture | null };
   u_opacity: { value: number };
   u_aspect: { value: number };
@@ -62,6 +63,7 @@ interface PoolEntry {
   /** The texture cache key this entry currently holds a pin on (see `texture-registry.ts`), or `null` before its first assignment. Tracked separately from `assignedKey` because on a thumbnail load failure the entry re-pins to the placeholder key while keeping the same `assignedKey`. */
   pinnedTextureKey: string | null;
   loadToken: number;
+  poster: THREE.Texture | null;
   /** True once `u_map` holds this assignment's texture; until then the card shows its skeleton. */
   textureReady: boolean;
 }
@@ -79,6 +81,19 @@ export class CardLayer {
   private readonly pool: PoolEntry[] = [];
   private readonly textures: TextureRegistry<THREE.Texture>;
 
+  private playbackKey: string | null = null;
+  private playbackTexture: THREE.VideoTexture | null = null;
+
+  setPlayback(key: string | null, texture: THREE.VideoTexture | null): void {
+    this.playbackKey = key;
+    this.playbackTexture = texture;
+    for (const entry of this.pool) {
+      entry.uniforms.u_map.value = entry.poster;
+      entry.uniforms.u_videoAspect.value = 0;
+      if (!entry.textureReady) entry.uniforms.u_reveal.value = 0;
+    }
+  }
+
   constructor(options: CardLayerOptions) {
     this.options = options;
     this.group = new THREE.Group();
@@ -93,6 +108,7 @@ export class CardLayer {
     while (this.pool.length < size) {
       const uniforms: CardUniforms = {
         u_map: { value: null },
+        u_videoAspect: { value: 0 },
         u_opacity: { value: 0 },
         u_aspect: { value: 1 },
         u_cornerRadius: { value: CORNER_RADIUS_FRACTION },
@@ -104,7 +120,18 @@ export class CardLayer {
       };
       const material = new THREE.ShaderMaterial({
         vertexShader: CARD_VERTEX_GLSL,
-        fragmentShader: CARD_FRAGMENT_GLSL,
+        fragmentShader: CARD_FRAGMENT_GLSL.replace(
+          "uniform sampler2D u_map;",
+          "uniform sampler2D u_map;\nuniform float u_videoAspect;",
+        ).replace(
+          "vec4 tex = texture2D(u_map, vUv);",
+          `vec2 mediaUv = vUv;
+          if (u_videoAspect > 0.0) {
+            vec2 crop = vec2(min(1.0, u_aspect / u_videoAspect), min(1.0, u_videoAspect / u_aspect));
+            mediaUv = (vUv - 0.5) * crop + 0.5;
+          }
+          vec4 tex = texture2D(u_map, mediaUv);`,
+        ),
         transparent: true,
         depthTest: false,
         depthWrite: false,
@@ -123,6 +150,7 @@ export class CardLayer {
         material,
         uniforms,
         assignedKey: null,
+        poster: null,
         pinnedTextureKey: null,
         loadToken: 0,
         textureReady: false,
@@ -131,6 +159,7 @@ export class CardLayer {
   }
 
   private applyTexture(entry: PoolEntry, texture: THREE.Texture): void {
+    entry.poster = texture;
     entry.uniforms.u_map.value = texture;
     entry.textureReady = true;
   }
@@ -250,7 +279,7 @@ export class CardLayer {
     this.textures.load(
       cacheKey,
       (resolve) => {
-        paintItemCardCanvas(item, widthPx, heightPx)
+        paintItemCardCanvas(item, widthPx, heightPx, { apiBaseUrl: this.options.apiBaseUrl })
           .then((canvas) => resolve(createCardCanvasTexture(canvas)))
           .catch(() =>
             resolve(createCardCanvasTexture(paintPlaceholderCanvas(item, widthPx, heightPx))),
@@ -327,6 +356,7 @@ export class CardLayer {
         entry.assignedKey = assignmentKey;
         entry.loadToken++;
         entry.textureReady = false;
+        entry.poster = null;
         this.assignTexture(
           entry,
           instance.item,
@@ -336,9 +366,20 @@ export class CardLayer {
         entry.uniforms.u_reveal.value = entry.textureReady ? 1 : 0;
       }
 
+      entry.uniforms.u_map.value = entry.poster;
+      entry.uniforms.u_videoAspect.value = 0;
+      let liveReady = false;
+      if (instance.key === this.playbackKey && this.playbackTexture) {
+        const video = this.playbackTexture.image as HTMLVideoElement;
+        if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+          liveReady = true;
+          entry.uniforms.u_map.value = this.playbackTexture;
+          entry.uniforms.u_videoAspect.value = video.videoWidth / video.videoHeight;
+        }
+      }
       entry.uniforms.u_reveal.value = stepFade(
         entry.uniforms.u_reveal.value,
-        entry.textureReady ? 1 : 0,
+        entry.textureReady || liveReady ? 1 : 0,
         frame.dtSeconds,
         frame.reducedMotion,
       );

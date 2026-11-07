@@ -224,17 +224,22 @@ async function paintVideoCard(
   item: VideoItem,
   widthPx: number,
   heightPx: number,
+  apiBaseUrl = "",
 ): Promise<HTMLCanvasElement> {
   const canvas = createDeviceCanvas(widthPx, heightPx);
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
   const content = videoCardContent(item);
-  const thumbnailUrl = thumbnailUrlForItem(item);
+  const thumbnailUrl = thumbnailUrlForItem(item, apiBaseUrl);
   const thumbnail = thumbnailUrl
     ? await loadImage(thumbnailUrl, IMAGE_LOAD_TIMEOUT_MS)
     : item.data.provider === "file" && item.data.r2Key
-      ? await loadVideoFrame(`/api/media/${item.data.r2Key}`, canvas.width, canvas.height)
+      ? await loadVideoFrame(
+          `${apiBaseUrl}/api/media/${item.data.r2Key}`,
+          canvas.width,
+          canvas.height,
+        )
       : null;
   const padding = canvas.width * PADDING_FRACTION;
 
@@ -439,6 +444,7 @@ async function paintFontCard(
 
 export interface CardPaintOptions {
   fontLoadTimeoutMs?: number;
+  apiBaseUrl?: string;
 }
 
 /**
@@ -458,7 +464,7 @@ export async function paintItemCardCanvas(
       case "link":
         return await paintLinkCard(item, widthPx, heightPx);
       case "video":
-        return await paintVideoCard(item, widthPx, heightPx);
+        return await paintVideoCard(item, widthPx, heightPx, options.apiBaseUrl);
       case "text":
         return paintTextCard(item, widthPx, heightPx);
       case "palette":

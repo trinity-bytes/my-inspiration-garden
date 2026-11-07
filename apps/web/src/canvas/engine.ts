@@ -2,6 +2,7 @@ import type { Item } from "@garden/shared";
 import * as THREE from "three";
 import { resolveApiBaseUrl } from "../api/client";
 import { canvasBackgroundRgb01 } from "./background";
+import { cardEntryProgress, cardScreenRect } from "./card-fade";
 import { visibleHoverKey } from "./card-hover";
 import { columnLayoutFor } from "./column-layout";
 import { DEFAULT_BARREL_K } from "./distortion";
@@ -22,6 +23,7 @@ import { BarrelPass } from "./post/barrel";
 import { renderPixelRatio } from "./render-pixel-ratio";
 import { SKELETON_ITEMS, sheenCenterPx, sheenHalfWidthPx, stepFade } from "./skeleton";
 import type { Vec2 } from "./types";
+import { VideoPlayback } from "./video-playback";
 
 export interface CanvasEngineOptions {
   /** Fired on a recoverable problem (texture load failure, lost WebGL context, no WebGL). Never thrown. */
@@ -34,6 +36,7 @@ export interface CanvasEngineOptions {
   /** Fired when a card is clicked (not after a drag — see `click-vs-drag.ts`) or opened via the parallel DOM/ARIA layer's Enter key. */
   onItemOpen?: (itemId: string) => void;
   /** Fired whenever the set of cards the parallel DOM/ARIA layer should mirror changes (see `dom-mirror.ts`). */
+  onPlaybackChange?: (key: string | null, error?: string) => void;
   onVisibleCardsChange?: (cards: CardInstance[]) => void;
 }
 
@@ -118,10 +121,15 @@ export class CanvasEngine {
   private lastFrameTime: number | null = null;
   private readonly distortionK = DEFAULT_BARREL_K;
 
+  private readonly playback: VideoPlayback;
   private disposed = false;
 
   constructor(options: CanvasEngineOptions = {}) {
     this.options = options;
+    this.playback = new VideoPlayback((key, error) => {
+      this.cards?.setPlayback(key, this.playback.texture);
+      options.onPlaybackChange?.(key, error);
+    });
     this.reducedMotion = options.reducedMotion ?? false;
     this.items = options.items ?? [];
     this.loading = options.loading ?? false;
@@ -131,6 +139,7 @@ export class CanvasEngine {
 
   /** Updates the items rendered as cards; picked up on the next frame. Invalidates the per-cell instance cache (`cardInstanceCache`), since a cell's cached `CardInstance` is only valid for the items array it was computed from. */
   setItems(items: Item[]): void {
+    this.playback.stop();
     this.items = items;
     this.cardInstanceCache.clear();
     this.columnPeriodCache.clear();
@@ -147,6 +156,26 @@ export class CanvasEngine {
     if (instance) {
       this.navigation?.centerOn({ x: instance.worldRect.x, y: instance.worldRect.y });
     }
+  }
+
+  /** Shared pointer/keyboard activation preserves click-vs-drag routing. */
+  activateCardKey(key: string): void {
+    const card = this.lastCardInstances.find((candidate) => candidate.key === key);
+    if (!card) return;
+    if (card.item.kind === "video" && card.item.data.provider === "file" && card.item.data.r2Key) {
+      this.playback.toggle(key, `${resolveApiBaseUrl()}/api/media/${card.item.data.r2Key}`);
+    } else {
+      this.options.onItemOpen?.(card.item.id);
+    }
+  }
+
+  openCardDetails(key: string): void {
+    const card = this.lastCardInstances.find((candidate) => candidate.key === key);
+    if (card) this.options.onItemOpen?.(card.item.id);
+  }
+
+  stopPlayback(): void {
+    this.playback.stop();
   }
 
   mount(container: HTMLElement): void {
@@ -230,12 +259,7 @@ export class CanvasEngine {
       pointerFromEvent: (event) => this.pointerFromEvent(event),
       hitTestAt: (pos) => this.hitTestAt(pos),
       onHoverChange: (key) => this.setHoveredCardKey(key),
-      onItemOpen: (cardKey) => {
-        const instance = this.lastCardInstances.find((candidate) => candidate.key === cardKey);
-        if (instance) {
-          this.options.onItemOpen?.(instance.item.id);
-        }
-      },
+      onItemOpen: (cardKey) => this.activateCardKey(cardKey),
     });
     this.pointerInteraction.mount();
 
@@ -260,6 +284,7 @@ export class CanvasEngine {
       return;
     }
     this.disposed = true;
+    this.playback.stop();
 
     if (this.rafHandle !== null) {
       cancelAnimationFrame(this.rafHandle);
@@ -309,6 +334,7 @@ export class CanvasEngine {
 
   /** Pauses (or resumes) canvas navigation (T9: the item detail modal). */
   setPaused(paused: boolean): void {
+    if (paused) this.playback.stop();
     this.navigation?.setPaused(paused);
   }
 
@@ -497,6 +523,19 @@ export class CanvasEngine {
       sheenCenterPx: sheenCenterPx(nowSeconds, renderWidth, renderHeight, this.reducedMotion),
       sheenHalfWidthPx: sheenHalfWidthPx(renderWidth, renderHeight),
     };
+    if (this.playback.key) {
+      const active = this.lastCardInstances.find((card) => card.key === this.playback.key);
+      if (
+        !active ||
+        cardEntryProgress(
+          cardScreenRect(active.worldRect, world, 1),
+          viewport.width,
+          viewport.height,
+        ) === 0
+      ) {
+        this.playback.stop();
+      }
+    }
     this.cards.update(this.lastCardInstances, frame, hoverKey);
 
     this.skeletonInstances.length = 0;

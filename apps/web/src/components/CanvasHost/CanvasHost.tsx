@@ -1,5 +1,5 @@
 import type { Item } from "@garden/shared";
-import { CircleAlert, Image } from "lucide-react";
+import { CircleAlert, Image, Info, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CanvasEngine } from "../../canvas/engine";
 import type { CardInstance } from "../../canvas/item-layout";
@@ -65,6 +65,11 @@ export function CanvasHost({
   const initialItemsRef = useRef(items);
   const initialLoadingRef = useRef(itemsStatus === "loading");
 
+  const [playback, setPlayback] = useState<{
+    key: string | null;
+    detailKey?: string;
+    error?: string;
+  }>({ key: null });
   const [visibleCards, setVisibleCards] = useState<CardInstance[]>([]);
 
   useEffect(() => {
@@ -86,6 +91,8 @@ export function CanvasHost({
       // back to the CSS background in CanvasHost.css; nothing to do here.
       onError: () => {},
       onItemOpen: (itemId) => onItemOpenRef.current?.(itemId),
+      onPlaybackChange: (key, error) =>
+        setPlayback((previous) => ({ key, error, detailKey: key ?? previous.detailKey })),
       onVisibleCardsChange: (cards) => setVisibleCards(cards),
     });
     engineRef.current = engine;
@@ -127,8 +134,8 @@ export function CanvasHost({
     engineRef.current?.centerOnCardKey(key);
   }, []);
 
-  const handleCardActivate = useCallback((itemId: string) => {
-    onItemOpenRef.current?.(itemId);
+  const handleCardActivate = useCallback((key: string) => {
+    engineRef.current?.activateCardKey(key);
   }, []);
 
   const showEmptyMessage = itemsStatus === "empty";
@@ -163,6 +170,32 @@ export function CanvasHost({
             : "Couldn't load the garden's items right now."}
         </p>
       )}
+      {(playback.key || playback.error) && (
+        <div className="glass canvas-host__playback">
+          <span role="status">{playback.error ?? "Playing video · Click card to stop"}</span>
+          {playback.detailKey && (
+            <button
+              type="button"
+              onClick={() => {
+                if (playback.detailKey) engineRef.current?.openCardDetails(playback.detailKey);
+              }}
+              aria-label="Open video details"
+            >
+              <Info size={16} aria-hidden="true" /> Details
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              engineRef.current?.stopPlayback();
+              setPlayback({ key: null });
+            }}
+            aria-label={playback.error ? "Dismiss video error" : "Stop video"}
+          >
+            <Square size={16} aria-hidden="true" /> {playback.error ? "Dismiss" : "Stop"}
+          </button>
+        </div>
+      )}
       <ul
         className="canvas-host__card-list visually-hidden"
         aria-label="Garden items currently in view"
@@ -172,10 +205,23 @@ export function CanvasHost({
             <button
               type="button"
               onFocus={() => handleCardFocus(card.key)}
-              onClick={() => handleCardActivate(card.item.id)}
+              onClick={() => handleCardActivate(card.key)}
+              aria-pressed={
+                card.item.kind === "video" && card.item.data.provider === "file"
+                  ? playback.key === card.key
+                  : undefined
+              }
             >
               {cardAriaLabel(card)}
+              {card.item.kind === "video" && card.item.data.provider === "file"
+                ? " — Play or stop video"
+                : ""}
             </button>
+            {card.item.kind === "video" && card.item.data.provider === "file" && (
+              <button type="button" onClick={() => onItemOpenRef.current?.(card.item.id)}>
+                Open details: {cardAriaLabel(card)}
+              </button>
+            )}
           </li>
         ))}
       </ul>
