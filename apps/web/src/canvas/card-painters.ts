@@ -8,6 +8,7 @@ import {
 } from "./card-content";
 import { createDeviceCanvas, paintPlaceholderCanvas } from "./placeholder-texture";
 import { thumbnailUrlForItem } from "./thumbnail-source";
+import { loadVideoFrame } from "./video-preview";
 import { wrapText } from "./wrap-text";
 
 /**
@@ -230,7 +231,11 @@ async function paintVideoCard(
 
   const content = videoCardContent(item);
   const thumbnailUrl = thumbnailUrlForItem(item);
-  const thumbnail = thumbnailUrl ? await loadImage(thumbnailUrl, IMAGE_LOAD_TIMEOUT_MS) : null;
+  const thumbnail = thumbnailUrl
+    ? await loadImage(thumbnailUrl, IMAGE_LOAD_TIMEOUT_MS)
+    : item.data.provider === "file" && item.data.r2Key
+      ? await loadVideoFrame(`/api/media/${item.data.r2Key}`, canvas.width, canvas.height)
+      : null;
   const padding = canvas.width * PADDING_FRACTION;
 
   if (thumbnail) {
