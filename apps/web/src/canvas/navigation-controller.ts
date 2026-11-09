@@ -30,9 +30,9 @@ export interface NavigationControllerOptions {
 // Exported so the constants are easy to find and re-tune later (owner
 // feedback: 220/260 felt slow → 380/420; 2026-09-24 doubled for 2x max speed;
 // 2026-10-03 raised another 1.5x → 1140/1260; 2026-10-04 another 1.5x →
-// 1710/1890).
-export const DEFAULT_MAX_SPEED = 1710;
-export const DEFAULT_KEYBOARD_SPEED = 1890;
+// 1710/1890; 2026-11-08 another 30% for the 1.0.0 launch → 2223/2457).
+export const DEFAULT_MAX_SPEED = 2223;
+export const DEFAULT_KEYBOARD_SPEED = 2457;
 /**
  * Marks UI that floats over the canvas (the navbar) where cursor drift must
  * stop: the pointer is there to use the UI, not to travel. Keyboard panning and drag are unaffected.

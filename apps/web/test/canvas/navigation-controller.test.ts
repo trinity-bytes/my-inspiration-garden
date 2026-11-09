@@ -7,9 +7,9 @@ import {
 } from "../../src/canvas/navigation-controller";
 
 describe("navigation speed defaults", () => {
-  it("raises the speeds another 1.5x after the first live check (owner feedback 2026-10-04)", () => {
-    expect(DEFAULT_MAX_SPEED).toBe(1710);
-    expect(DEFAULT_KEYBOARD_SPEED).toBe(1890);
+  it("raises the speeds another 30% for the 1.0.0 launch (owner feedback 2026-11-08)", () => {
+    expect(DEFAULT_MAX_SPEED).toBe(2223);
+    expect(DEFAULT_KEYBOARD_SPEED).toBe(2457);
   });
 });
 
