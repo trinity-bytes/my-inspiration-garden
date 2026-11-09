@@ -1,120 +1,131 @@
-# my-inspiration-garden
+<p align="center">
+  <img src="docs/images/github-social-preview.png" alt="Inspiration Garden — a personal space of resources, curated by me, for me." width="100%" />
+</p>
 
-A personal, omnidirectional (360°) infinite canvas gallery for collecting inspiration — images,
-links, texts, videos, color palettes and fonts — from across the web. It is publicly readable
-from any device, while writes are restricted to the owner and owner-issued agent tokens, and is
-built to stay organized and filterable for both the owner and AI agents.
+<p align="center">
+  <a href="https://inspo.jahattrinidad.com/"><strong>inspo.jahattrinidad.com</strong></a>
+  ·
+  <a href="docs/api.md">API reference</a>
+  ·
+  <a href="https://github.com/trinity-bytes/my-inspiration-garden/releases">Releases</a>
+</p>
 
-## Workspace layout
+# Inspiration Garden
+
+A personal, omnidirectional infinite canvas for collecting inspiration from across the web —
+images, links, texts, videos, color palettes and fonts. Anyone can browse it from any device;
+only the owner and owner-issued agent tokens can write to it.
+
+![The garden on desktop: an endless grid of resource cards bending under a soft lens, with the floating search bar at the bottom.](docs/images/home-desktop.webp)
+
+## Highlights
+
+| | |
+| --- | --- |
+| **Infinite canvas** | WebGL (three.js) canvas you can travel in every direction: drift with the cursor toward an edge, drag, or use the arrow keys. A barrel lens bends the edges, cards fade in as they load. |
+| **Six kinds of items** | Image, link (with an unfurled preview), text, video, color palette and font. |
+| **Find anything** | Search (`⌘K`) with filters inside it: kind, category tree, tags and dominant color. |
+| **Built for phones** | 2.4-column canvas below 480px, bottom sheets for every dialog, a thumb-reachable bar. Installable as a PWA. |
+| **Fast on slow devices** | WebP thumbnails generated on the edge, videos load only on play, GPU texture uploads are budgeted per frame. |
+| **Agent-friendly** | Scoped bearer tokens and an OpenAPI 3.1 spec at `/api/openapi.json`, so AI agents can read and curate the garden through the same API as the web app. |
+| **Safe edits** | Trash with restore, and a revision history for every item. |
+
+<table>
+  <tr>
+    <td width="40%"><img src="docs/images/filters-desktop.webp" alt="The filter panel rising above the search bar, with kind and tag chips." /></td>
+    <td width="40%"><img src="docs/images/detail-desktop.webp" alt="An item detail dialog showing a video with its tags, date and source." /></td>
+    <td width="20%"><img src="docs/images/home-phone.webp" alt="The canvas on a phone, with the search bar at the bottom." /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Filters live inside the search bar</sub></td>
+    <td align="center"><sub>Item detail</sub></td>
+    <td align="center"><sub>Phone</sub></td>
+  </tr>
+</table>
+
+## Quick start
+
+[mise](https://mise.jdx.dev) pins the toolchain (`node 26`, `pnpm 10`) from `mise.toml`.
+
+```bash
+mise exec -- pnpm install
+cp apps/api/.dev.vars.example apps/api/.dev.vars          # every local request becomes the owner
+mise exec -- pnpm --filter @garden/api db:migrate:local   # apply migrations to local D1
+mise exec -- pnpm --filter @garden/api dev                # Worker on http://localhost:8787
+mise exec -- pnpm --filter @garden/web dev                # web app on http://localhost:5173
+```
+
+Start the API first: Vite proxies `/api` and `/auth` to the Worker, so the web app talks to it
+same-origin, exactly as in production.
+
+## Stack
 
 ```
 apps/
-  api/      Cloudflare Worker (Hono) — the API, backed by D1 (Drizzle) and R2, which also serves the web app's static assets
-  web/      React + Vite web app — desktop canvas client
+  api/      Cloudflare Worker (Hono) — REST API on D1 (Drizzle) + R2 + Images; also serves the web app's static assets
+  web/      React + Vite + three.js — the canvas client (PWA)
 packages/
-  shared/   Shared TypeScript types and Zod schemas used by api/web and future clients
+  shared/   Shared TypeScript types and Zod schemas (one source for validation and the OpenAPI spec)
 ```
 
-## Requirements
+| Command | What it does |
+| --- | --- |
+| `mise exec -- pnpm test` | Run every workspace's test suite (Vitest) |
+| `mise exec -- pnpm typecheck` | Type-check every workspace |
+| `mise exec -- pnpm lint` | Lint and check formatting (Biome) |
+| `mise exec -- pnpm format` | Apply formatting (Biome) |
+| `mise exec -- pnpm build` | Build the web app into `apps/web/dist` |
 
-- [mise](https://mise.jdx.dev) manages the pinned toolchain (`node 26`, `pnpm 10`) declared in
-  `mise.toml`. Run every command below through `mise exec --`.
+## Using it from an agent
 
-## Commands
+1. Sign in as the owner and open **API tokens**. Create a `read` or `read + write` token; it is
+   shown once.
+2. Point your client at `GET /api/openapi.json`.
+3. Call the API with `Authorization: Bearer <token>`:
 
-```bash
-mise exec -- pnpm install    # install all workspace dependencies
-mise exec -- pnpm test       # run every workspace's test suite
-mise exec -- pnpm typecheck  # type-check every workspace
-mise exec -- pnpm lint       # lint and check formatting (Biome)
-mise exec -- pnpm format     # apply formatting (Biome)
-mise exec -- pnpm build      # build the web app into apps/web/dist
+```sh
+curl "https://inspo.jahattrinidad.com/api/items?limit=5" \
+  -H "Authorization: Bearer ig_your_token_here"
 ```
 
-### Local development
-
-`apps/api/.dev.vars` is gitignored, so create it once from the example — it turns every local
-request into the owner, so you can skip Cloudflare Access entirely while developing:
-
-```bash
-cp apps/api/.dev.vars.example apps/api/.dev.vars
-mise exec -- pnpm --filter @garden/api db:migrate:local   # apply migrations to local D1
-mise exec -- pnpm --filter @garden/api dev                 # wrangler dev, http://localhost:8787
-mise exec -- pnpm --filter @garden/web dev                 # vite, http://localhost:5173
-```
-
-Vite proxies `/api` and `/auth` to the Worker, so the web app talks to the API same-origin in dev
-exactly as it will in production. Run the API first — the web app needs it to load any data.
+Full endpoint reference: [`docs/api.md`](docs/api.md).
 
 ## Deployment
 
-**One Cloudflare Worker serves both the API and the web app's static assets, on one hostname.**
-There is no Cloudflare Pages project.
+**One Cloudflare Worker serves both the API and the web app, on one hostname.** `wrangler.jsonc`
+points `assets.directory` at `../web/dist` and sends only `/api/*` and `/auth/*` to Worker code;
+everything else is a static asset.
 
-`apps/api/wrangler.jsonc` sets `assets.directory` to the web build output
-(`../web/dist`) with a single-page-application fallback, and
-`run_worker_first: ["/api/*", "/auth/*"]` to send *only* those two path globs to Worker code.
-Every other request is served from the asset directory without invoking the Worker at all.
+The single origin is what makes owner auth work: Cloudflare Access protects only `/auth/login`
+and sets a `CF_Authorization` cookie that the browser then sends on every same-origin `/api/*`
+request. The gallery stays public; writes need that cookie or a bearer token.
 
-### Why a single origin
+**Releases deploy themselves.** Publishing a GitHub release runs
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): lint, typecheck, tests, remote D1
+migrations, `pnpm run deploy`, then a health check on `/api/health`. It needs the
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 
-Owner auth depends on it. The browser authenticates once at `/auth/login`, and Cloudflare Access
-sets a `CF_Authorization` cookie that the browser then attaches automatically to every same-origin
-request — that cookie *is* the owner's session. Split the UI and the API onto different origins and
-the cookie stops being ambient, credentialed CORS becomes mandatory, and the CSRF guard has no
-same-origin `Origin` left to check. One Worker also means one deploy, one hostname, and static
-assets that are free and unmetered.
+<details>
+<summary>Setting it up on your own Cloudflare account</summary>
 
-### Prerequisites
+1. `wrangler login`.
+2. `wrangler d1 create inspiration-garden` and paste the `database_id` into `apps/api/wrangler.jsonc`.
+3. `wrangler r2 bucket create inspiration-garden-media`.
+4. Create an Access application scoped to **only** `/auth/login` on your hostname (not `/api/*`,
+   not the whole site), with a `SameSite=Lax` session cookie on the default path.
+5. Set `ACCESS_TEAM_DOMAIN`, `ACCESS_AUD`, `OWNER_EMAIL` and `CORS_ORIGINS` in `wrangler.jsonc`.
+   `CORS_ORIGINS` must include your production origin exactly: the CSRF guard checks owner writes
+   against it, so a missing origin fails every write with `403 csrf check failed`.
+6. `mise exec -- pnpm --filter @garden/api db:migrate:remote`.
+7. `mise exec -- pnpm run deploy` from the repository root (it builds the web app first, which
+   `wrangler deploy` needs).
+8. `curl https://<your-hostname>/api/health` should return `{"ok":true,"config":{"problems":[]}}`;
+   otherwise each entry in `config.problems` names the binding at fault.
 
-- A Cloudflare account with Workers, D1, R2 and Zero Trust (Access).
-- `wrangler login`, once, on the machine that will deploy.
-- A hostname you control, routed to the Worker.
+</details>
 
-> **This repository's machine has no Cloudflare credentials configured.** Nothing below has been
-> run against a real account; the deploy config still carries placeholders.
+## Design
 
-### Placeholders to fill in `apps/api/wrangler.jsonc`
-
-| Placeholder               | Replace with                                               |
-| ------------------------- | ---------------------------------------------------------- |
-| `database_id` (all zeros) | the id printed by `wrangler d1 create`                      |
-| `bucket_name`             | the name printed by `wrangler r2 bucket create`             |
-| `ACCESS_TEAM_DOMAIN`      | your Access team domain, e.g. `myteam.cloudflareaccess.com` |
-| `ACCESS_AUD`              | the `AUD` tag of the Access application                     |
-| `OWNER_EMAIL`             | the exact email Access reports for you                      |
-| `CORS_ORIGINS`            | the production origin, exact, no trailing slash             |
-
-`CORS_ORIGINS` is not only about cross-origin clients. The CSRF guard checks *same-origin* owner
-writes against that same allowlist, so if the production origin is missing every owner write fails
-with `403 csrf check failed`. Never widen it with a wildcard to silence that.
-
-### Remote setup, in order
-
-Steps 1–6 are one-time; step 7 is what every later release repeats. **None of this has been done
-yet.**
-
-1. **Authenticate** — `wrangler login`.
-2. **Create the D1 database** — `wrangler d1 create inspiration-garden`, then paste the printed
-   `database_id` into `wrangler.jsonc`. Migrations cannot run until this is filled in.
-3. **Create the R2 bucket** — `wrangler r2 bucket create inspiration-garden-media`.
-4. **Create the Access application**, scoped to **only** `/auth/login` on that hostname — not
-   `/api/*`, and not the whole site. That narrow scope is what makes the gallery public while
-   owner login works. Set the session cookie to `SameSite=Lax`, and leave its `Path` at the default
-   so it is sent on every `/api/*` request, not just on `/auth/login`. Copy the application's `AUD`
-   tag into `ACCESS_AUD`, and your email into `OWNER_EMAIL`.
-5. **Fill the remaining placeholders** — the table above, including the production origin in
-   `CORS_ORIGINS`.
-6. **Apply migrations to the remote database** —
-   `mise exec -- pnpm --filter @garden/api db:migrate:remote`.
-7. **Deploy** — `mise exec -- pnpm run deploy` from the repository root. This builds the web app
-   *first*, because `assets.directory` must exist when the Worker is deployed; deploying in the
-   other order fails. Prefer this over `pnpm --filter @garden/api deploy` for exactly that reason.
-8. **Verify** — `curl https://<your-hostname>/api/health`. `{"ok":true,"config":{"problems":[]}}`
-   means every placeholder was replaced. If `ok` is `false`, each entry in `config.problems` names
-   the binding at fault and what to do about it.
-
-Sign-out needs no route of its own: the web app's "Sign out" link points at Cloudflare's
-`/cdn-cgi/access/logout`.
-
-Endpoint reference: [`docs/api.md`](docs/api.md).
+The interface is designed Figma-first: foundations (tokens mirrored in
+`apps/web/src/styles/tokens.css`), components and every screen, desktop and phone, live in the
+project's Figma file before they reach code.

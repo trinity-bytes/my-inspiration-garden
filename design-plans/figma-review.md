@@ -2,6 +2,17 @@
 
 Figma file `tX6gKvasJmMovsbC3KBiWU` ("Inspiration Garden — UI (current state)"). Every fix is designed in Figma first; code changes start only after the owner approves all of them. Proposals live on the Figma page "Proposals" (current vs proposed, side by side).
 
+## File layout (since v1.0.0, 2026-11-08)
+
+The "Proposals" page is gone: every shipped proposal was promoted and every discarded option deleted. Pages:
+
+- **Cover** — Figma thumbnail (1920×960, `103:3933`), social preview (Open Graph 1200×630, `103:3881`, same as `apps/web/public/og-image.png`) and GitHub repository preview (1280×640, `103:3907`, exported to `docs/images/github-social-preview.png`).
+- **Foundations** — tokens (`2:12`) and Brand (`104:3094`: App Icon master `88:3686`, sizes, lockup).
+- **Components** — Canvas Card, Skeleton Card, Navbar v2 (`104:2939`, Role × Device), Filter Panel (`104:2940`), Icons & navigation controls, Controls (v2), Tags & link button, Item Note.
+- **Screens** — sections Desktop · Home (`104:829`), Desktop · Item detail & forms (`104:830`), Desktop · Dialogs (`104:831`), Phone · 390 (`104:832`).
+
+The node IDs in the history below that point at the Proposals page no longer exist.
+
 ## Resume here (paused 2026-10-29)
 
 1. Re-open the Figma file and the "Proposals" page (`16:609`); sections top to bottom: F6 detail, F5 navbar v2, F4 mobile navbar v2, F7 mobile gutter, Modals v2, F8 mobile states.
@@ -76,3 +87,5 @@ Code first, Figma synced after (motion/shader work can't be designed in Figma). 
 - L18 (2026-11-05, owner): "me gusta el A pero me quedo con el B porque funciona mejor en tamaños pequeños. pero si, me quedo con la D tambien pero ese azul sobre naranja al centro es poco legible en tamaños peuqueños"
 - L19 (2026-11-05, owner): "pon el icono ao lado ixquierdo del nombre en un layout tipo isologotipo y creo que queda"
 - L20 (2026-11-05, owner): "queda. aprobado"
+- L21 (2026-11-08, owner): "ordenes el figma y dejes en una pagina 'cover' la miniatura para figma, el social preview al compartir la web y la imagen preview del repo de github. del figma quita todas las propuestas descartadas y deja fundations components y screens bien actualizados."
+- 2026-11-08: Done for v1.0.0. Cover page added; shipped proposals promoted to Screens (F8 phone sheets got Navbar v2 at the bottom edge, per F9) and Components (Navbar v2, Filter Panel); v1 Navbar, Filter Panel and unused v1 controls removed; Proposals page deleted. Variables re-checked against `tokens.css`: no drift.
