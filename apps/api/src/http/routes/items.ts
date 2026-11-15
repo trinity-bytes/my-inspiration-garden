@@ -1,5 +1,7 @@
 import {
   createItemInputSchema,
+  type Item,
+  type ItemField,
   itemListQuerySchema,
   scopeSatisfies,
   updateItemInputSchema,
@@ -12,6 +14,16 @@ import { importLinkPreview } from "../../lib/link-preview";
 import { actorLabel, computeItemSource } from "../actor-label";
 import { requireAuth } from "../middleware/require";
 import type { Actor, AppDeps, AppEnv } from "../types";
+
+/** Narrows an item to `id` plus the requested fields; a field the item lacks stays absent. */
+function pickFields(item: Item, fields: ItemField[]): Partial<Item> {
+  const source = item as Record<string, unknown>;
+  const picked: Record<string, unknown> = { id: item.id };
+  for (const field of fields) {
+    if (source[field] !== undefined) picked[field] = source[field];
+  }
+  return picked as Partial<Item>;
+}
 
 function canSeeDeleted(actor: Actor): boolean {
   return actor.type === "owner" || (actor.type === "token" && scopeSatisfies(actor.scope, "write"));
@@ -39,6 +51,7 @@ export function registerItemRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void 
       limit: c.req.query("limit"),
       includeDeleted: c.req.query("includeDeleted"),
       deletedOnly: c.req.query("deletedOnly"),
+      fields: c.req.queries("fields"),
     };
     const parsed = itemListQuerySchema.safeParse(raw);
     if (!parsed.success) {
@@ -52,7 +65,8 @@ export function registerItemRoutes(app: Hono<AppEnv>, deps: AppDeps = {}): void 
 
     const repo = new ItemsRepository(createDb(c.env.DB));
     const result = await repo.list(query);
-    return c.json(result);
+    if (query.fields.length === 0) return c.json(result);
+    return c.json({ ...result, items: result.items.map((item) => pickFields(item, query.fields)) });
   });
 
   app.get("/api/items/:id", async (c) => {

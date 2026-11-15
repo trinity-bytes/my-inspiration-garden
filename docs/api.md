@@ -224,39 +224,73 @@ not automated here):
 
 ## For agents
 
-The garden is designed to be read and written by AI agents through the same
-REST API the web app uses — no separate MCP server exists yet (planned for a
-later phase), but the API and tokens described here are already usable.
+AI agents read and write the garden through the same REST API the web app
+uses. There is no MCP server; the API, scoped tokens and the skill below are
+the supported path.
 
-1. **Create a token.** Sign in as the owner in the web app and open **API
-   tokens** from the navbar (next to **Categories**). Create a token with a
-   name and a scope — `read` for browsing only, or `read + write` to also
-   create/update/delete items, categories, and tags (`write` always implies
-   `read`). The plaintext token is shown exactly once, right after creation —
-   copy it immediately; it cannot be retrieved again (only revoked and
-   replaced with a new one).
-2. **Read the machine-readable spec.** `GET /api/openapi.json` serves an
-   OpenAPI 3.1 document covering every `/api/*` route (items, categories,
-   tags, tokens, session, media, unfurl), generated from this project's own
-   Zod schemas — feed it directly to an OpenAPI-aware client/codegen tool
-   instead of hand-transcribing this page.
-3. **Call the API** with `Authorization: Bearer <token>`:
+### Setup
 
-   ```sh
-   # List the 5 most recent items
-   curl "https://garden.example.com/api/items?limit=5" \
-     -H "Authorization: Bearer ig_your_token_here"
+1. **Token (writes only).** Reads are public. To write, sign in as the owner,
+   open **API tokens** and create a `read + write` token (`write` always
+   implies `read`). The plaintext token is shown once; it can only be revoked
+   and replaced.
+2. **Skill.** [`skills/inspiration-garden`](../skills/inspiration-garden/SKILL.md)
+   is an Agent Skills `SKILL.md` that Claude Code, Codex and OpenCode load.
+   Link it into `~/.claude/skills/` (Claude Code, OpenCode) and
+   `~/.agents/skills/` (Codex, OpenCode), then export `GARDEN_API_URL` and, for
+   writes, `GARDEN_API_TOKEN`. Its [`references/recipes.md`](../skills/inspiration-garden/references/recipes.md)
+   holds copy-ready curl recipes.
+3. **Spec.** `GET /api/openapi.json` is an OpenAPI 3.1 document for every
+   `/api/*` route, generated from the shared Zod schemas.
 
-   # Create a text item (needs a write-scope token)
-   curl -X POST "https://garden.example.com/api/items" \
-     -H "Authorization: Bearer ig_your_token_here" \
-     -H "Content-Type: application/json" \
-     -d '{"kind":"text","data":{"body":"Noted via agent"}}'
-   ```
+### Query narrowly
 
-   A bearer token is exempt from the CSRF guard above (it's never an ambient
-   credential), so `Origin`/`X-Garden-Client` are not required on token
-   requests — only for owner-session writes from a browser.
+Listing without filters returns 40 full items per page (100 items is about
+70 KB), which floods an agent's context. Narrow every list call:
+
+| Parameter | Behavior |
+|-----------|----------|
+| `q` | Full-text over title, notes, text body or link/image description, and tags. Each word matches as a prefix (`insp` → "inspiration"); every word must match, in any order and any field. |
+| `tag` | Repeatable, AND: `tag=portfolio&tag=animations`. Names from `GET /api/tags`. |
+| `kind` | Repeatable, OR: `image`, `link`, `text`, `video`, `palette`, `font`. |
+| `categoryId` | Repeatable, OR, includes descendant categories. |
+| `color` | Hex such as `#F29A6B`; matches items with a close indexed color. |
+| `fields` | Comma list or repeatable. Returns only those fields plus `id` (a field the item lacks is left out): `id kind title url notes data source categoryIds tags createdAt updatedAt deletedAt`. An unknown field is a `400 invalid_query`. |
+| `limit`, `cursor` | Page size 1–100 (default 40); pass the previous `nextCursor` for the next page. |
+
+```sh
+# Vocabulary first: every tag with its item count
+curl -s "$GARDEN_API_URL/api/tags"
+
+# Narrow, compact search
+curl -s -G "$GARDEN_API_URL/api/items" --data-urlencode "q=landing hero" \
+  -d fields=title,url,tags -d limit=20
+
+# Then the full item only where needed
+curl -s "$GARDEN_API_URL/api/items/<id>"
+```
+
+### Write
+
+Send `Authorization: Bearer <token>`. A bearer token is exempt from the CSRF
+guard above (it's never an ambient credential), so `Origin`/`X-Garden-Client`
+are only required for owner-session writes from a browser.
+
+```sh
+# Create a text item
+curl -X POST "$GARDEN_API_URL/api/items" \
+  -H "Authorization: Bearer $GARDEN_API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"text","data":{"body":"Noted via agent"},"tags":["inspiration"]}'
+
+# Replace an item's tags: kind must match the item; tags replaces the whole list
+curl -X PATCH "$GARDEN_API_URL/api/items/<id>" \
+  -H "Authorization: Bearer $GARDEN_API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"kind":"link","tags":["portfolio","animations"]}'
+```
+
+`PATCH /api/tags/:id` with `{"name": "..."}` renames a tag and merges it into
+an existing tag of the same name; `DELETE /api/tags/:id` removes a tag from
+every item (the items stay).
 
 ## Local dev reseed
 
