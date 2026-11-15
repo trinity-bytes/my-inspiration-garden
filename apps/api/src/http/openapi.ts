@@ -280,7 +280,13 @@ function buildRoutes(): RouteSpec[] {
           description: "Matches indexed item colors.",
           schema: schemaOf(hexColorSchema),
         },
-        { name: "q", in: "query", description: "Full-text search.", schema: { type: "string" } },
+        {
+          name: "q",
+          in: "query",
+          description:
+            "Full-text search over title, notes, text body or link/image description, and tags. Each word matches as a prefix; an item must match every word, in any order.",
+          schema: { type: "string" },
+        },
         {
           name: "cursor",
           in: "query",
