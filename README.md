@@ -78,17 +78,35 @@ packages/
 
 ## Using it from an agent
 
-1. Sign in as the owner and open **API tokens**. Create a `read` or `read + write` token; it is
-   shown once.
-2. Point your client at `GET /api/openapi.json`.
-3. Call the API with `Authorization: Bearer <token>`:
+CLI agents (Claude Code, Codex, OpenCode) curate the garden through the REST API. A bundled skill
+teaches them to search narrowly instead of pulling whole pages:
+
+1. **Install the skill** by linking it where your agents look for skills:
+
+   ```sh
+   ln -s "$PWD/skills/inspiration-garden" ~/.claude/skills/inspiration-garden  # Claude Code, OpenCode
+   ln -s "$PWD/skills/inspiration-garden" ~/.agents/skills/inspiration-garden  # Codex, OpenCode
+   ```
+
+2. **Point it at your garden.** Reads are public; writes need a token from **API tokens** (owner
+   only, `read + write`, shown once):
+
+   ```sh
+   export GARDEN_API_URL=https://inspo.jahattrinidad.com
+   export GARDEN_API_TOKEN=ig_your_token_here   # only for writes
+   ```
+
+3. **Ask in plain words:** "find landing page references with hero sections", "tag these links",
+   "clean up unused tags".
+
+The key call is a narrow, compact list: search words match as prefixes, and `fields` trims each
+item to what the agent needs.
 
 ```sh
-curl "https://inspo.jahattrinidad.com/api/items?limit=5" \
-  -H "Authorization: Bearer ig_your_token_here"
+curl -s -G "$GARDEN_API_URL/api/items" --data-urlencode "q=landing hero" -d fields=title,url,tags -d limit=20
 ```
 
-Full endpoint reference: [`docs/api.md`](docs/api.md).
+Full reference: [`docs/api.md`](docs/api.md#for-agents) and `GET /api/openapi.json`.
 
 ## Deployment
 
