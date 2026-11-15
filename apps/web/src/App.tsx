@@ -10,9 +10,13 @@ import { defaultFilterState } from "./filters/filter-state";
 import { useCategories } from "./forms/useCategories";
 import { useGardenItems } from "./items/useGardenItems";
 import { useOwnerSession } from "./session/useOwnerSession";
+import type { TagChange } from "./tags/TagManagerModal";
 
 // Owner-only dialogs load on first open: visitors never download them, and the
 // entry chunk stays focused on the canvas.
+const TagManagerModal = lazy(() =>
+  import("./tags/TagManagerModal").then((m) => ({ default: m.TagManagerModal })),
+);
 const CategoryManagerModal = lazy(() =>
   import("./categories/CategoryManagerModal").then((m) => ({ default: m.CategoryManagerModal })),
 );
@@ -37,7 +41,7 @@ const TrashModal = lazy(() =>
  * detail modal), so at most one is ever open. `edit` and `history` are scoped
  * to the open detail item.
  */
-type ActiveDialog = "quickAdd" | "trash" | "categories" | "tokens" | "edit" | "history";
+type ActiveDialog = "quickAdd" | "trash" | "categories" | "tags" | "tokens" | "edit" | "history";
 
 function isItemScopedDialog(dialog: ActiveDialog | null): boolean {
   return dialog === "edit" || dialog === "history";
@@ -53,7 +57,13 @@ export function App() {
   // the item detail modal below.
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
-  const { status: itemsStatus, items, applySavedItem, removeItem } = useGardenItems(filters);
+  const {
+    status: itemsStatus,
+    items,
+    applySavedItem,
+    removeItem,
+    refetch: refetchItems,
+  } = useGardenItems(filters);
   const { selectedItem, selectedItemId, openItem, closeItem } = useItemDetail(
     items,
     itemsStatus !== "loading",
@@ -66,9 +76,27 @@ export function App() {
   const openQuickAdd = useCallback(() => setActiveDialog("quickAdd"), []);
   const openTrash = useCallback(() => setActiveDialog("trash"), []);
   const openCategories = useCallback(() => setActiveDialog("categories"), []);
+  const openTags = useCallback(() => setActiveDialog("tags"), []);
   const openTokens = useCallback(() => setActiveDialog("tokens"), []);
   const openEdit = useCallback(() => setActiveDialog("edit"), []);
   const openHistory = useCallback(() => setActiveDialog("history"), []);
+
+  // A renamed or deleted tag would leave an active tag filter pointing at a
+  // name that no longer exists (an empty canvas), so the filter follows the
+  // change; otherwise refetch so loaded items show their new tags.
+  const handleTagsChange = useCallback(
+    (changes: TagChange[]) => {
+      const renames = new Map(changes.map(({ from, to }) => [from, to]));
+      if (!filters.tags.some((name) => renames.has(name))) {
+        refetchItems();
+        return;
+      }
+      const next = filters.tags.map((name) => (renames.has(name) ? renames.get(name) : name));
+      const nextTags = [...new Set(next.filter((name): name is string => Boolean(name)))];
+      setFilters({ ...filters, tags: nextTags });
+    },
+    [filters, refetchItems],
+  );
 
   const handleCloseDetail = useCallback(() => {
     setActiveDialog((current) => (isItemScopedDialog(current) ? null : current));
@@ -129,6 +157,7 @@ export function App() {
         onAddClick={isOwner ? openQuickAdd : undefined}
         onTrashClick={isOwner ? openTrash : undefined}
         onCategoriesClick={isOwner ? openCategories : undefined}
+        onTagsClick={isOwner ? openTags : undefined}
         onTokensClick={isOwner ? openTokens : undefined}
       />
       {selectedItem && (
@@ -151,6 +180,9 @@ export function App() {
         )}
         {isOwner && activeDialog === "categories" && (
           <CategoryManagerModal categories={categories} onClose={closeDialog} />
+        )}
+        {isOwner && activeDialog === "tags" && (
+          <TagManagerModal onClose={closeDialog} onTagsChange={handleTagsChange} />
         )}
         {isOwner && activeDialog === "tokens" && <TokensModal onClose={closeDialog} />}
         {isOwner && selectedItem && activeDialog === "edit" && (

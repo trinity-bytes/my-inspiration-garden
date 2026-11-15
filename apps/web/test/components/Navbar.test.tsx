@@ -208,6 +208,19 @@ describe("Navbar", () => {
     expect(onTokensClick).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a Tags button for the owner and wires its callback", () => {
+    const onTagsClick = vi.fn();
+    render(<Navbar isOwner onTagsClick={onTagsClick} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Tags" }));
+    expect(onTagsClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a Tags button to a visitor", () => {
+    render(<Navbar onTagsClick={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Tags" })).not.toBeInTheDocument();
+  });
+
   it("gives the owner an account menu with the management actions and Sign out last", () => {
     const onTrashClick = vi.fn();
     render(<Navbar isOwner onTrashClick={onTrashClick} onCategoriesClick={() => {}} />);

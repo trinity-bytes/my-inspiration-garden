@@ -39,13 +39,54 @@
   margin-bottom: 0;
 }
 
-.filter-panel__group legend {
+.filter-panel__group legend,
+.filter-panel__legend {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-heading);
   text-transform: uppercase;
   letter-spacing: var(--tracking-overline);
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
+}
+
+/* Tags group (Figma "Proposal · Tags"): label with the sort toggle on the
+   right, a name filter, the chips, then Show all / Manage tags. */
+.filter-panel__group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.filter-panel__group-header .filter-panel__legend {
+  margin-bottom: 0;
+}
+
+.filter-panel__sort {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-panel__tag-filter {
+  margin-bottom: var(--space-2);
+}
+
+.filter-panel__tags-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.filter-panel__match-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.filter-panel__manage-tags {
+  margin-left: auto;
 }
 
 .filter-panel__chips {

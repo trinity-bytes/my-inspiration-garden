@@ -2,6 +2,7 @@ import type { Category } from "@garden/shared";
 import { useEffect, useState } from "react";
 import { getCategoryTree, getTags, type TagsResult } from "../api/endpoints";
 import { useCategoriesVersion } from "../categories/useCategoriesVersion";
+import { useTagsVersion } from "../tags/useTagsVersion";
 
 export interface FilterOptions {
   categories: Category[];
@@ -16,12 +17,14 @@ export interface FilterOptions {
  * throwing (matches `useCategoryNames`'s established convention). The
  * category list refetches whenever the category manager modal changes a
  * category, via the shared `useCategoriesVersion` invalidation
- * signal; tags are unaffected and stay on their own one-shot load.
+ * signal, and the tag list refetches whenever the tag manager renames or
+ * deletes a tag, via `useTagsVersion`.
  */
 export function useFilterOptions(): FilterOptions {
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<TagsResult["tags"]>([]);
   const categoriesVersion = useCategoriesVersion();
+  const tagsVersion = useTagsVersion();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: categoriesVersion is a deliberate re-fetch trigger, not read in the effect body.
   useEffect(() => {
@@ -40,6 +43,7 @@ export function useFilterOptions(): FilterOptions {
     };
   }, [categoriesVersion]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: tagsVersion is a deliberate re-fetch trigger, not read in the effect body.
   useEffect(() => {
     let cancelled = false;
 
@@ -54,7 +58,7 @@ export function useFilterOptions(): FilterOptions {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tagsVersion]);
 
   return { categories, tags };
 }

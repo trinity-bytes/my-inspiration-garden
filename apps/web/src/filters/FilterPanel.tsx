@@ -7,6 +7,7 @@ import { useSwipeToDismiss } from "../hooks/useSwipeToDismiss";
 import { KIND_ICONS, KIND_LABELS } from "../items/kind-icons";
 import { CategoryTree } from "./CategoryTree";
 import { buildCategoryTree, type FilterState, isFilterActive, toggleValue } from "./filter-state";
+import { TagFilterGroup } from "./TagFilterGroup";
 import "./FilterPanel.css";
 
 export interface FilterPanelProps {
@@ -17,6 +18,8 @@ export interface FilterPanelProps {
   onClose?: () => void;
   categories: Category[];
   tags: TagsResult["tags"];
+  /** Owner only: opens the tag manager from the Tags group. */
+  onManageTags?: () => void;
 }
 
 const KINDS: ItemKind[] = ["image", "link", "text", "video", "palette", "font"];
@@ -44,6 +47,7 @@ export function FilterPanel({
   onClose = () => {},
   categories,
   tags,
+  onManageTags,
 }: FilterPanelProps) {
   const { sheetRef, handleProps } = useSwipeToDismiss<HTMLElement>(onClose);
 
@@ -124,31 +128,12 @@ export function FilterPanel({
       )}
 
       {tags.length > 0 && (
-        <fieldset className="filter-panel__group">
-          <legend>Tags</legend>
-          <div className="filter-panel__chips">
-            {tags.map((tag) => {
-              const isSelected = filters.tags.includes(tag.name);
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  className="chip chip--toggle"
-                  aria-pressed={isSelected}
-                  onClick={() => toggleTag(tag.name)}
-                >
-                  {isSelected && <Check size={14} aria-hidden="true" />}
-                  {tag.name}{" "}
-                  <span className="chip__count">
-                    <span className="visually-hidden">(</span>
-                    {tag.count}
-                    <span className="visually-hidden">)</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <TagFilterGroup
+          tags={tags}
+          selected={filters.tags}
+          onToggle={toggleTag}
+          onManageTags={onManageTags}
+        />
       )}
 
       <fieldset className="filter-panel__group">

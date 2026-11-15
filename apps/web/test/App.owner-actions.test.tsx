@@ -23,6 +23,8 @@ vi.mock("../src/api/endpoints", () => ({
   listTokens: vi.fn(),
   createToken: vi.fn(),
   revokeToken: vi.fn(),
+  renameTag: vi.fn(),
+  deleteTag: vi.fn(),
 }));
 
 import { App } from "../src/App";
@@ -37,6 +39,7 @@ import {
   listItemRevisions,
   listItems,
   listTokens,
+  renameTag,
   restoreItem,
   restoreItemRevision,
   updateItem,
@@ -221,11 +224,39 @@ describe("App: owner quick-add / edit / history / trash (T11)", () => {
     expect(vi.mocked(listItems).mock.calls.length).toBe(listItemsCallsBefore);
   });
 
+  it("keeps an active tag filter in step when the tag manager renames that tag", async () => {
+    vi.mocked(getTags).mockResolvedValue({ tags: [{ id: "t-ref", name: "web-ref", count: 3 }] });
+    vi.mocked(renameTag).mockResolvedValue({ id: "t-web", name: "web-reference", count: 3 });
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Filters" }));
+    fireEvent.click(await screen.findByRole("button", { name: "web-ref (3)" }));
+    await waitFor(() =>
+      expect(vi.mocked(listItems).mock.lastCall?.[0]).toMatchObject({ tag: ["web-ref"] }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Manage tags" }));
+    const dialog = await screen.findByRole("dialog", { name: "Tags" });
+    expect(screen.queryByRole("region", { name: "Filters" })).not.toBeInTheDocument();
+
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Rename web-ref" }));
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Rename web-ref" }), {
+      target: { value: "web-reference" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(renameTag).toHaveBeenCalledWith("t-ref", "web-reference"));
+    await waitFor(() =>
+      expect(vi.mocked(listItems).mock.lastCall?.[0]).toMatchObject({ tag: ["web-reference"] }),
+    );
+  });
+
   it.each([
     ["Add item", "Add item"],
     ["Trash", "Trash"],
     ["Categories", "Categories"],
     ["API tokens", "API tokens"],
+    ["Tags", "Tags"],
   ])(
     "pauses canvas navigation while the %s dialog is open (owner QA)",
     async (button, dialogName) => {

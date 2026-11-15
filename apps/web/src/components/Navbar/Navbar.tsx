@@ -1,4 +1,4 @@
-import { FolderTree, KeyRound, LogOut, Plus, Trash2 } from "lucide-react";
+import { FolderTree, KeyRound, LogOut, Plus, Tag, Trash2 } from "lucide-react";
 import { type PointerEvent, useEffect, useRef } from "react";
 import { isClick } from "../../canvas/click-vs-drag";
 import { NAVIGATION_BLOCKER_ATTRIBUTE } from "../../canvas/navigation-controller";
@@ -35,6 +35,8 @@ export interface NavbarProps {
   onTrashClick?: () => void;
   /** Opens the owner-only category manager modal. Only rendered when `isOwner` and this is provided. */
   onCategoriesClick?: () => void;
+  /** Opens the owner-only tag manager (navbar and the filter panel's "Manage tags"). Only rendered when `isOwner`. */
+  onTagsClick?: () => void;
   /** Opens the owner-only API tokens modal. Only rendered when `isOwner` and this is provided. */
   onTokensClick?: () => void;
 }
@@ -64,6 +66,7 @@ export function Navbar({
   onAddClick,
   onTrashClick,
   onCategoriesClick,
+  onTagsClick,
   onTokensClick,
 }: NavbarProps) {
   const searchRef = useRef<HTMLInputElement>(null);
@@ -122,6 +125,7 @@ export function Navbar({
         icon: FolderTree,
         onSelect: onCategoriesClick,
       },
+    isOwner && onTagsClick && { label: "Tags", icon: Tag, onSelect: onTagsClick },
     isOwner && onTokensClick && { label: "API tokens", icon: KeyRound, onSelect: onTokensClick },
   ].filter((action): action is AccountMenuAction => Boolean(action));
 
@@ -178,6 +182,14 @@ export function Navbar({
         onClose={closeFilters}
         categories={categories}
         tags={tags}
+        onManageTags={
+          isOwner && onTagsClick
+            ? () => {
+                closeFilters();
+                onTagsClick();
+              }
+            : undefined
+        }
       />
     </header>
   );
