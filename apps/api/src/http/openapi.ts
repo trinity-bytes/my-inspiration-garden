@@ -6,6 +6,7 @@ import {
   createItemInputSchema,
   hexColorSchema,
   idSchema,
+  itemFieldSchema,
   itemKindSchema,
   itemSchema,
   linkPlatformSchema,
@@ -310,6 +311,13 @@ function buildRoutes(): RouteSpec[] {
           in: "query",
           description: "Owner or write-scope only: lists exclusively soft-deleted (trashed) items.",
           schema: { type: "boolean" },
+        },
+        {
+          name: "fields",
+          in: "query",
+          description:
+            "Comma-separated or repeatable. Returns only these fields per item, plus `id` (a field the item lacks is left out); every field when omitted. Use it to keep responses small, e.g. `fields=title,url,tags`.",
+          schema: { type: "array", items: schemaOf(itemFieldSchema) },
         },
       ],
       responses: {

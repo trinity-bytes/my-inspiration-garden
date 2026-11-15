@@ -227,6 +227,35 @@ function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [value];
 }
 
+/** Repeated params and comma lists both become one flat list: `fields=a,b&fields=c` → `["a","b","c"]`. */
+function toCommaList(value: unknown): unknown[] {
+  return toArray(value).flatMap((entry) =>
+    typeof entry === "string"
+      ? entry
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean)
+      : [entry],
+  );
+}
+
+/** Item fields an item list can be narrowed to with `fields`. */
+export const itemFieldSchema = z.enum([
+  "id",
+  "kind",
+  "title",
+  "url",
+  "notes",
+  "data",
+  "source",
+  "categoryIds",
+  "tags",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+]);
+export type ItemField = z.infer<typeof itemFieldSchema>;
+
 function toOptionalBoolean(value: unknown): unknown {
   if (value === undefined || typeof value === "boolean") return value;
   if (value === "true") return true;
@@ -245,5 +274,7 @@ export const itemListQuerySchema = z.object({
   includeDeleted: z.preprocess(toOptionalBoolean, z.boolean().optional()),
   /** Lists exclusively soft-deleted items (the trash view). Gated the same as `includeDeleted`. */
   deletedOnly: z.preprocess(toOptionalBoolean, z.boolean().optional()),
+  /** Returns only these fields per item (plus `id`); every field when empty. */
+  fields: z.preprocess(toCommaList, z.array(itemFieldSchema)).default([]),
 });
 export type ItemListQuery = z.infer<typeof itemListQuerySchema>;

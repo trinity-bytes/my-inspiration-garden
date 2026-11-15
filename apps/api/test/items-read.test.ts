@@ -196,6 +196,52 @@ describe("GET /api/items filters", () => {
     expect(res.status).toBe(200);
   });
 
+  describe("fields", () => {
+    it("returns only the requested fields, always including id", async () => {
+      await insertItem("fields-item", {
+        title: "Fieldsword",
+        notes: "hidden",
+        searchText: "alpha",
+      });
+      const res = await SELF.fetch("https://example.com/api/items?q=fieldsword&fields=title,tags");
+      expect(res.status).toBe(200);
+      const body = await res.json<{ items: Record<string, unknown>[]; nextCursor: unknown }>();
+      expect(body.items).toEqual([{ id: "fields-item", title: "Fieldsword", tags: [] }]);
+      expect(body).toHaveProperty("nextCursor");
+    });
+
+    it("accepts repeated fields params the same as a comma list", async () => {
+      await insertItem("fields-repeat", { title: "Fieldsrepeat" });
+      const res = await SELF.fetch(
+        "https://example.com/api/items?q=fieldsrepeat&fields=kind&fields=title",
+      );
+      const body = await res.json<{ items: Record<string, unknown>[] }>();
+      expect(body.items).toEqual([{ id: "fields-repeat", kind: "text", title: "Fieldsrepeat" }]);
+    });
+
+    it("leaves out a requested field the item does not have", async () => {
+      await insertItem("fields-missing", { title: "Fieldsmissing" });
+      const res = await SELF.fetch("https://example.com/api/items?q=fieldsmissing&fields=url");
+      const body = await res.json<{ items: Record<string, unknown>[] }>();
+      expect(body.items).toEqual([{ id: "fields-missing" }]);
+    });
+
+    it("rejects an unknown field", async () => {
+      const res = await SELF.fetch("https://example.com/api/items?fields=title,secret");
+      expect(res.status).toBe(400);
+      const body = await res.json<{ error: { code: string } }>();
+      expect(body.error.code).toBe("invalid_query");
+    });
+
+    it("returns full items when fields is absent", async () => {
+      await insertItem("fields-full", { title: "Fieldsfull", notes: "kept" });
+      const res = await SELF.fetch("https://example.com/api/items?q=fieldsfull");
+      const body = await res.json<{ items: Record<string, unknown>[] }>();
+      expect(body.items[0]).toMatchObject({ id: "fields-full", notes: "kept", kind: "text" });
+      expect(body.items[0]).toHaveProperty("data");
+    });
+  });
+
   it("does not error on special characters in q", async () => {
     const res = await SELF.fetch(
       `https://example.com/api/items?q=${encodeURIComponent('"weird" OR (query) NOT* stuff')}`,
