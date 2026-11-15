@@ -117,6 +117,89 @@ describe("FilterPanel", () => {
     expect(screen.getByRole("button", { name: "ui (3)" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  describe("tag list", () => {
+    const manyTags = Array.from({ length: 15 }, (_, index) => ({
+      id: `m${index}`,
+      name: `tag-${String.fromCharCode(97 + index)}`,
+      count: index + 1,
+    }));
+
+    function tagNames(): string[] {
+      const group = screen.getByRole("group", { name: "Tags" });
+      return Array.from(group.querySelectorAll<HTMLButtonElement>("[data-tag]")).map(
+        (button) => button.dataset.tag ?? "",
+      );
+    }
+
+    function renderPanel(props: Partial<Parameters<typeof FilterPanel>[0]> = {}) {
+      return render(
+        <FilterPanel
+          isOpen
+          filters={defaultFilterState()}
+          onChange={vi.fn()}
+          categories={categories}
+          tags={manyTags}
+          {...props}
+        />,
+      );
+    }
+
+    it("lists the most used tags first and switches to A–Z", () => {
+      renderPanel({ tags: [...tags, { id: "t3", name: "amber", count: 2 }] });
+      expect(tagNames()).toEqual(["ui", "amber", "warm"]);
+      expect(screen.getByRole("button", { name: "Most used" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "A–Z" }));
+      expect(tagNames()).toEqual(["amber", "ui", "warm"]);
+      expect(screen.getByRole("button", { name: "A–Z" })).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("shows the 12 most used tags until Show all is pressed", () => {
+      renderPanel();
+      expect(tagNames()).toHaveLength(12);
+      expect(tagNames()).not.toContain("tag-a");
+
+      fireEvent.click(screen.getByRole("button", { name: "Show all 15" }));
+      expect(tagNames()).toHaveLength(15);
+
+      fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+      expect(tagNames()).toHaveLength(12);
+    });
+
+    it("keeps a selected tag visible even when it is outside the 12 most used", () => {
+      renderPanel({ filters: { ...defaultFilterState(), tags: ["tag-a"] } });
+      expect(tagNames()).toHaveLength(13);
+      expect(screen.getByRole("button", { name: "tag-a (1)" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    it("filters tags by name and reports how many match", () => {
+      renderPanel();
+      fireEvent.change(screen.getByRole("searchbox", { name: "Filter tags" }), {
+        target: { value: "TAG-B" },
+      });
+      expect(tagNames()).toEqual(["tag-b"]);
+      expect(screen.getByText("1 of 15 tags")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Show all/ })).not.toBeInTheDocument();
+    });
+
+    it("offers Manage tags only when a handler is given", () => {
+      const onManageTags = vi.fn();
+      const { unmount } = renderPanel();
+      expect(screen.queryByRole("button", { name: "Manage tags" })).not.toBeInTheDocument();
+      unmount();
+
+      renderPanel({ onManageTags });
+      fireEvent.click(screen.getByRole("button", { name: "Manage tags" }));
+      expect(onManageTags).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("selects a preset color swatch", () => {
     const onChange = vi.fn();
     render(

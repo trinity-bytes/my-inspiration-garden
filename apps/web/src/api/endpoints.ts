@@ -210,6 +210,25 @@ export function getTags(): Promise<TagsResult> {
   return apiFetch("/api/tags", { schema: tagsResultSchema });
 }
 
+export type TagWithCountResult = z.infer<typeof tagWithCountSchema>;
+
+/**
+ * `PATCH /api/tags/:id` — owner-only rename. When another tag already has
+ * the new name, the server merges into it and returns that tag.
+ */
+export function renameTag(id: string, name: string): Promise<TagWithCountResult> {
+  return apiFetch(`/api/tags/${encodeURIComponent(id)}`, {
+    schema: tagWithCountSchema,
+    method: "PATCH",
+    body: { name },
+  });
+}
+
+/** `DELETE /api/tags/:id` — owner-only. Removes the tag from every item; the items stay (204). */
+export function deleteTag(id: string): Promise<void> {
+  return apiFetch(`/api/tags/${encodeURIComponent(id)}`, { schema: z.void(), method: "DELETE" });
+}
+
 const sessionResultSchema = z.object({ role: z.enum(["owner", "visitor"]) });
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 

@@ -151,6 +151,51 @@ describe("GET /api/items filters", () => {
     expect(body.items.map((i) => i.id)).toContain("fts-tag-item");
   });
 
+  it("matches partial words as prefixes", async () => {
+    await insertItem("fts-prefix-item", { title: "Inspirational Prefixword Poster" });
+    const res = await SELF.fetch("https://example.com/api/items?q=prefixw");
+    const body = await res.json<{ items: { id: string }[] }>();
+    expect(body.items.map((i) => i.id)).toContain("fts-prefix-item");
+  });
+
+  it.each([
+    ["link", { description: "Descriptionlinkword gallery" }],
+    [
+      "image",
+      {
+        r2Key: "media/x.webp",
+        width: 1,
+        height: 1,
+        mime: "image/webp",
+        description: "Descriptionimageword",
+      },
+    ],
+  ])("matches a %s item's description by prefix", async (kind, data) => {
+    const word = kind === "link" ? "descriptionlink" : "descriptionimage";
+    await insertItem(`fts-desc-${kind}`, { kind, data });
+    const res = await SELF.fetch(`https://example.com/api/items?q=${word}`);
+    const body = await res.json<{ items: { id: string }[] }>();
+    expect(body.items.map((i) => i.id)).toContain(`fts-desc-${kind}`);
+  });
+
+  it("matches every word in any order and across fields", async () => {
+    await insertItem("fts-order-item", { title: "Orderzeta logo", notes: "orderalpha palette" });
+    await insertItem("fts-order-miss", { title: "Orderzeta only" });
+    const res = await SELF.fetch("https://example.com/api/items?q=ordera%20orderz");
+    const body = await res.json<{ items: { id: string }[] }>();
+    const ids = body.items.map((i) => i.id);
+    expect(ids).toContain("fts-order-item");
+    expect(ids).not.toContain("fts-order-miss");
+  });
+
+  it.each([
+    ["punctuation", "- * ()"],
+    ["quotes", '"'],
+  ])("does not error when q is only %s", async (_label, q) => {
+    const res = await SELF.fetch(`https://example.com/api/items?q=${encodeURIComponent(q)}`);
+    expect(res.status).toBe(200);
+  });
+
   it("does not error on special characters in q", async () => {
     const res = await SELF.fetch(
       `https://example.com/api/items?q=${encodeURIComponent('"weird" OR (query) NOT* stuff')}`,

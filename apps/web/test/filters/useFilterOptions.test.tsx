@@ -9,6 +9,7 @@ vi.mock("../../src/api/endpoints", () => ({
 
 import { getCategoryTree, getTags } from "../../src/api/endpoints";
 import { invalidateCategories } from "../../src/categories/categories-store";
+import { invalidateTags } from "../../src/tags/tags-store";
 
 describe("useFilterOptions", () => {
   it("starts empty and fills in categories and tags once both loads resolve", async () => {
@@ -67,5 +68,18 @@ describe("useFilterOptions", () => {
       ]),
     );
     expect(result.current.tags).toEqual(tags);
+  });
+
+  it("refetches tags after invalidateTags() is called (tag manager invalidation)", async () => {
+    vi.mocked(getCategoryTree).mockResolvedValue({ categories: [] });
+    vi.mocked(getTags).mockResolvedValue({ tags: [{ id: "t1", name: "ui", count: 1 }] });
+
+    const { result } = renderHook(() => useFilterOptions());
+    await waitFor(() => expect(result.current.tags).toEqual([{ id: "t1", name: "ui", count: 1 }]));
+
+    vi.mocked(getTags).mockResolvedValue({ tags: [{ id: "t2", name: "ux", count: 4 }] });
+    invalidateTags();
+
+    await waitFor(() => expect(result.current.tags).toEqual([{ id: "t2", name: "ux", count: 4 }]));
   });
 });
