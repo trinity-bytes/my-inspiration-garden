@@ -18,11 +18,14 @@ export const sourceSchema = z.union([
 
 export const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, "must be a #RRGGBB hex color");
 
-/** Free-form tags: normalized (trim + lowercase), deduplicated, empty strings dropped. */
-export const tagsSchema = z
-  .array(z.string())
-  .default([])
-  .transform((tags) => {
-    const normalized = tags.map(normalizeTag).filter((tag) => tag.length > 0);
-    return Array.from(new Set(normalized));
-  });
+/**
+ * Free-form tag list: normalized (trim + lowercase), deduplicated, empty strings
+ * dropped. No default, so a partial update can tell "omitted" from "cleared".
+ */
+export const tagListSchema = z.array(z.string()).transform((tags) => {
+  const normalized = tags.map(normalizeTag).filter((tag) => tag.length > 0);
+  return Array.from(new Set(normalized));
+});
+
+/** Tags on a full item or create payload: an omitted list means no tags. */
+export const tagsSchema = tagListSchema.default([]);
