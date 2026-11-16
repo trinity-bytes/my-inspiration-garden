@@ -5,6 +5,7 @@ import {
   idSchema,
   isoDateTimeSchema,
   sourceSchema,
+  tagListSchema,
   tagsSchema,
 } from "./primitives";
 
@@ -186,11 +187,15 @@ export type CreateItemInput = z.infer<typeof createItemInputSchema>;
  * update never leaves a kind's `data` in an inconsistent shape.
  *
  * An omitted field keeps its stored value, so `null` is how a patch clears an
- * optional one. A link item's `url` is required and stays non-nullable.
+ * optional one, and `[]` is how it clears `tags` or `categoryIds`. A link
+ * item's `url` is required and stays non-nullable.
  */
 const clearableFields = {
   title: itemCore.title.nullable(),
   notes: itemCore.notes.nullable(),
+  // No defaults here: an omitted list must keep the stored one, not clear it.
+  categoryIds: z.array(idSchema).optional(),
+  tags: tagListSchema.optional(),
 };
 const clearableUrl = { url: z.url().nullable().optional() };
 
