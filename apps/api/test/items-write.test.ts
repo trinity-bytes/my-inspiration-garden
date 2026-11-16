@@ -92,6 +92,40 @@ describe("PATCH /api/items/:id", () => {
     expect(kindMismatch.status).toBe(422);
   });
 
+  it("keeps stored tags and categoryIds when the patch omits them", async () => {
+    const auth = await writeToken("write-update-keep", "ig_write_update_keep");
+    const catId = "66666666-6666-4666-8666-666666666666";
+    await insertCategory(catId, { name: "Keep Cat", slug: "keep-cat" });
+    const created = await createItem(auth, {
+      kind: "text",
+      source: "web",
+      data: { body: "hi" },
+      tags: ["keep", "these"],
+      categoryIds: [catId],
+    });
+    const item = await created.json<{ id: string }>();
+
+    const patched = await SELF.fetch(`https://example.com/api/items/${item.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...auth },
+      body: JSON.stringify({ kind: "text", title: "Renamed only" }),
+    });
+    expect(patched.status).toBe(200);
+    const patchedBody = await patched.json<{ tags: string[]; categoryIds: string[] }>();
+    expect([...patchedBody.tags].sort()).toEqual(["keep", "these"]);
+    expect(patchedBody.categoryIds).toEqual([catId]);
+
+    const stored = await SELF.fetch(`https://example.com/api/items/${item.id}`);
+    const storedBody = await stored.json<{
+      title: string;
+      tags: string[];
+      categoryIds: string[];
+    }>();
+    expect(storedBody.title).toBe("Renamed only");
+    expect([...storedBody.tags].sort()).toEqual(["keep", "these"]);
+    expect(storedBody.categoryIds).toEqual([catId]);
+  });
+
   it("validates categoryIds on update and reports a missing item before a bad category", async () => {
     const auth = await writeToken("write-update-cats", "ig_write_update_cats");
     const catId = "44444444-4444-4444-8444-444444444444";
