@@ -12,6 +12,10 @@
 
 # Inspiration Garden
 
+<a href="https://github.com/Gentleman-Programming/gentle-ai">
+  <img width="220" src="https://raw.githubusercontent.com/Gentleman-Programming/gentle-ai/main/docs/assets/brand/built-with-gentle-ai.png" alt="Built with Gentle-AI" />
+</a>
+
 A personal, omnidirectional infinite canvas for collecting inspiration from across the web —
 images, links, texts, videos, color palettes and fonts. Anyone can browse it from any device;
 only the owner and owner-issued agent tokens can write to it.
